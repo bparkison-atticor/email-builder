@@ -1,0 +1,1434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Email Builder</title>
+<link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
+<!--
+  HOW TO RUN
+  This file uses ES modules and CDN imports, which browsers block on file://.
+  You must serve it over http://. Pick one:
+
+  Option A (easiest, Windows): double-click "Email Builder.bat" in this folder.
+    It starts a local server and opens the app automatically.
+
+  Option B (any OS): open a terminal in this folder and run one of:
+      python -m http.server 8080
+      npx serve .
+    then open http://localhost:8080/ (or the port shown) in a browser.
+
+  Requires internet — Quill, MJML, and esm.sh load from CDN at runtime.
+
+  EDITING TEMPLATES
+  Scroll to the "TEMPLATE CONFIGS" block in the <script> below. Each brand is a single
+  object — replace banner URL, CTA color hex, and footer HTML. Add new brands by
+  copying one of the existing entries.
+-->
+<style>
+  :root {
+    --bg: #fafafa;
+    --panel-bg: #ffffff;
+    --border: #e5e5e5;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --success: #10b981;
+    --danger: #dc2626;
+    --radius: 6px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+  .app {
+    display: grid;
+    grid-template-columns: 420px 1fr;
+    height: 100vh;
+  }
+  .panel {
+    overflow-y: auto;
+    background: var(--panel-bg);
+  }
+  .form-panel {
+    padding: 20px;
+    border-right: 1px solid var(--border);
+  }
+  h1 {
+    font-size: 18px;
+    margin: 0 0 18px;
+    font-weight: 600;
+  }
+  .field { margin-bottom: 12px; }
+  label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+  input[type="text"], textarea, select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font);
+    font-size: 13px;
+    background: white;
+    color: var(--text);
+  }
+  input[type="text"]:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+  input[type="text"].invalid,
+  input[type="text"].invalid:focus {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+  }
+  textarea {
+    resize: vertical;
+    min-height: 100px;
+    line-height: 1.5;
+  }
+  textarea.mono-textarea {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    min-height: 60px;
+    white-space: pre;
+    overflow: hidden;
+    resize: none;
+  }
+  .hint.error { color: var(--danger); }
+  .hint.success { color: #047857; }
+  #ctaDestinationLabel,
+  #ctaDestinationHint { transition: opacity 0.12s ease; }
+  #ctaDestinationLabel.fading,
+  #ctaDestinationHint.fading { opacity: 0; }
+  .rich-editor-wrap {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: white;
+    overflow: hidden;
+  }
+  .rich-editor-wrap:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+  .rich-editor-wrap.invalid,
+  .rich-editor-wrap.invalid:focus-within {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+  }
+  .rich-editor-wrap .ql-toolbar {
+    border: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    background: #fafafa;
+    padding: 6px 8px;
+  }
+  .rich-editor-wrap .ql-container {
+    border: none !important;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+  }
+  .rich-editor-wrap .ql-editor {
+    min-height: 120px;
+    padding: 10px 12px;
+    line-height: 1.5;
+  }
+  .rich-editor-wrap .ql-editor.ql-blank::before {
+    font-style: normal;
+    color: #9b9b9b;
+    left: 12px;
+    right: 12px;
+  }
+  .preview-panel {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+  }
+  .preview-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--panel-bg);
+  }
+  button {
+    font-family: var(--font);
+    font-size: 13px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary.copied { background: var(--success); }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-3px); }
+    75% { transform: translateX(3px); }
+  }
+  .copy-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .copy-error {
+    font-size: 12px;
+    color: var(--danger);
+    font-weight: 500;
+    display: none;
+    max-width: 220px;
+    text-align: right;
+    line-height: 1.3;
+  }
+  .copy-error.visible { display: block; }
+  .preview-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .preview-stage {
+    flex: 1;
+    min-height: 0;
+    background: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    overflow: auto;
+  }
+  .preview-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #ffffff;
+    transition: width 0.25s ease;
+  }
+  .preview-stage.mobile .preview-iframe {
+    width: 375px;
+    max-width: 100%;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    margin: 16px 0;
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .warn {
+    font-size: 12px;
+    color: var(--danger);
+    padding: 10px 20px;
+    background: #fef2f2;
+    border-bottom: 1px solid #fecaca;
+    display: none;
+  }
+  .warn.visible { display: block; }
+
+  /* ---------- Form panel cards (ENH-001) ---------- */
+  .seg {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 10px;
+  }
+  .seg.seg-cta  { background: #f7f7f8; border-color: #e0e0e2; }
+  .seg.seg-test { background: #fffaf0; border-color: #fde68a; }
+  .seg.seg-meta { background: transparent; border: none; padding: 0; margin-bottom: 18px; }
+  .seg-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .seg-title {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .seg-tag {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: #f3f4f6;
+    padding: 2px 7px;
+    border-radius: 3px;
+  }
+  .seg.seg-test .seg-tag { background: #fef3c7; color: #b45309; }
+  .seg-desc {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: auto;
+    font-weight: 500;
+  }
+  .seg.seg-meta .field { margin-bottom: 10px; }
+  .seg.seg-meta .field:last-child { margin-bottom: 0; }
+
+  /* ---------- Segmented control (shared: CTA destination + viewport) ---------- */
+  .seg-control {
+    display: inline-flex;
+    background: #f3f4f6;
+    border-radius: 6px;
+    padding: 2px;
+    gap: 2px;
+    width: 100%;
+  }
+  .seg-control button {
+    flex: 1;
+    background: transparent;
+    border: none;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 7px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .seg-control button .ico {
+    width: 13px;
+    height: 13px;
+    color: currentColor;
+    opacity: 0.85;
+  }
+  .seg-control button.active {
+    background: #fff;
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+
+  /* ---------- CTA preview chip ---------- */
+  .cta-preview {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: #fff;
+    border-radius: 6px;
+    border: 1px dashed var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .cta-preview .btn {
+    background: #000;
+    color: #fff;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 10px 22px;
+    border-radius: 4px;
+  }
+
+  /* ---------- Top bar: divider, switch, toolbar buttons ---------- */
+  .divider {
+    width: 1px;
+    height: 22px;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .switch:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  .switch .track {
+    width: 28px;
+    height: 16px;
+    background: #d4d4d8;
+    border-radius: 999px;
+    position: relative;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .switch .track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.15s;
+  }
+  .switch.on .track { background: var(--accent); }
+  .switch.on .track::after { transform: translateX(12px); }
+  .switch.on { color: var(--text); }
+
+  .btn-toolbar {
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color 0.15s;
+  }
+  .btn-toolbar:hover { background: #f5f5f5; }
+  .btn-toolbar .ico { width: 14px; height: 14px; flex-shrink: 0; }
+  .btn-toolbar.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .btn-toolbar.primary:hover { background: var(--accent-hover); }
+  .btn-toolbar.primary.copied {
+    background: var(--success);
+    border-color: var(--success);
+  }
+  .btn-toolbar.primary.error {
+    background: var(--danger);
+    border-color: var(--danger);
+    animation: shake 0.3s ease-in-out;
+  }
+  .btn-toolbar.primary.error:hover { background: var(--danger); }
+
+  /* Raw HTML modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 24px;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal {
+    background: white;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 920px;
+    height: 80vh;
+    max-height: 720px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+  }
+  .modal-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-header h2 {
+    margin: 0;
+    font-size: 14px;
+    color: var(--text);
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 600;
+  }
+  .modal-close {
+    background: transparent;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: var(--muted);
+    padding: 0;
+    line-height: 1;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+  }
+  .modal-close:hover { background: #f5f5f5; color: var(--text); }
+  .modal-body {
+    flex: 1;
+    min-height: 0;
+    padding: 16px 20px;
+    display: flex;
+  }
+  .modal-body textarea {
+    width: 100%;
+    height: 100%;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre;
+    overflow: auto;
+    resize: none;
+    background: #fafafa;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+  }
+  .modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .modal-meta {
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="panel form-panel">
+    <h1>Email Builder</h1>
+
+    <div class="seg seg-meta">
+      <div class="field">
+        <label for="template">Template</label>
+        <select id="template"></select>
+      </div>
+      <div class="field">
+        <label for="preheader">Preheader</label>
+        <input type="text" id="preheader" maxlength="150" placeholder="e.g. See if you qualify for benefits today" />
+        <div class="hint">Appears next to the subject in the inbox. <span id="preheaderCount">0</span> chars · aim for under 90. Subject line is set in SendGrid, not here.</div>
+      </div>
+    </div>
+
+    <div class="seg">
+      <div class="seg-head">
+        <span class="seg-title">Body</span>
+        <span class="seg-tag">above CTA</span>
+      </div>
+      <div class="rich-editor-wrap">
+        <div id="bodyAbove"></div>
+      </div>
+    </div>
+
+    <div class="seg seg-cta">
+      <div class="seg-head">
+        <span class="seg-title">Call to action</span>
+      </div>
+      <div class="field">
+        <label for="ctaText">Button text</label>
+        <input type="text" id="ctaText" placeholder="e.g. Check My Eligibility" />
+      </div>
+      <div class="field">
+        <label>Destination</label>
+        <div class="seg-control" role="tablist" aria-label="Destination type">
+          <button type="button" class="active" data-cta-type="phone" aria-pressed="true">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/>
+            </svg>
+            Phone
+          </button>
+          <button type="button" data-cta-type="variable" aria-pressed="false">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+            URL variable
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <label id="ctaDestinationLabel" for="ctaDestination">Phone number</label>
+        <input type="text" id="ctaDestination" placeholder="555-123-4567" />
+        <div class="hint" id="ctaDestinationHint">Any format — non-digits stripped for tel: link.</div>
+      </div>
+      <div class="cta-preview" aria-hidden="true">
+        <span class="btn" id="ctaPreviewBtn">Click Here</span>
+      </div>
+    </div>
+
+    <div class="seg">
+      <div class="seg-head">
+        <span class="seg-title">Body</span>
+        <span class="seg-tag">below CTA</span>
+        <span class="seg-desc">optional</span>
+      </div>
+      <div class="rich-editor-wrap">
+        <div id="bodyBelow"></div>
+      </div>
+    </div>
+
+    <div class="seg seg-test">
+      <div class="seg-head">
+        <span class="seg-title">Test data</span>
+        <span class="seg-tag">preview only</span>
+      </div>
+      <div class="field">
+        <textarea id="testData" class="mono-textarea" spellcheck="false" placeholder='{ "Client": { "FirstName": "James" } }'></textarea>
+        <div class="hint" id="testDataHint">Substitutes <span style="font-family:ui-monospace,Consolas,monospace">{{Client.FirstName}}</span> tokens in the live preview. Copied HTML is unaffected.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel preview-panel">
+    <div class="preview-header">
+      <div class="preview-header-left">
+        <div class="seg-control" role="group" aria-label="Viewport" style="width:auto">
+          <button type="button" class="active" data-vp="desktop" aria-pressed="true">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="2" y="3" width="20" height="14" rx="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            Desktop
+          </button>
+          <button type="button" data-vp="mobile" aria-pressed="false">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="5" y="2" width="14" height="20" rx="2"/>
+              <line x1="12" y1="18" x2="12" y2="18"/>
+            </svg>
+            Mobile
+          </button>
+        </div>
+        <span class="divider" aria-hidden="true"></span>
+        <span class="switch on" role="switch" aria-checked="true" tabindex="0" id="testDataSwitch" title="Substitute {{tokens}} in preview">
+          <span class="track"></span>
+          Test data
+        </span>
+      </div>
+      <div class="copy-group">
+        <div class="copy-error" id="copyError"></div>
+        <button type="button" class="btn-toolbar" id="viewHtmlBtn">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="16 18 22 12 16 6"/>
+            <polyline points="8 6 2 12 8 18"/>
+          </svg>
+          <span class="label">View HTML</span>
+        </button>
+        <button type="button" class="btn-toolbar primary" id="copyBtn">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          <span class="label">Copy HTML</span>
+        </button>
+      </div>
+    </div>
+    <div class="warn" id="warn"></div>
+    <div class="preview-stage" id="previewStage">
+      <iframe class="preview-iframe" id="preview" title="Email preview"></iframe>
+    </div>
+  </div>
+</div>
+
+<!-- Raw HTML inspection modal -->
+<div class="modal-overlay" id="htmlModal" role="dialog" aria-modal="true" aria-labelledby="htmlModalTitle">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="htmlModalTitle">Raw HTML output</h2>
+      <button class="modal-close" id="htmlModalClose" aria-label="Close" title="Close (Esc)">×</button>
+    </div>
+    <div class="modal-body">
+      <textarea id="rawHtml" readonly spellcheck="false"></textarea>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-meta" id="htmlMeta"></span>
+      <button class="btn-primary" id="copyFromModal">Copy HTML</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import mjml2html from 'https://esm.sh/mjml-browser@4.15.3';
+
+// ============================================================
+// TEMPLATE CONFIGS — edit brand assets here.
+//   bannerImageUrl     — publicly hosted image URL (CDN / SendGrid)
+//   bannerHref         — optional; wraps banner in a clickable link
+//   ctaBackgroundColor — brand hex, used for CTA button fill
+//   ctaTextColor       — usually #ffffff
+//   unsubscribeHtml    — standalone unsubscribe link (rendered as its own block,
+//                        matches SendGrid's template pattern). Use {{{unsubscribe}}}.
+//   disclosureHtml     — legal/compliance copy (address, dynamic fields, etc.)
+// ============================================================
+const DEFAULT_UNSUBSCRIBE = `<a href="{{{unsubscribe}}}" style="color:#6b6b6b;text-decoration:underline;">Unsubscribe</a>`;
+
+const templates = {
+  postmanLaw: {
+    name: "Postman Law",
+    bannerImageUrl: "https://cdn.mcauto-images-production.sendgrid.net/53a6f228e7d10c92/92844aec-254b-4cfb-94fb-f35d4a47c76c/1875x469.png",
+    bannerAlt: "Postman Law",
+    bannerWidth: "600px",
+    bannerHref: "https://www.postmanlaw.com",
+    ctaBackgroundColor: "#000000",
+    ctaTextColor: "#ffffff",
+    unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
+    disclosureHtml: `
+      <p style="font-size:12px;margin:0 0 8px 0;">***</p>
+      <p style="font-size:16px;margin:0 0 6px 0;"><strong>The Postman Promise</strong></p>
+      <p style="font-size:13px;margin:0 0 14px 0;">Ease, Speed, Results</p>
+      <p style="font-size:12px;margin:0 0 16px 0;">Postman Law is a results-driven personal injury law firm that brings a passionate, experienced, and caring approach to helping injured clients. Our promise is simple: to fight tirelessly to get our clients the justice and compensation they deserve—fast and with as little stress as possible.</p>
+      <p style="margin:0 0 10px 0;">You have received this email because you contacted Postman Law to represent you in a potential {{CaseType.FriendlyName}} claim. If you no longer wish to receive these messages, please contact us immediately.</p>
+      <p style="margin:0 0 4px 0;">This message was sent to: {{Client.Email}}</p>
+      <p style="margin:0 0 4px 0;">This message was sent by: Postman Law</p>
+      <p style="margin:0;">150 N. Riverside Plaza, Suite 4100, Chicago, IL 60606</p>
+    `
+  },
+  nationalDisabilityCenter: {
+    name: "National Disability Center",
+    bannerImageUrl: "https://cdn.mcauto-images-production.sendgrid.net/53a6f228e7d10c92/9e0b2f4d-4afb-4e1b-9963-fcdb65c3dccb/587x185.png",
+    bannerAlt: "National Disability Center",
+    bannerWidth: "600px",
+    ctaBackgroundColor: "#333333",
+    ctaTextColor: "#ffffff",
+    unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
+    disclosureHtml: `
+      <p style="margin:0 0 10px 0;">You are receiving this email because you contacted Disability Benefit Center about a potential {{CaseType.CaseName}} claim. Use the unsubscribe link above to opt out at any time.</p>
+      <p style="margin:0 0 4px 0;">This message was sent to: {{Client.Email}}</p>
+      <p style="margin:0 0 4px 0;">This message was sent by: Disability Benefit Center</p>
+      <p style="margin:0;">100 Grandview Pl, Suite 530, Birmingham, AL 35243</p>
+    `
+  },
+  wettermarkKeith: {
+    name: "Wettermark Keith",
+    bannerImageUrl: "https://cdn.mcauto-images-production.sendgrid.net/53a6f228e7d10c92/e7e3bc1e-0aa2-4716-9f6c-94dc32b0072b/3750x938.png",
+    bannerAlt: "Wettermark Keith",
+    bannerWidth: "600px",
+    bannerHref: "https://wkfirm.com",
+    ctaBackgroundColor: "#000000",
+    ctaTextColor: "#ffffff",
+    unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
+    disclosureHtml: `
+      <p style="font-size:12px;margin:0 0 6px 0;">* * *</p>
+      <p style="font-size:12px;margin:0 0 14px 0;">At Wettermark Keith, we represent individuals and families across the Southeast in personal injury, Social Security Disability, and VA disability claims. When you hire us, you get a team committed to justice, recovery, and results. You owe nothing unless we win for you.</p>
+      <p style="margin:0 0 10px 0;">You have received this email because you contacted Wettermark Keith to represent you in a potential {{Case.CaseType}} claim. If you no longer wish to receive these messages, please contact us immediately.</p>
+      <p style="margin:0 0 4px 0;">This message was sent to: {{Client.Email}}</p>
+      <p style="margin:0 0 4px 0;">This message was sent by: Wettermark Keith</p>
+      <p style="margin:0;">100 Grandview Pl, Suite 530, Birmingham AL 35243</p>
+    `
+  }
+};
+// ============================================================
+
+const DEFAULT_FONT = "Arial, Helvetica, sans-serif";
+
+// Populate template dropdown
+const templateSelect = document.getElementById('template');
+Object.entries(templates).forEach(([key, tpl]) => {
+  const opt = document.createElement('option');
+  opt.value = key;
+  opt.textContent = tpl.name;
+  templateSelect.appendChild(opt);
+});
+
+const els = {
+  template: templateSelect,
+  preheader: document.getElementById('preheader'),
+  preheaderCount: document.getElementById('preheaderCount'),
+  ctaText: document.getElementById('ctaText'),
+  ctaDestination: document.getElementById('ctaDestination'),
+  ctaDestinationLabel: document.getElementById('ctaDestinationLabel'),
+  ctaDestinationHint: document.getElementById('ctaDestinationHint'),
+  preview: document.getElementById('preview'),
+  copyBtn: document.getElementById('copyBtn'),
+  warn: document.getElementById('warn'),
+  testData: document.getElementById('testData'),
+  testDataHint: document.getElementById('testDataHint')
+};
+
+els.preheader.addEventListener('input', () => {
+  els.preheaderCount.textContent = els.preheader.value.length;
+});
+
+// --- Quill rich text editors ---
+// Override the default link sanitizer so {{variable}}, tel:, and other non-URL
+// patterns are accepted without being stripped or mangled.
+const QuillLink = Quill.import('formats/link');
+class PassthroughLink extends QuillLink {
+  static sanitize(url) { return url; }
+}
+Quill.register(PassthroughLink, true);
+
+const richToolbar = [['bold', 'link'], [{ list: 'ordered' }, { list: 'bullet' }]];
+// Whitelist only the formats our toolbar exposes. This also governs paste:
+// anything pasted with other formats (italic, color, headers, images, tables,
+// base64 data URLs, etc.) gets stripped to plain text on the way in.
+const allowedFormats = ['bold', 'link', 'list'];
+
+const bodyAboveQuill = new Quill('#bodyAbove', {
+  modules: { toolbar: [...richToolbar] },
+  formats: [...allowedFormats],
+  theme: 'snow',
+  placeholder: 'Enter copy. Bold, lists, and links supported.'
+});
+
+const bodyBelowQuill = new Quill('#bodyBelow', {
+  modules: { toolbar: [...richToolbar] },
+  formats: [...allowedFormats],
+  theme: 'snow',
+  placeholder: 'Optional.'
+});
+
+const ctaTypeButtons = document.querySelectorAll('.seg-control button[data-cta-type]');
+function getCtaType() {
+  const active = document.querySelector('.seg-control button[data-cta-type].active');
+  return active ? active.dataset.ctaType : 'phone';
+}
+
+let ctaFieldFadeTimer;
+function updateCtaFields() {
+  const type = getCtaType();
+  const nextLabel = type === 'phone' ? 'Phone number' : 'Variable name';
+  const nextPlaceholder = type === 'phone' ? '555-123-4567' : 'eligibilityLink';
+  const nextHint = type === 'phone'
+    ? 'Any format — non-digits stripped for tel: link.'
+    : 'Wrapped as {{variable}} in output (Handlebars).';
+  // Skip the fade when nothing changes (e.g. initial render or rapid double-
+  // toggle of the active button) — fading identical content reads as a flicker.
+  if (els.ctaDestinationLabel.textContent !== nextLabel) {
+    clearTimeout(ctaFieldFadeTimer);
+    els.ctaDestinationLabel.classList.add('fading');
+    els.ctaDestinationHint.classList.add('fading');
+    ctaFieldFadeTimer = setTimeout(() => {
+      els.ctaDestinationLabel.textContent = nextLabel;
+      els.ctaDestinationHint.textContent = nextHint;
+      els.ctaDestination.placeholder = nextPlaceholder;
+      els.ctaDestinationLabel.classList.remove('fading');
+      els.ctaDestinationHint.classList.remove('fading');
+    }, 120);
+  }
+  scheduleRender();
+}
+function wireSegControl(buttons, onChange) {
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      buttons.forEach(b => {
+        const isActive = b === btn;
+        b.classList.toggle('active', isActive);
+        b.setAttribute('aria-pressed', String(isActive));
+      });
+      onChange(btn);
+    });
+  });
+}
+wireSegControl(ctaTypeButtons, () => updateCtaFields());
+
+// Escapes the 5 standard chars for both HTML text and XML attributes.
+// Note: &#39; instead of &apos; — &apos; wasn't valid in HTML4 and Outlook's
+// Word-based render engine can be unreliable with it. Numeric entity is universal.
+function escapeHtml(str) {
+  return (str == null ? '' : String(str))
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Matches US phone numbers with separators between the 3-3-4 groups. The
+// separator requirement keeps us from auto-linking arbitrary 10-digit strings
+// (order IDs, account numbers). Optional leading +1 / 1 country code.
+const PHONE_REGEX = /\b(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/g;
+
+function autoLinkPhones(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (node.parentNode.closest('a')) return NodeFilter.FILTER_REJECT;
+      // Reset lastIndex — PHONE_REGEX has /g, so .test() is stateful and would
+      // otherwise skip past the start of the next text node and miss matches.
+      PHONE_REGEX.lastIndex = 0;
+      return PHONE_REGEX.test(node.nodeValue)
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_SKIP;
+    }
+  });
+  const targets = [];
+  let n;
+  while ((n = walker.nextNode())) targets.push(n);
+
+  targets.forEach(node => {
+    const text = node.nodeValue;
+    const frag = document.createDocumentFragment();
+    let lastIdx = 0;
+    PHONE_REGEX.lastIndex = 0;
+    let m;
+    while ((m = PHONE_REGEX.exec(text)) !== null) {
+      if (m.index > lastIdx) {
+        frag.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
+      }
+      const a = document.createElement('a');
+      const digits = m[0].replace(/[^\d+]/g, '');
+      a.setAttribute('href', `tel:${digits}`);
+      a.setAttribute('style', 'color:#0000ee;text-decoration:underline;');
+      a.setAttribute('data-autolinked', 'phone');
+      a.textContent = m[0];
+      frag.appendChild(a);
+      lastIdx = m.index + m[0].length;
+    }
+    if (lastIdx < text.length) {
+      frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+    }
+    node.parentNode.replaceChild(frag, node);
+  });
+}
+
+function richTextToMjText(html, tpl) {
+  if (!html) return '';
+  // Strip empty paragraphs Quill inserts when the user hits Enter twice.
+  const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
+  if (!cleaned || cleaned === '<p></p>') return '';
+
+  // Parse into a DOM so we can normalize styling for email clients, which
+  // don't collapse margins like browsers and vary wildly on default list styles.
+  const div = document.createElement('div');
+  div.innerHTML = cleaned;
+
+  // Quill 2 quirk: ALL lists (bullet and numbered) are stored as <ol> in the DOM,
+  // with a data-list attribute on each <li> distinguishing "bullet" vs "ordered".
+  // Quill's own CSS renders the correct marker, but email clients see the literal
+  // <ol> and render numbered. We convert to semantically correct <ul>/<ol> here,
+  // splitting into multiple lists if a single <ol> contains mixed item types.
+  div.querySelectorAll('.ql-ui').forEach(n => n.remove());
+  div.querySelectorAll('ol').forEach(ol => {
+    const items = Array.from(ol.children).filter(c => c.tagName === 'LI');
+    if (!items.length) return;
+    const groups = [];
+    let current = null;
+    items.forEach(li => {
+      const type = li.getAttribute('data-list') === 'bullet' ? 'ul' : 'ol';
+      if (!current || current.type !== type) {
+        current = { type, items: [] };
+        groups.push(current);
+      }
+      current.items.push(li);
+      li.removeAttribute('data-list');
+    });
+    if (groups.length === 1 && groups[0].type === 'ol') return; // already correct
+    const fragment = document.createDocumentFragment();
+    groups.forEach(g => {
+      const listEl = document.createElement(g.type);
+      g.items.forEach(li => listEl.appendChild(li));
+      fragment.appendChild(listEl);
+    });
+    ol.parentNode.replaceChild(fragment, ol);
+  });
+
+  // Auto-link plaintext phone numbers in body copy. Requires separators between
+  // the 3-3-4 groups so we don't catch order IDs or other long digit runs.
+  autoLinkPhones(div);
+
+  // Links: brand color + target="_blank". Auto-linked phones keep their own
+  // standard-blue style and don't need target=_blank (tel: links don't navigate).
+  div.querySelectorAll('a:not([data-autolinked])').forEach(a => {
+    a.setAttribute('style', `color:${tpl.ctaBackgroundColor};text-decoration:underline;`);
+    a.setAttribute('target', '_blank');
+  });
+
+  // Paragraphs: consistent 14px bottom margin, zero top.
+  div.querySelectorAll('p').forEach(p => {
+    p.setAttribute('style', 'margin:0 0 14px 0;');
+  });
+
+  // Lists: reset default margins, give a predictable indent.
+  div.querySelectorAll('ul, ol').forEach(list => {
+    list.setAttribute('style', 'margin:0 0 14px 0;padding-left:24px;');
+  });
+  div.querySelectorAll('li').forEach(li => {
+    li.setAttribute('style', 'margin:0 0 6px 0;');
+  });
+
+  // Zero the last block's bottom margin so the mj-text padding doesn't double up.
+  const last = div.lastElementChild;
+  if (last && ['P', 'UL', 'OL'].includes(last.tagName)) {
+    last.setAttribute('style', last.getAttribute('style').replace(/margin:[^;]*;?/, 'margin:0;'));
+  }
+
+  return `        <mj-text padding="0 0 14px 0">\n          ${div.innerHTML}\n        </mj-text>`;
+}
+
+function buildCtaHref() {
+  const type = getCtaType();
+  const value = (els.ctaDestination.value || '').trim();
+  if (!value) return '#';
+  if (type === 'phone') {
+    const digits = value.replace(/[^\d+]/g, '');
+    return `tel:${digits}`;
+  }
+  return `{{${value}}}`;
+}
+
+function buildMjml() {
+  const tpl = templates[els.template.value];
+  if (!tpl) return '';
+  const ctaText = (els.ctaText.value || '').trim() || 'Click Here';
+  const ctaHref = buildCtaHref();
+  // tel: links must not open in a new tab — iOS Mail silently fails the
+  // dial intent when target=_blank. Web URLs keep the default _blank with
+  // rel=noopener noreferrer to prevent reverse-tabnabbing.
+  const isPhone = getCtaType() === 'phone';
+  const ctaTarget = isPhone ? '_self' : '_blank';
+  const ctaRelAttr = isPhone ? '' : ' rel="noopener noreferrer"';
+  const preheader = (els.preheader.value || '').trim();
+  const previewTag = preheader
+    ? `<mj-preview>${escapeHtml(preheader)}</mj-preview>\n    `
+    : '';
+  const bannerHrefAttr = tpl.bannerHref
+    ? ` href="${escapeHtml(tpl.bannerHref)}"`
+    : '';
+
+  return `<mjml>
+  <mj-head>
+    ${previewTag}<mj-raw>
+      <meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no" />
+      <meta name="x-apple-disable-message-reformatting" />
+    </mj-raw>
+    <mj-style>
+      a[x-apple-data-detectors] {
+        color: inherit !important;
+        text-decoration: none !important;
+        font-size: inherit !important;
+        font-family: inherit !important;
+        font-weight: inherit !important;
+        line-height: inherit !important;
+      }
+    </mj-style>
+    <mj-attributes>
+      <mj-all font-family="${DEFAULT_FONT}" />
+      <mj-text font-size="16px" line-height="1.5" color="#333333" />
+      <mj-button font-size="16px" font-weight="600" border-radius="4px" inner-padding="14px 28px" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#f4f4f4">
+    <mj-section padding="0" background-color="#ffffff">
+      <mj-column>
+        <mj-image src="${escapeHtml(tpl.bannerImageUrl)}" alt="${escapeHtml(tpl.bannerAlt)}" width="${escapeHtml(tpl.bannerWidth)}" padding="0"${bannerHrefAttr} />
+      </mj-column>
+    </mj-section>
+    <mj-section padding="28px 24px 8px 24px" background-color="#ffffff">
+      <mj-column>
+${richTextToMjText(bodyAboveQuill.root.innerHTML, tpl)}
+        <mj-button href="${escapeHtml(ctaHref)}" target="${ctaTarget}"${ctaRelAttr} background-color="${tpl.ctaBackgroundColor}" color="${tpl.ctaTextColor}" padding="14px 0 18px 0">
+          ${escapeHtml(ctaText)}
+        </mj-button>
+${richTextToMjText(bodyBelowQuill.root.innerHTML, tpl)}
+      </mj-column>
+    </mj-section>
+    <mj-section padding="16px 24px 4px 24px" background-color="#f1f1f1">
+      <mj-column>
+        <mj-text font-size="12px" color="#6b6b6b" align="center" padding="12px 0">
+          ${tpl.unsubscribeHtml}
+        </mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section padding="0 24px 24px 24px" background-color="#f1f1f1">
+      <mj-column>
+        <mj-text font-size="11px" color="#6b6b6b" align="center" line-height="1.6">
+          ${tpl.disclosureHtml}
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>`;
+}
+
+let lastHtml = '';
+
+// --- Test data (preview-only Handlebars substitution) ---
+// Mirrors SendGrid's "test data" panel: parses a JSON object and resolves
+// {{Path.To.Value}} tokens in the rendered HTML so authors can see real
+// names/links instead of raw tokens. Only affects the iframe preview —
+// lastHtml (used by Copy HTML and the raw HTML modal) keeps tokens intact.
+const TEST_DATA_STORAGE_KEY = 'emailBuilder.testData';
+const SAMPLE_TEST_DATA = {
+  Client: {
+    FirstName: "James",
+    LastName: "Harper",
+    Email: "jharper78@example.com",
+    Phone: "555-123-4567",
+    ClientID: "CLJ-20230801-4521"
+  },
+  Request: {
+    UniqueUrl: "https://kellerpostman.com/claim-review/jharper78"
+  },
+  CaseType: {
+    FriendlyName: "personal injury",
+    CaseName: "Social Security Disability"
+  },
+  Case: {
+    CaseType: "personal injury"
+  }
+};
+
+let testData = {};
+let testDataValid = true;
+let testDataEnabled = localStorage.getItem('emailBuilder.testDataEnabled') !== 'false';
+
+// Triple-brace tokens are unescaped in Handlebars/SendGrid; double-brace are HTML-escaped.
+// The path uses \w + dots, so block helpers ({{#if}}, {{/if}}, {{else}}, {{!comment}}) are
+// naturally skipped — they contain non-word chars that don't match this pattern.
+const HANDLEBARS_TOKEN = /\{\{(\{)?\s*([\w.]+)\s*(\})?\}\}/g;
+
+function resolveTokenPath(obj, path) {
+  return path.split('.').reduce((acc, key) => (acc == null ? acc : acc[key]), obj);
+}
+
+function applyTestData(html) {
+  if (!testDataEnabled || !testDataValid) return html;
+  return html.replace(HANDLEBARS_TOKEN, (match, openTriple, path, closeTriple) => {
+    // Only treat as triple-brace if both sides match — otherwise it's a malformed token; skip.
+    const isTriple = !!openTriple && !!closeTriple;
+    if (!!openTriple !== !!closeTriple) return match;
+
+    // SendGrid injects {{{unsubscribe}}} at send time; in preview, give it a harmless href.
+    if (path === 'unsubscribe' && resolveTokenPath(testData, path) === undefined) {
+      return '#unsubscribe-preview';
+    }
+
+    const value = resolveTokenPath(testData, path);
+    if (value === undefined || value === null) return match; // visible-on-miss
+    return isTriple ? String(value) : escapeHtml(value);
+  });
+}
+
+function setTestDataHint(text, kind) {
+  els.testDataHint.textContent = text;
+  els.testDataHint.classList.remove('error', 'success');
+  if (kind) els.testDataHint.classList.add(kind);
+}
+
+function loadTestData() {
+  const stored = localStorage.getItem(TEST_DATA_STORAGE_KEY);
+  if (stored !== null) {
+    els.testData.value = stored;
+  } else {
+    els.testData.value = JSON.stringify(SAMPLE_TEST_DATA, null, 2);
+  }
+  parseTestData();
+}
+
+function parseTestData() {
+  const raw = els.testData.value.trim();
+  if (!raw) {
+    testData = {};
+    testDataValid = true;
+    els.testData.classList.remove('invalid');
+    setTestDataHint('Empty — preview will show raw {{tokens}}.', null);
+    return;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new Error('Root must be a JSON object');
+    }
+    testData = parsed;
+    testDataValid = true;
+    els.testData.classList.remove('invalid');
+    setTestDataHint('JSON parsed · preview substitution active.', 'success');
+  } catch (e) {
+    testDataValid = false;
+    els.testData.classList.add('invalid');
+    setTestDataHint(`Invalid JSON: ${e.message}`, 'error');
+  }
+}
+
+function autoSizeTestData() {
+  els.testData.style.height = 'auto';
+  els.testData.style.height = els.testData.scrollHeight + 'px';
+}
+
+els.testData.addEventListener('input', () => {
+  autoSizeTestData();
+  parseTestData();
+  localStorage.setItem(TEST_DATA_STORAGE_KEY, els.testData.value);
+  scheduleRender();
+});
+
+function showWarn(msg) {
+  if (!msg) { els.warn.classList.remove('visible'); els.warn.textContent = ''; return; }
+  els.warn.textContent = msg;
+  els.warn.classList.add('visible');
+}
+
+function render() {
+  const mjml = buildMjml();
+  try {
+    const result = mjml2html(mjml, { validationLevel: 'soft' });
+    lastHtml = result.html;
+    // Preview gets test-data substitution; lastHtml stays pure for Copy HTML / modal.
+    els.preview.srcdoc = applyTestData(result.html);
+
+    // Aggregate non-fatal warnings from template state + MJML compiler output.
+    const warnings = [];
+    const tpl = templates[els.template.value];
+    if (tpl.bannerImageUrl.startsWith('REPLACE_')) {
+      warnings.push('Banner image URL is a placeholder — edit templates in index.html.');
+    }
+    if (result.errors && result.errors.length) {
+      // MJML errors in 'soft' mode are warnings — compilation still succeeded.
+      const msgs = result.errors.slice(0, 3).map(e => e.formattedMessage || e.message);
+      const suffix = result.errors.length > 3 ? ` (+${result.errors.length - 3} more)` : '';
+      warnings.push(`MJML warning: ${msgs.join('; ')}${suffix}`);
+    }
+    showWarn(warnings.join(' · '));
+  } catch (e) {
+    lastHtml = '';
+    els.preview.srcdoc = `<pre style="color:#dc2626;padding:20px;font-family:monospace;">MJML error:\n${escapeHtml(e.message)}</pre>`;
+    showWarn('MJML compilation failed. See preview.');
+  }
+}
+
+let renderTimer;
+function scheduleRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(render, 150);
+}
+
+['template', 'preheader', 'ctaText', 'ctaDestination'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', scheduleRender);
+  el.addEventListener('change', scheduleRender);
+});
+
+bodyAboveQuill.on('text-change', scheduleRender);
+bodyBelowQuill.on('text-change', scheduleRender);
+
+// Viewport toggle (segmented control in the preview top bar)
+const viewportButtons = document.querySelectorAll('.seg-control button[data-vp]');
+const previewStage = document.getElementById('previewStage');
+wireSegControl(viewportButtons, (btn) => {
+  previewStage.classList.toggle('mobile', btn.dataset.vp === 'mobile');
+});
+
+// Test-data substitution toggle (preview only — never affects copied HTML).
+// Single switch element replaces the previous two-button toggle.
+const testDataSwitch = document.getElementById('testDataSwitch');
+function syncTestDataSwitch() {
+  testDataSwitch.classList.toggle('on', testDataEnabled);
+  testDataSwitch.setAttribute('aria-checked', String(testDataEnabled));
+}
+function flipTestData() {
+  testDataEnabled = !testDataEnabled;
+  localStorage.setItem('emailBuilder.testDataEnabled', String(testDataEnabled));
+  syncTestDataSwitch();
+  scheduleRender();
+}
+testDataSwitch.addEventListener('click', flipTestData);
+testDataSwitch.addEventListener('keydown', (e) => {
+  if (e.key === ' ' || e.key === 'Enter') {
+    e.preventDefault();
+    flipTestData();
+  }
+});
+syncTestDataSwitch();
+
+// CTA preview chip — re-renders on CTA text edits and template switches so the
+// dashed chip mirrors what the email button will look like.
+const ctaPreviewBtn = document.getElementById('ctaPreviewBtn');
+function updateCtaPreview() {
+  const tpl = templates[els.template.value];
+  const text = (els.ctaText.value || '').trim() || 'Click Here';
+  ctaPreviewBtn.textContent = text;
+  if (tpl && tpl.ctaBackgroundColor) ctaPreviewBtn.style.backgroundColor = tpl.ctaBackgroundColor;
+  if (tpl && tpl.ctaTextColor) ctaPreviewBtn.style.color = tpl.ctaTextColor;
+}
+els.ctaText.addEventListener('input', updateCtaPreview);
+els.template.addEventListener('change', updateCtaPreview);
+
+// Copy validation
+function hasRichContent(quill) {
+  const html = quill.root.innerHTML;
+  const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
+  return !!(cleaned && cleaned !== '<p></p>');
+}
+
+function isValidPhone(value) {
+  if (!value) return false;
+  // Allow only phone-appropriate chars (digits, spaces, dashes, dots, parens, optional leading +)
+  if (!/^\+?[\d\s().\-]+$/.test(value)) return false;
+  // 7–15 digits covers US local through international E.164 length.
+  const digits = value.replace(/\D/g, '');
+  return digits.length >= 7 && digits.length <= 15;
+}
+
+// Invalid-field highlighting
+const bodyAboveWrap = document.getElementById('bodyAbove').closest('.rich-editor-wrap');
+const invalidEls = new Set();
+function markInvalid(el) {
+  if (!el) return;
+  el.classList.add('invalid');
+  invalidEls.add(el);
+}
+function clearAllInvalid() {
+  invalidEls.forEach(el => el.classList.remove('invalid'));
+  invalidEls.clear();
+}
+// Clear a field's invalid state the moment the user starts fixing it.
+els.ctaText.addEventListener('input', () => {
+  els.ctaText.classList.remove('invalid');
+  invalidEls.delete(els.ctaText);
+});
+els.ctaDestination.addEventListener('input', () => {
+  els.ctaDestination.classList.remove('invalid');
+  invalidEls.delete(els.ctaDestination);
+});
+bodyAboveQuill.on('text-change', () => {
+  bodyAboveWrap.classList.remove('invalid');
+  invalidEls.delete(bodyAboveWrap);
+});
+
+const copyErrorEl = document.getElementById('copyError');
+let copyErrorTimer;
+function showCopyError(msg) {
+  clearTimeout(copyErrorTimer);
+  copyErrorEl.textContent = msg;
+  copyErrorEl.classList.add('visible');
+  els.copyBtn.classList.remove('error');
+  // Force reflow so the shake re-triggers on repeated clicks.
+  void els.copyBtn.offsetWidth;
+  els.copyBtn.classList.add('error');
+  copyErrorTimer = setTimeout(() => {
+    copyErrorEl.classList.remove('visible');
+    els.copyBtn.classList.remove('error');
+    clearAllInvalid();
+  }, 4000);
+}
+
+els.copyBtn.addEventListener('click', async () => {
+  const result = await runCopyAction();
+  if (result === 'copied') flashCopyButton(els.copyBtn, 'Copied', 'copied');
+  else if (result === 'copy-failed') flashCopyButton(els.copyBtn, 'Copy failed', null);
+  // 'validation-failed' is already surfaced by showCopyError + field highlights
+});
+
+// Returns: 'copied' | 'validation-failed' | 'copy-failed' | 'no-html'
+// Shared by the main Copy HTML button and the modal's Copy button.
+async function runCopyAction() {
+  clearAllInvalid();
+  const missing = [];
+  if (!hasRichContent(bodyAboveQuill)) {
+    missing.push('body copy');
+    markInvalid(bodyAboveWrap);
+  }
+  if (!els.ctaText.value.trim()) {
+    missing.push('CTA text');
+    markInvalid(els.ctaText);
+  }
+
+  let phoneFormatError = false;
+  if (getCtaType() === 'phone') {
+    const ctaDest = els.ctaDestination.value.trim();
+    if (!ctaDest) {
+      missing.push('phone number');
+      markInvalid(els.ctaDestination);
+    } else if (!isValidPhone(ctaDest)) {
+      phoneFormatError = true;
+      markInvalid(els.ctaDestination);
+    }
+  }
+
+  if (missing.length) {
+    showCopyError(`Add ${missing.join(' and ')}`);
+    return 'validation-failed';
+  }
+  if (phoneFormatError) {
+    showCopyError('Check phone number format');
+    return 'validation-failed';
+  }
+
+  if (!lastHtml) { render(); if (!lastHtml) return 'no-html'; }
+
+  try {
+    await navigator.clipboard.writeText(lastHtml);
+    return 'copied';
+  } catch {
+    // Fallback for non-secure contexts (e.g. file:// in some browsers)
+    const ta = document.createElement('textarea');
+    ta.value = lastHtml;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch {}
+    document.body.removeChild(ta);
+    return ok ? 'copied' : 'copy-failed';
+  }
+}
+
+function flashCopyButton(btn, label, cls) {
+  // Buttons may contain an inline <svg> icon plus a <span class="label">. Update
+  // the label span if present (preserves the icon); otherwise fall back to
+  // textContent for plain-text buttons (e.g. the modal's Copy button).
+  const labelEl = btn.querySelector('.label');
+  const original = labelEl ? labelEl.textContent : 'Copy HTML';
+  if (labelEl) labelEl.textContent = label;
+  else btn.textContent = label;
+  if (cls) btn.classList.add(cls);
+  setTimeout(() => {
+    if (labelEl) labelEl.textContent = original;
+    else btn.textContent = original;
+    if (cls) btn.classList.remove(cls);
+  }, 1500);
+}
+
+// --- Raw HTML inspection modal ---
+const htmlModal = document.getElementById('htmlModal');
+const htmlModalClose = document.getElementById('htmlModalClose');
+const rawHtmlEl = document.getElementById('rawHtml');
+const htmlMeta = document.getElementById('htmlMeta');
+const viewHtmlBtn = document.getElementById('viewHtmlBtn');
+const copyFromModal = document.getElementById('copyFromModal');
+
+function openHtmlModal() {
+  const html = lastHtml || '';
+  rawHtmlEl.value = html;
+  const kb = (new Blob([html]).size / 1024).toFixed(1);
+  const lines = html ? html.split('\n').length : 0;
+  htmlMeta.textContent = `${kb} KB · ${html.length.toLocaleString()} chars · ${lines.toLocaleString()} lines`;
+  htmlModal.classList.add('visible');
+  setTimeout(() => { rawHtmlEl.focus(); rawHtmlEl.setSelectionRange(0, 0); }, 50);
+}
+function closeHtmlModal() {
+  htmlModal.classList.remove('visible');
+}
+viewHtmlBtn.addEventListener('click', openHtmlModal);
+htmlModalClose.addEventListener('click', closeHtmlModal);
+htmlModal.addEventListener('click', (e) => {
+  if (e.target === htmlModal) closeHtmlModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && htmlModal.classList.contains('visible')) closeHtmlModal();
+});
+copyFromModal.addEventListener('click', async () => {
+  const result = await runCopyAction();
+  if (result === 'copied') flashCopyButton(copyFromModal, 'Copied', 'copied');
+  else if (result === 'copy-failed') flashCopyButton(copyFromModal, 'Copy failed', null);
+  else if (result === 'validation-failed') closeHtmlModal();
+});
+
+loadTestData();
+autoSizeTestData();
+updateCtaPreview();
+render();
+</script>
+</body>
+</html>

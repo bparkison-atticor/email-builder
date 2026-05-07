@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Email Builder · Preview Top Bar</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f4f4f5; }
+  .root {
+    --bg: #fafafa;
+    --panel-bg: #ffffff;
+    --border: #e5e5e5;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --muted-2: #9b9b9b;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --radius: 6px;
+    color: var(--text);
+    font-size: 14px;
+  }
+  .stage-wrap { background: white; }
+  .stage-wrap + .stage-wrap { border-top: 1px solid var(--border); }
+  .row {
+    background: white;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .left { display: flex; align-items: center; gap: 12px; min-width: 0; flex-wrap: wrap; }
+  .right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .iframe-mock {
+    background: #f0f0f0;
+    height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #aaa;
+    font-size: 12px;
+  }
+  .meta {
+    font-size: 11px;
+    color: var(--muted);
+    background: #f4f4f5;
+    border-bottom: 1px solid var(--border);
+    padding: 6px 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 600;
+  }
+  /* primitives */
+  .btn {
+    font: 500 13px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: white;
+    color: var(--text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .btn.primary:hover { background: var(--accent-hover); }
+  .btn:hover:not(.primary) { background: #f5f5f5; }
+  .icon { width: 14px; height: 14px; flex-shrink: 0; }
+  .seg {
+    display: inline-flex;
+    background: #f3f4f6;
+    border-radius: 6px;
+    padding: 2px;
+    gap: 2px;
+  }
+  .seg button {
+    background: transparent;
+    border: none;
+    font: 500 12px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .seg button.on {
+    background: white;
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+  .group-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--muted-2);
+  }
+  .divider {
+    width: 1px;
+    height: 22px;
+    background: var(--border);
+  }
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .switch .track {
+    width: 28px;
+    height: 16px;
+    background: #d4d4d8;
+    border-radius: 999px;
+    position: relative;
+    transition: background 0.15s;
+  }
+  .switch .track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.15s;
+  }
+  .switch.on .track { background: var(--accent); }
+  .switch.on .track::after { transform: translateX(12px); }
+  .switch.on { color: var(--text); }
+  .pageTitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
+  }
+  .badge {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #fef3c7;
+    color: #b45309;
+  }
+  /* Current row mimic */
+  .currentH2 {
+    margin: 0;
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 700;
+  }
+  .currentToggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .currentToggle button {
+    padding: 5px 10px;
+    background: white;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+  }
+  .currentToggle button + button { border-left: 1px solid var(--border); }
+  .currentToggle button.on { background: var(--text); color: white; }
+</style>
+</head>
+<body>
+<div id="root" class="root"></div>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel">
+const { DesignCanvas, DCSection, DCArtboard } = window;
+
+const Phone = (p) => (<svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>);
+const Desktop = (p) => (<svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>);
+const Code = (p) => (<svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>);
+const Copy = (p) => (<svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>);
+
+const IframeStub = ({ label = 'preview iframe' }) => (
+  <div className="iframe-mock">{label}</div>
+);
+
+/* Reference: current bar */
+const Current = () => (
+  <div className="stage-wrap">
+    <div className="meta">Current</div>
+    <div className="row">
+      <div className="left">
+        <h2 className="currentH2">Preview</h2>
+        <div className="currentToggle">
+          <button className="on">Desktop</button>
+          <button>Mobile</button>
+        </div>
+        <h2 className="currentH2">Test Data</h2>
+        <div className="currentToggle">
+          <button className="on">Show</button>
+          <button>Hide</button>
+        </div>
+      </div>
+      <div className="right">
+        <button className="btn">View HTML</button>
+        <button className="btn primary">Copy HTML</button>
+      </div>
+    </div>
+    <IframeStub />
+  </div>
+);
+
+/* T1 — Single segmented control for viewport, Test Data becomes a labeled toggle switch.
+   "Preview" / "Test Data" labels removed (the controls themselves communicate the function). */
+const T1 = () => {
+  const [vp, setVp] = React.useState('desktop');
+  const [td, setTd] = React.useState(true);
+  return (
+    <div className="stage-wrap">
+      <div className="meta">T1 · Viewport segmented + Test data as toggle</div>
+      <div className="row">
+        <div className="left">
+          <div className="seg">
+            <button className={vp==='desktop'?'on':''} onClick={()=>setVp('desktop')}><Desktop /> Desktop</button>
+            <button className={vp==='mobile'?'on':''} onClick={()=>setVp('mobile')}><Phone /> Mobile</button>
+          </div>
+          <span className="divider" />
+          <span
+            className={`switch ${td?'on':''}`}
+            onClick={()=>setTd(!td)}
+          >
+            <span className="track" />
+            Test data
+          </span>
+        </div>
+        <div className="right">
+          <button className="btn"><Code /> View HTML</button>
+          <button className="btn primary"><Copy /> Copy HTML</button>
+        </div>
+      </div>
+      <IframeStub />
+    </div>
+  );
+};
+
+/* T2 — Two-row top bar: title strip on top, controls below.
+   Cleaner separation. Labels stay because the bar is roomier. */
+const T2 = () => {
+  const [vp, setVp] = React.useState('desktop');
+  const [td, setTd] = React.useState(true);
+  return (
+    <div className="stage-wrap">
+      <div className="meta">T2 · Two-row · title above, controls below</div>
+      <div className="row" style={{ paddingBottom: 6, borderBottom: 'none' }}>
+        <div className="left">
+          <h3 className="pageTitle">Preview</h3>
+          {td && <span className="badge">Test data on</span>}
+        </div>
+        <div className="right">
+          <button className="btn"><Code /> View HTML</button>
+          <button className="btn primary"><Copy /> Copy HTML</button>
+        </div>
+      </div>
+      <div className="row" style={{ paddingTop: 8 }}>
+        <div className="left">
+          <span className="group-label">Viewport</span>
+          <div className="seg">
+            <button className={vp==='desktop'?'on':''} onClick={()=>setVp('desktop')}><Desktop /> Desktop</button>
+            <button className={vp==='mobile'?'on':''} onClick={()=>setVp('mobile')}><Phone /> Mobile</button>
+          </div>
+          <span className="divider" />
+          <span
+            className={`switch ${td?'on':''}`}
+            onClick={()=>setTd(!td)}
+            title="Substitute {{tokens}} in preview"
+          >
+            <span className="track" />
+            Substitute test data
+          </span>
+        </div>
+        <div className="right" />
+      </div>
+      <IframeStub />
+    </div>
+  );
+};
+
+/* T3 — Single row, grouped with subtle inline labels, no redundant headings.
+   Controls stay visually separated by a divider. Compact, scannable. */
+const T3 = () => {
+  const [vp, setVp] = React.useState('desktop');
+  const [td, setTd] = React.useState(true);
+  return (
+    <div className="stage-wrap">
+      <div className="meta">T3 · Single row · inline mini-labels, divider</div>
+      <div className="row">
+        <div className="left">
+          <span className="group-label">Viewport</span>
+          <div className="seg">
+            <button className={vp==='desktop'?'on':''} onClick={()=>setVp('desktop')}><Desktop /> Desktop</button>
+            <button className={vp==='mobile'?'on':''} onClick={()=>setVp('mobile')}><Phone /> Mobile</button>
+          </div>
+          <span className="divider" />
+          <span
+            className={`switch ${td?'on':''}`}
+            onClick={()=>setTd(!td)}
+            title="Substitute Handlebars {{tokens}} in preview"
+          >
+            <span className="track" />
+            Test data
+          </span>
+        </div>
+        <div className="right">
+          <button className="btn"><Code /> View HTML</button>
+          <button className="btn primary"><Copy /> Copy HTML</button>
+        </div>
+      </div>
+      <IframeStub />
+    </div>
+  );
+};
+
+const App = () => (
+  <DesignCanvas title="Email Builder · Preview Top Bar" initialZoom={0.9}>
+    <DCSection id="explore" title="Top bar — preview & test data toggles">
+      <DCArtboard id="t1" label="T1 · Segmented + toggle switch" width={840} height={340}>
+        <T1 />
+      </DCArtboard>
+      <DCArtboard id="t3" label="T3 · Single row with mini-labels" width={840} height={340}>
+        <T3 />
+      </DCArtboard>
+      <DCArtboard id="t2" label="T2 · Two-row split" width={840} height={400}>
+        <T2 />
+      </DCArtboard>
+    </DCSection>
+    <DCSection id="ref" title="Current (for reference)">
+      <DCArtboard id="cur" label="Current top bar" width={840} height={340}>
+        <Current />
+      </DCArtboard>
+    </DCSection>
+  </DesignCanvas>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

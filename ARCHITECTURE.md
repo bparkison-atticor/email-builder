@@ -1,0 +1,62 @@
+# Architecture
+
+## Purpose
+
+Email Builder is a local, single-file browser tool that lets marketers assemble brand-templated SendGrid emails from copy and a CTA, outputting inlined HTML ready to paste into SendGrid's Code Editor. There is no backend, no API, and no deployment — the app runs entirely in the browser against a local HTTP server.
+
+## Entry Points
+
+- **`index.html`** — the sole entry point. Served at `http://127.0.0.1:8080/`. Contains all HTML structure, inline CSS, and a `<script type="module">` block with all application logic.
+- **`Email Builder.bat`** — Windows launcher. Double-click to start `python -m http.server` (or `npx serve` as fallback) and open the browser automatically.
+
+## Top-Level Layout
+
+- **`index.html`** — single-file app: HTML markup, `<style>` block, `<script type="module">`. All logic lives here.
+- **`Email Builder.bat`** — server launcher for Windows users.
+- **`README.md`** — end-user workflow docs; also documents the template config schema.
+- **`CHANGELOG.md`** — change log with detailed diffs per entry.
+- **`Claude Design Handoff - UI ENH-001/`** — mid-fidelity React/JSX prototypes used as design references for the panel/top-bar redesign; reference only, not production code.
+
+## Major Components / Layers
+
+All logic lives in `index.html`. Logical sections within the `<script type="module">` block:
+
+- **Template configs** (`TEMPLATE_CONFIGS` object, ~line 664) — per-brand assets: banner image URL, CTA colors, unsubscribe HTML, disclosure HTML. Three brands ship: Postman Law, National Disability Center, Wettermark Keith.
+- **Quill editors** — two `Quill` instances (`bodyAboveQuill`, `bodyBelowQuill`) for rich-text body copy above and below the CTA. Quill's link sanitizer is patched (`PassthroughLink`) to allow `tel:` URLs and Handlebars tokens.
+- **MJML build pipeline** — `buildMjml()` assembles an MJML string from form state; `render()` calls `mjml2html()` and writes the compiled HTML into a sandboxed `<iframe>`.
+- **Test data substitution** — `applyTestData()` / `parseTestData()` handle preview-only Handlebars token resolution (`{{dot.path}}` / `{{{triple}}}`) against a user-editable JSON object persisted in `localStorage`.
+- **Copy / output flow** — `runCopyAction()` validates required fields, compiles MJML, and copies to clipboard. `openHtmlModal()` / `closeHtmlModal()` manage the raw HTML inspection modal.
+- **UI controls** — `wireSegControl()` registers groups of `.seg-control button` elements as mutually exclusive toggles. `updateCtaPreview()` mirrors the active CTA button style live in the form panel.
+
+## Frameworks & External Dependencies
+
+All loaded from CDN at runtime — no lockfile, no install step:
+
+- **Quill 2** (jsDelivr CDN) — rich text editor for both body copy fields.
+- **mjml-browser 4.15.3** (esm.sh CDN) — MJML-to-HTML compilation in the browser.
+
+## Data Model
+
+No persistent data layer. State is held in:
+
+- DOM form values (template select, preheader, CTA text / type / destination)
+- Two Quill editor instances (body above / below CTA)
+- `localStorage` (test data JSON and toggle state)
+
+## Build & Run
+
+```
+# Start local server (pick one):
+python -m http.server 8080 --bind 127.0.0.1
+npx serve . -l tcp://127.0.0.1:8080
+
+# Then open:
+http://127.0.0.1:8080/
+```
+
+No build step required. Double-click `Email Builder.bat` on Windows for a one-click launch.
+
+## Decisions & Trade-offs
+
+_Add architectural decisions here as they're made. ADRs (one file per decision
+under `docs/decisions/`) are encouraged for non-trivial trade-offs._

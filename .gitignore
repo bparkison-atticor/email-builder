@@ -1,0 +1,23 @@
+# Obsidian vault config (this folder doubles as a vault — personal config, not source)
+.obsidian/
+
+# Claude Code per-user settings (shared agents/ stays tracked)
+.claude/settings.local.json
+.claude/.session*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# Logs / env
+*.log
+.env
+.env.local
+.env.*.local
+
+# Node (in case future tooling adds it)
+node_modules/

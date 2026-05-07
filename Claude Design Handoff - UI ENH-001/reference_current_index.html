@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Email Builder</title>
+<link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
+<!--
+  HOW TO RUN
+  Option A (simplest): double-click this file. Works in most modern browsers via file://.
+  Option B (most reliable, recommended): open a terminal in this folder and run one of:
+      npx serve .
+      python -m http.server 8080
+    then open http://localhost:<port>/ in a browser.
+
+  EDITING TEMPLATES
+  Scroll to the "TEMPLATE CONFIGS" block in the <script> below. Each brand is a single
+  object — replace banner URL, CTA color hex, and footer HTML. Add new brands by
+  copying one of the existing entries.
+-->
+<style>
+  :root {
+    --bg: #fafafa;
+    --panel-bg: #ffffff;
+    --border: #e5e5e5;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --success: #10b981;
+    --danger: #dc2626;
+    --radius: 6px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+  .app {
+    display: grid;
+    grid-template-columns: 420px 1fr;
+    height: 100vh;
+  }
+  .panel {
+    overflow-y: auto;
+    background: var(--panel-bg);
+  }
+  .form-panel {
+    padding: 20px;
+    border-right: 1px solid var(--border);
+  }
+  h1 {
+    font-size: 18px;
+    margin: 0 0 18px;
+    font-weight: 600;
+  }
+  h2 {
+    font-size: 11px;
+    margin: 18px 0 8px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 700;
+  }
+  h2:first-of-type { margin-top: 0; }
+  .field { margin-bottom: 12px; }
+  label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+  input[type="text"], textarea, select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font);
+    font-size: 13px;
+    background: white;
+    color: var(--text);
+  }
+  input[type="text"]:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+  input[type="text"].invalid,
+  input[type="text"].invalid:focus {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+  }
+  textarea {
+    resize: vertical;
+    min-height: 100px;
+    line-height: 1.5;
+  }
+  textarea.mono-textarea {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    min-height: 60px;
+    white-space: pre;
+    overflow: hidden;
+    resize: none;
+  }
+  .hint.error { color: var(--danger); }
+  .hint.success { color: #047857; }
+  .rich-editor-wrap {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: white;
+    overflow: hidden;
+  }
+  .rich-editor-wrap:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+  .rich-editor-wrap.invalid,
+  .rich-editor-wrap.invalid:focus-within {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+  }
+  .rich-editor-wrap .ql-toolbar {
+    border: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    background: #fafafa;
+    padding: 6px 8px;
+  }
+  .rich-editor-wrap .ql-container {
+    border: none !important;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+  }
+  .rich-editor-wrap .ql-editor {
+    min-height: 120px;
+    padding: 10px 12px;
+    line-height: 1.5;
+  }
+  .rich-editor-wrap .ql-editor.ql-blank::before {
+    font-style: normal;
+    color: #9b9b9b;
+    left: 12px;
+    right: 12px;
+  }
+  .radio-group {
+    display: flex;
+    gap: 16px;
+    margin-top: 2px;
+  }
+  .radio-group label {
+    display: inline-flex;
+    align-items: center;
+    font-weight: normal;
+    margin-bottom: 0;
+    cursor: pointer;
+  }
+  .radio-group input { margin-right: 6px; }
+  .preview-panel {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+  }
+  .preview-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--panel-bg);
+  }
+  .preview-header h2 { margin: 0; }
+  button {
+    font-family: var(--font);
+    font-size: 13px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary.copied { background: var(--success); }
+  .btn-primary.error { background: var(--danger); animation: shake 0.3s ease-in-out; }
+  .btn-primary.error:hover { background: var(--danger); }
+  .btn-secondary {
+    background: white;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: #f5f5f5; }
+  .btn-secondary.copied { background: var(--success); color: white; border-color: var(--success); }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-3px); }
+    75% { transform: translateX(3px); }
+  }
+  .copy-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .copy-error {
+    font-size: 12px;
+    color: var(--danger);
+    font-weight: 500;
+    display: none;
+    max-width: 220px;
+    text-align: right;
+    line-height: 1.3;
+  }
+  .copy-error.visible { display: block; }
+  .preview-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .viewport-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .vp-btn {
+    padding: 5px 10px;
+    background: white;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+    border: none;
+    border-radius: 0;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .vp-btn + .vp-btn { border-left: 1px solid var(--border); }
+  .vp-btn:hover:not(.active) { background: #f5f5f5; }
+  .vp-btn.active { background: var(--text); color: white; }
+  .preview-stage {
+    flex: 1;
+    min-height: 0;
+    background: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    overflow: auto;
+  }
+  .preview-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #ffffff;
+    transition: width 0.25s ease;
+  }
+  .preview-stage.mobile .preview-iframe {
+    width: 375px;
+    max-width: 100%;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    margin: 16px 0;
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .note {
+    padding: 8px 10px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: var(--radius);
+    font-size: 12px;
+    line-height: 1.45;
+    color: #78350f;
+    margin-bottom: 14px;
+  }
+  .note strong { color: #78350f; }
+  .warn {
+    font-size: 12px;
+    color: var(--danger);
+    padding: 10px 20px;
+    background: #fef2f2;
+    border-bottom: 1px solid #fecaca;
+    display: none;
+  }
+  .warn.visible { display: block; }
+
+  /* Raw HTML modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 24px;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal {
+    background: white;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 920px;
+    height: 80vh;
+    max-height: 720px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+  }
+  .modal-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-header h2 {
+    margin: 0;
+    font-size: 14px;
+    color: var(--text);
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 600;
+  }
+  .modal-close {
+    background: transparent;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: var(--muted);
+    padding: 0;
+    line-height: 1;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+  }
+  .modal-close:hover { background: #f5f5f5; color: var(--text); }
+  .modal-body {
+    flex: 1;
+    min-height: 0;
+    padding: 16px 20px;
+    display: flex;
+  }
+  .modal-body textarea {
+    width: 100%;
+    height: 100%;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre;
+    overflow: auto;
+    resize: none;
+    background: #fafafa;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+  }
+  .modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .modal-meta {
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="panel form-panel">
+    <h1>Email Builder</h1>
+
+    <h2>Template</h2>
+    <div class="field">
+      <select id="template"></select>
+    </div>
+
+    <h2>Subject</h2>
+    <div class="note">
+      <strong>Reminder:</strong> Subject lines aren't part of the HTML. Set it directly in SendGrid when creating the send.
+    </div>
+
+    <h2>Preheader</h2>
+    <div class="field">
+      <input type="text" id="preheader" maxlength="150" placeholder="e.g. See if you qualify for benefits today" />
+      <div class="hint">Appears next to the subject in the inbox. <span id="preheaderCount">0</span> chars · aim for under 90.</div>
+    </div>
+
+    <h2>Body — above CTA</h2>
+    <div class="field">
+      <div class="rich-editor-wrap">
+        <div id="bodyAbove"></div>
+      </div>
+    </div>
+
+    <h2>CTA</h2>
+    <div class="field">
+      <label for="ctaText">Button text</label>
+      <input type="text" id="ctaText" placeholder="e.g. Check My Eligibility" />
+    </div>
+    <div class="field">
+      <label>Destination type</label>
+      <div class="radio-group">
+        <label><input type="radio" name="ctaType" value="phone" checked /> Phone</label>
+        <label><input type="radio" name="ctaType" value="variable" /> URL variable</label>
+      </div>
+    </div>
+    <div class="field">
+      <label id="ctaDestinationLabel" for="ctaDestination">Phone number</label>
+      <input type="text" id="ctaDestination" placeholder="555-123-4567" />
+      <div class="hint" id="ctaDestinationHint">Any format — non-digits stripped for tel: link.</div>
+    </div>
+
+    <h2>Body — below CTA</h2>
+    <div class="field">
+      <div class="rich-editor-wrap">
+        <div id="bodyBelow"></div>
+      </div>
+    </div>
+
+    <h2>Test Data <span style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--muted)">— preview only</span></h2>
+    <div class="note">
+      <strong>Preview only.</strong> Substitutes Handlebars tokens (e.g. <span style="font-family:ui-monospace,Consolas,monospace">&#123;&#123;Client.FirstName&#125;&#125;</span>) in the live preview using the JSON below. <strong>Copy HTML output is unaffected</strong> — tokens stay intact for SendGrid.
+    </div>
+    <div class="field">
+      <textarea id="testData" class="mono-textarea" spellcheck="false" placeholder='{ "Client": { "FirstName": "James" } }'></textarea>
+      <div class="hint" id="testDataHint">Unresolved tokens stay visible in the preview so missing keys are obvious.</div>
+    </div>
+  </div>
+
+  <div class="panel preview-panel">
+    <div class="preview-header">
+      <div class="preview-header-left">
+        <h2>Preview</h2>
+        <div class="viewport-toggle" role="group" aria-label="Viewport">
+          <button type="button" class="vp-btn active" data-vp="desktop">Desktop</button>
+          <button type="button" class="vp-btn" data-vp="mobile">Mobile</button>
+        </div>
+        <h2>Test Data</h2>
+        <div class="viewport-toggle" role="group" aria-label="Test data substitution" title="Toggle Handlebars token substitution in the preview">
+          <button type="button" class="vp-btn active" data-td="on">Show</button>
+          <button type="button" class="vp-btn" data-td="off">Hide</button>
+        </div>
+      </div>
+      <div class="copy-group">
+        <div class="copy-error" id="copyError"></div>
+        <button class="btn-secondary" id="viewHtmlBtn">View HTML</button>
+        <button class="btn-primary" id="copyBtn">Copy HTML</button>
+      </div>
+    </div>
+    <div class="warn" id="warn"></div>
+    <div class="preview-stage" id="previewStage">
+      <iframe class="preview-iframe" id="preview" title="Email preview"></iframe>
+    </div>
+  </div>
+</div>
+
+<!-- Raw HTML inspection modal -->
+<div class="modal-overlay" id="htmlModal" role="dialog" aria-modal="true" aria-labelledby="htmlModalTitle">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="htmlModalTitle">Raw HTML output</h2>
+      <button class="modal-close" id="htmlModalClose" aria-label="Close" title="Close (Esc)">×</button>
+    </div>
+    <div class="modal-body">
+      <textarea id="rawHtml" readonly spellcheck="false"></textarea>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-meta" id="htmlMeta"></span>
+      <button class="btn-primary" id="copyFromModal">Copy HTML</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import mjml2html from 'https://esm.sh/mjml-browser@4.15.3';
+
+// ============================================================
+// TEMPLATE CONFIGS — edit brand assets here.
+//   bannerImageUrl     — publicly hosted image URL (CDN / SendGrid)
+//   bannerHref         — optional; wraps banner in a clickable link
+//   ctaBackgroundColor — brand hex, used for CTA button fill
+//   ctaTextColor       — usually #ffffff
+//   unsubscribeHtml    — standalone unsubscribe link (rendered as its own block,
+//                        matches SendGrid's template pattern). Use {{{unsubscribe}}}.
+//   disclosureHtml     — legal/compliance copy (address, dynamic fields, etc.)
+// ============================================================
+const DEFAULT_UNSUBSCRIBE = `<a href="{{{unsubscribe}}}" style="color:#6b6b6b;text-decoration:underline;">Unsubscribe</a>`;
+
+const templates = {
+  postmanLaw: {
+    name: "Postman Law",
+    bannerImageUrl: "https://cdn.mcauto-images-production.sendgrid.net/53a6f228e7d10c92/92844aec-254b-4cfb-94fb-f35d4a47c76c/1875x469.png",
+    bannerAlt: "Postman Law",
+    bannerWidth: "600px",
+    bannerHref: "https://www.postmanlaw.com",
+    ctaBackgroundColor: "#000000",
+    ctaTextColor: "#ffffff",
+    unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
+    disclosureHtml: `
+      <p style="font-size:12px;margin:0 0 8px 0;">***</p>
+      <p style="font-size:16px;margin:0 0 6px 0;"><strong>The Postman Promise</strong></p>
+      <p style="font-size:13px;margin:0 0 14px 0;">Ease, Speed, Results</p>
+      <p style="font-size:12px;margin:0 0 16px 0;">Postman Law is a results-driven personal injury law firm that brings a passionate, experienced, and caring approach to helping injured clients. Our promise is simple: to fight tirelessly to get our clients the justice and compensation they deserve—fast and with as little stress as possible.</p>
+      <p style="margin:0 0 10px 0;">You have received this email because you contacted Postman Law to represent you in a potential {{CaseType.FriendlyName}} claim. If you no longer wish to receive these messages, please contact us immediately.</p>
+      <p style="margin:0 0 4px 0;">This message was sent to: {{Client.Email}}</p>
+      <p style="margin:0 0 4px 0;">This message was sent by: Postman Law</p>
+      <p style="margin:0;">150 N. Riverside Plaza, Suite 4100, Chicago, IL 60606</p>
+    `
+  },
+  nationalDisabilityCenter: {
+    name: "National Disability Center",
+    bannerImageUrl: "https://cdn.mcauto-images-production.sendgrid.net/53a6f228e7d10c92/9e0b2f4d-4afb-4e1b-9963-fcdb65c3dccb/587x185.png",
+    bannerAlt: "National Disability Center",
+    bannerWidth: "600px",
+    ctaBackgroundColor: "#333333",
+    ctaTextColor: "#ffffff",
+    unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
+    disclosureHtml: `
+      <p style="margin:0 0 10px 0;">You are receiving this email because you contacted Disability Benefit Center about a potential {{CaseType.CaseName}} claim. Use the unsubscribe link above to opt out at any time.</p>
+      <p style="margin:0 0 4px 0;">This message was sent to: {{Client.Email}}</p>
+      <p style="margin:0 0 4px 0;">This message was sent by: Disability Benefit Center</p>
+      <p style="margin:0;">100 Grandview Pl, Suite 530, Birmingham, AL 35243</p>
+    `
+  },
+  wettermarkKeith: {
+    name: "Wettermark Keith",
+    bannerImageUrl: "https://cdn.mcauto-images-production.sendgrid.net/53a6f228e7d10c92/e7e3bc1e-0aa2-4716-9f6c-94dc32b0072b/3750x938.png",
+    bannerAlt: "Wettermark Keith",
+    bannerWidth: "600px",
+    bannerHref: "https://wkfirm.com",
+    ctaBackgroundColor: "#000000",
+    ctaTextColor: "#ffffff",
+    unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
+    disclosureHtml: `
+      <p style="font-size:12px;margin:0 0 6px 0;">* * *</p>
+      <p style="font-size:12px;margin:0 0 14px 0;">At Wettermark Keith, we represent individuals and families across the Southeast in personal injury, Social Security Disability, and VA disability claims. When you hire us, you get a team committed to justice, recovery, and results. You owe nothing unless we win for you.</p>
+      <p style="margin:0 0 10px 0;">You have received this email because you contacted Wettermark Keith to represent you in a potential {{Case.CaseType}} claim. If you no longer wish to receive these messages, please contact us immediately.</p>
+      <p style="margin:0 0 4px 0;">This message was sent to: {{Client.Email}}</p>
+      <p style="margin:0 0 4px 0;">This message was sent by: Wettermark Keith</p>
+      <p style="margin:0;">100 Grandview Pl, Suite 530, Birmingham AL 35243</p>
+    `
+  }
+};
+// ============================================================
+
+const DEFAULT_FONT = "Arial, Helvetica, sans-serif";
+
+// Populate template dropdown
+const templateSelect = document.getElementById('template');
+Object.entries(templates).forEach(([key, tpl]) => {
+  const opt = document.createElement('option');
+  opt.value = key;
+  opt.textContent = tpl.name;
+  templateSelect.appendChild(opt);
+});
+
+const els = {
+  template: templateSelect,
+  preheader: document.getElementById('preheader'),
+  preheaderCount: document.getElementById('preheaderCount'),
+  ctaText: document.getElementById('ctaText'),
+  ctaDestination: document.getElementById('ctaDestination'),
+  ctaDestinationLabel: document.getElementById('ctaDestinationLabel'),
+  ctaDestinationHint: document.getElementById('ctaDestinationHint'),
+  preview: document.getElementById('preview'),
+  copyBtn: document.getElementById('copyBtn'),
+  warn: document.getElementById('warn'),
+  testData: document.getElementById('testData'),
+  testDataHint: document.getElementById('testDataHint')
+};
+
+els.preheader.addEventListener('input', () => {
+  els.preheaderCount.textContent = els.preheader.value.length;
+});
+
+// --- Quill rich text editors ---
+// Override the default link sanitizer so {{variable}}, tel:, and other non-URL
+// patterns are accepted without being stripped or mangled.
+const QuillLink = Quill.import('formats/link');
+class PassthroughLink extends QuillLink {
+  static sanitize(url) { return url; }
+}
+Quill.register(PassthroughLink, true);
+
+const richToolbar = [['bold', 'link'], [{ list: 'ordered' }, { list: 'bullet' }]];
+// Whitelist only the formats our toolbar exposes. This also governs paste:
+// anything pasted with other formats (italic, color, headers, images, tables,
+// base64 data URLs, etc.) gets stripped to plain text on the way in.
+const allowedFormats = ['bold', 'link', 'list'];
+
+const bodyAboveQuill = new Quill('#bodyAbove', {
+  modules: { toolbar: [...richToolbar] },
+  formats: [...allowedFormats],
+  theme: 'snow',
+  placeholder: 'Enter copy. Bold, lists, and links supported.'
+});
+
+const bodyBelowQuill = new Quill('#bodyBelow', {
+  modules: { toolbar: [...richToolbar] },
+  formats: [...allowedFormats],
+  theme: 'snow',
+  placeholder: 'Optional.'
+});
+
+function getCtaType() {
+  return document.querySelector('input[name="ctaType"]:checked').value;
+}
+
+function updateCtaFields() {
+  const type = getCtaType();
+  if (type === 'phone') {
+    els.ctaDestinationLabel.textContent = 'Phone number';
+    els.ctaDestination.placeholder = '555-123-4567';
+    els.ctaDestinationHint.textContent = 'Any format — non-digits stripped for tel: link.';
+  } else {
+    els.ctaDestinationLabel.textContent = 'Variable name';
+    els.ctaDestination.placeholder = 'eligibilityLink';
+    els.ctaDestinationHint.textContent = 'Wrapped as {{variable}} in output (Handlebars).';
+  }
+  scheduleRender();
+}
+document.querySelectorAll('input[name="ctaType"]').forEach(r =>
+  r.addEventListener('change', updateCtaFields)
+);
+
+// --- MJML assembly ---
+function escapeXml(str) {
+  // Note: &#39; instead of &apos; — &apos; wasn't valid in HTML4 and Outlook's
+  // Word-based render engine can be unreliable with it. Numeric entity is universal.
+  return (str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Matches US phone numbers with separators between the 3-3-4 groups. The
+// separator requirement keeps us from auto-linking arbitrary 10-digit strings
+// (order IDs, account numbers). Optional leading +1 / 1 country code.
+const PHONE_REGEX = /\b(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/g;
+
+function autoLinkPhones(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (node.parentNode.closest('a')) return NodeFilter.FILTER_REJECT;
+      return PHONE_REGEX.test(node.nodeValue)
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_SKIP;
+    }
+  });
+  const targets = [];
+  let n;
+  while ((n = walker.nextNode())) targets.push(n);
+
+  targets.forEach(node => {
+    const text = node.nodeValue;
+    const frag = document.createDocumentFragment();
+    let lastIdx = 0;
+    PHONE_REGEX.lastIndex = 0;
+    let m;
+    while ((m = PHONE_REGEX.exec(text)) !== null) {
+      if (m.index > lastIdx) {
+        frag.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
+      }
+      const a = document.createElement('a');
+      const digits = m[0].replace(/[^\d+]/g, '');
+      a.setAttribute('href', `tel:${digits}`);
+      a.setAttribute('style', 'color:#0000ee;text-decoration:underline;');
+      a.setAttribute('data-autolinked', 'phone');
+      a.textContent = m[0];
+      frag.appendChild(a);
+      lastIdx = m.index + m[0].length;
+    }
+    if (lastIdx < text.length) {
+      frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+    }
+    node.parentNode.replaceChild(frag, node);
+  });
+}
+
+function richTextToMjText(html, tpl) {
+  if (!html) return '';
+  // Strip empty paragraphs Quill inserts when the user hits Enter twice.
+  const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
+  if (!cleaned || cleaned === '<p></p>') return '';
+
+  // Parse into a DOM so we can normalize styling for email clients, which
+  // don't collapse margins like browsers and vary wildly on default list styles.
+  const div = document.createElement('div');
+  div.innerHTML = cleaned;
+
+  // Quill 2 quirk: ALL lists (bullet and numbered) are stored as <ol> in the DOM,
+  // with a data-list attribute on each <li> distinguishing "bullet" vs "ordered".
+  // Quill's own CSS renders the correct marker, but email clients see the literal
+  // <ol> and render numbered. We convert to semantically correct <ul>/<ol> here,
+  // splitting into multiple lists if a single <ol> contains mixed item types.
+  div.querySelectorAll('.ql-ui').forEach(n => n.remove());
+  div.querySelectorAll('ol').forEach(ol => {
+    const items = Array.from(ol.children).filter(c => c.tagName === 'LI');
+    if (!items.length) return;
+    const groups = [];
+    let current = null;
+    items.forEach(li => {
+      const type = li.getAttribute('data-list') === 'bullet' ? 'ul' : 'ol';
+      if (!current || current.type !== type) {
+        current = { type, items: [] };
+        groups.push(current);
+      }
+      current.items.push(li);
+      li.removeAttribute('data-list');
+    });
+    if (groups.length === 1 && groups[0].type === 'ol') return; // already correct
+    const fragment = document.createDocumentFragment();
+    groups.forEach(g => {
+      const listEl = document.createElement(g.type);
+      g.items.forEach(li => listEl.appendChild(li));
+      fragment.appendChild(listEl);
+    });
+    ol.parentNode.replaceChild(fragment, ol);
+  });
+
+  // Auto-link plaintext phone numbers in body copy. Requires separators between
+  // the 3-3-4 groups so we don't catch order IDs or other long digit runs.
+  autoLinkPhones(div);
+
+  // Links: brand color + target="_blank". Auto-linked phones keep their own
+  // standard-blue style and don't need target=_blank (tel: links don't navigate).
+  div.querySelectorAll('a:not([data-autolinked])').forEach(a => {
+    a.setAttribute('style', `color:${tpl.ctaBackgroundColor};text-decoration:underline;`);
+    a.setAttribute('target', '_blank');
+  });
+
+  // Paragraphs: consistent 14px bottom margin, zero top.
+  div.querySelectorAll('p').forEach(p => {
+    p.setAttribute('style', 'margin:0 0 14px 0;');
+  });
+
+  // Lists: reset default margins, give a predictable indent.
+  div.querySelectorAll('ul, ol').forEach(list => {
+    list.setAttribute('style', 'margin:0 0 14px 0;padding-left:24px;');
+  });
+  div.querySelectorAll('li').forEach(li => {
+    li.setAttribute('style', 'margin:0 0 6px 0;');
+  });
+
+  // Zero the last block's bottom margin so the mj-text padding doesn't double up.
+  const last = div.lastElementChild;
+  if (last && ['P', 'UL', 'OL'].includes(last.tagName)) {
+    last.setAttribute('style', last.getAttribute('style').replace(/margin:[^;]*;?/, 'margin:0;'));
+  }
+
+  return `        <mj-text padding="0 0 14px 0">\n          ${div.innerHTML}\n        </mj-text>`;
+}
+
+function buildCtaHref() {
+  const type = getCtaType();
+  const value = (els.ctaDestination.value || '').trim();
+  if (!value) return '#';
+  if (type === 'phone') {
+    const digits = value.replace(/[^\d+]/g, '');
+    return `tel:${digits}`;
+  }
+  return `{{${value}}}`;
+}
+
+function buildMjml() {
+  const tpl = templates[els.template.value];
+  if (!tpl) return '';
+  const ctaText = (els.ctaText.value || '').trim() || 'Click Here';
+  const ctaHref = buildCtaHref();
+  // tel: links must not open in a new tab — iOS Mail silently fails the
+  // dial intent when target=_blank. Web URLs keep the default _blank.
+  const ctaTarget = getCtaType() === 'phone' ? '_self' : '_blank';
+  const preheader = (els.preheader.value || '').trim();
+  const previewTag = preheader
+    ? `<mj-preview>${escapeXml(preheader)}</mj-preview>\n    `
+    : '';
+  const bannerHrefAttr = tpl.bannerHref
+    ? ` href="${escapeXml(tpl.bannerHref)}"`
+    : '';
+
+  return `<mjml>
+  <mj-head>
+    ${previewTag}<mj-raw>
+      <meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no" />
+      <meta name="x-apple-disable-message-reformatting" />
+    </mj-raw>
+    <mj-style>
+      a[x-apple-data-detectors] {
+        color: inherit !important;
+        text-decoration: none !important;
+        font-size: inherit !important;
+        font-family: inherit !important;
+        font-weight: inherit !important;
+        line-height: inherit !important;
+      }
+    </mj-style>
+    <mj-attributes>
+      <mj-all font-family="${DEFAULT_FONT}" />
+      <mj-text font-size="16px" line-height="1.5" color="#333333" />
+      <mj-button font-size="16px" font-weight="600" border-radius="4px" inner-padding="14px 28px" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#f4f4f4">
+    <mj-section padding="0" background-color="#ffffff">
+      <mj-column>
+        <mj-image src="${escapeXml(tpl.bannerImageUrl)}" alt="${escapeXml(tpl.bannerAlt)}" width="${escapeXml(tpl.bannerWidth)}" padding="0"${bannerHrefAttr} />
+      </mj-column>
+    </mj-section>
+    <mj-section padding="28px 24px 8px 24px" background-color="#ffffff">
+      <mj-column>
+${richTextToMjText(bodyAboveQuill.root.innerHTML, tpl)}
+        <mj-button href="${escapeXml(ctaHref)}" target="${ctaTarget}" background-color="${tpl.ctaBackgroundColor}" color="${tpl.ctaTextColor}" padding="14px 0 18px 0">
+          ${escapeXml(ctaText)}
+        </mj-button>
+${richTextToMjText(bodyBelowQuill.root.innerHTML, tpl)}
+      </mj-column>
+    </mj-section>
+    <mj-section padding="16px 24px 4px 24px" background-color="#f1f1f1">
+      <mj-column>
+        <mj-text font-size="12px" color="#6b6b6b" align="center" padding="12px 0">
+          ${tpl.unsubscribeHtml}
+        </mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section padding="0 24px 24px 24px" background-color="#f1f1f1">
+      <mj-column>
+        <mj-text font-size="11px" color="#6b6b6b" align="center" line-height="1.6">
+          ${tpl.disclosureHtml}
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>`;
+}
+
+let lastHtml = '';
+
+// --- Test data (preview-only Handlebars substitution) ---
+// Mirrors SendGrid's "test data" panel: parses a JSON object and resolves
+// {{Path.To.Value}} tokens in the rendered HTML so authors can see real
+// names/links instead of raw tokens. Only affects the iframe preview —
+// lastHtml (used by Copy HTML and the raw HTML modal) keeps tokens intact.
+const TEST_DATA_STORAGE_KEY = 'emailBuilder.testData';
+const SAMPLE_TEST_DATA = {
+  Client: {
+    FirstName: "James",
+    LastName: "Harper",
+    Email: "jharper78@example.com",
+    Phone: "555-123-4567",
+    ClientID: "CLJ-20230801-4521"
+  },
+  Request: {
+    UniqueUrl: "https://kellerpostman.com/claim-review/jharper78"
+  },
+  CaseType: {
+    FriendlyName: "personal injury",
+    CaseName: "Social Security Disability"
+  },
+  Case: {
+    CaseType: "personal injury"
+  }
+};
+
+let testData = {};
+let testDataValid = true;
+let testDataEnabled = localStorage.getItem('emailBuilder.testDataEnabled') !== 'false';
+
+// Triple-brace tokens are unescaped in Handlebars/SendGrid; double-brace are HTML-escaped.
+// The path uses \w + dots, so block helpers ({{#if}}, {{/if}}, {{else}}, {{!comment}}) are
+// naturally skipped — they contain non-word chars that don't match this pattern.
+const HANDLEBARS_TOKEN = /\{\{(\{)?\s*([\w.]+)\s*(\})?\}\}/g;
+
+function resolveTokenPath(obj, path) {
+  return path.split('.').reduce((acc, key) => (acc == null ? acc : acc[key]), obj);
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function applyTestData(html) {
+  if (!testDataEnabled || !testDataValid) return html;
+  return html.replace(HANDLEBARS_TOKEN, (match, openTriple, path, closeTriple) => {
+    // Only treat as triple-brace if both sides match — otherwise it's a malformed token; skip.
+    const isTriple = !!openTriple && !!closeTriple;
+    if (!!openTriple !== !!closeTriple) return match;
+
+    // SendGrid injects {{{unsubscribe}}} at send time; in preview, give it a harmless href.
+    if (path === 'unsubscribe' && resolveTokenPath(testData, path) === undefined) {
+      return '#unsubscribe-preview';
+    }
+
+    const value = resolveTokenPath(testData, path);
+    if (value === undefined || value === null) return match; // visible-on-miss
+    return isTriple ? String(value) : escapeHtml(value);
+  });
+}
+
+function setTestDataHint(text, kind) {
+  els.testDataHint.textContent = text;
+  els.testDataHint.classList.remove('error', 'success');
+  if (kind) els.testDataHint.classList.add(kind);
+}
+
+function loadTestData() {
+  const stored = localStorage.getItem(TEST_DATA_STORAGE_KEY);
+  if (stored !== null) {
+    els.testData.value = stored;
+  } else {
+    els.testData.value = JSON.stringify(SAMPLE_TEST_DATA, null, 2);
+  }
+  parseTestData();
+}
+
+function parseTestData() {
+  const raw = els.testData.value.trim();
+  if (!raw) {
+    testData = {};
+    testDataValid = true;
+    els.testData.classList.remove('invalid');
+    setTestDataHint('Empty — preview will show raw {{tokens}}.', null);
+    return;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new Error('Root must be a JSON object');
+    }
+    testData = parsed;
+    testDataValid = true;
+    els.testData.classList.remove('invalid');
+    setTestDataHint('JSON parsed · preview substitution active.', 'success');
+  } catch (e) {
+    testDataValid = false;
+    els.testData.classList.add('invalid');
+    setTestDataHint(`Invalid JSON: ${e.message}`, 'error');
+  }
+}
+
+function autoSizeTestData() {
+  els.testData.style.height = 'auto';
+  els.testData.style.height = els.testData.scrollHeight + 'px';
+}
+
+els.testData.addEventListener('input', () => {
+  autoSizeTestData();
+  parseTestData();
+  localStorage.setItem(TEST_DATA_STORAGE_KEY, els.testData.value);
+  scheduleRender();
+});
+
+function showWarn(msg) {
+  if (!msg) { els.warn.classList.remove('visible'); els.warn.textContent = ''; return; }
+  els.warn.textContent = msg;
+  els.warn.classList.add('visible');
+}
+
+function render() {
+  const mjml = buildMjml();
+  try {
+    const result = mjml2html(mjml, { validationLevel: 'soft' });
+    lastHtml = result.html;
+    // Preview gets test-data substitution; lastHtml stays pure for Copy HTML / modal.
+    els.preview.srcdoc = applyTestData(result.html);
+
+    // Aggregate non-fatal warnings from template state + MJML compiler output.
+    const warnings = [];
+    const tpl = templates[els.template.value];
+    if (tpl.bannerImageUrl.startsWith('REPLACE_')) {
+      warnings.push('Banner image URL is a placeholder — edit templates in index.html.');
+    }
+    if (result.errors && result.errors.length) {
+      // MJML errors in 'soft' mode are warnings — compilation still succeeded.
+      const msgs = result.errors.slice(0, 3).map(e => e.formattedMessage || e.message);
+      const suffix = result.errors.length > 3 ? ` (+${result.errors.length - 3} more)` : '';
+      warnings.push(`MJML warning: ${msgs.join('; ')}${suffix}`);
+    }
+    showWarn(warnings.join(' · '));
+  } catch (e) {
+    lastHtml = '';
+    els.preview.srcdoc = `<pre style="color:#dc2626;padding:20px;font-family:monospace;">MJML error:\n${escapeXml(e.message)}</pre>`;
+    showWarn('MJML compilation failed. See preview.');
+  }
+}
+
+let renderTimer;
+function scheduleRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(render, 150);
+}
+
+['template', 'preheader', 'ctaText', 'ctaDestination'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', scheduleRender);
+  el.addEventListener('change', scheduleRender);
+});
+
+bodyAboveQuill.on('text-change', scheduleRender);
+bodyBelowQuill.on('text-change', scheduleRender);
+
+// Viewport toggle
+const viewportButtons = document.querySelectorAll('.vp-btn[data-vp]');
+const previewStage = document.getElementById('previewStage');
+viewportButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    viewportButtons.forEach(b => b.classList.toggle('active', b === btn));
+    previewStage.classList.toggle('mobile', btn.dataset.vp === 'mobile');
+  });
+});
+
+// Test-data substitution toggle (preview only — never affects copied HTML)
+const testDataButtons = document.querySelectorAll('.vp-btn[data-td]');
+function syncTestDataToggle() {
+  testDataButtons.forEach(b => {
+    const matches = (b.dataset.td === 'on') === testDataEnabled;
+    b.classList.toggle('active', matches);
+  });
+}
+testDataButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    testDataEnabled = btn.dataset.td === 'on';
+    localStorage.setItem('emailBuilder.testDataEnabled', String(testDataEnabled));
+    syncTestDataToggle();
+    scheduleRender();
+  });
+});
+syncTestDataToggle();
+
+// Copy validation
+function hasRichContent(quill) {
+  const html = quill.root.innerHTML;
+  const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
+  return !!(cleaned && cleaned !== '<p></p>');
+}
+
+function isValidPhone(value) {
+  if (!value) return false;
+  // Allow only phone-appropriate chars (digits, spaces, dashes, dots, parens, optional leading +)
+  if (!/^\+?[\d\s().\-]+$/.test(value)) return false;
+  // 7–15 digits covers US local through international E.164 length.
+  const digits = value.replace(/\D/g, '');
+  return digits.length >= 7 && digits.length <= 15;
+}
+
+// Invalid-field highlighting
+const bodyAboveWrap = document.getElementById('bodyAbove').closest('.rich-editor-wrap');
+const invalidEls = new Set();
+function markInvalid(el) {
+  if (!el) return;
+  el.classList.add('invalid');
+  invalidEls.add(el);
+}
+function clearAllInvalid() {
+  invalidEls.forEach(el => el.classList.remove('invalid'));
+  invalidEls.clear();
+}
+// Clear a field's invalid state the moment the user starts fixing it.
+els.ctaText.addEventListener('input', () => {
+  els.ctaText.classList.remove('invalid');
+  invalidEls.delete(els.ctaText);
+});
+els.ctaDestination.addEventListener('input', () => {
+  els.ctaDestination.classList.remove('invalid');
+  invalidEls.delete(els.ctaDestination);
+});
+bodyAboveQuill.on('text-change', () => {
+  bodyAboveWrap.classList.remove('invalid');
+  invalidEls.delete(bodyAboveWrap);
+});
+
+const copyErrorEl = document.getElementById('copyError');
+let copyErrorTimer;
+function showCopyError(msg) {
+  clearTimeout(copyErrorTimer);
+  copyErrorEl.textContent = msg;
+  copyErrorEl.classList.add('visible');
+  els.copyBtn.classList.remove('error');
+  // Force reflow so the shake re-triggers on repeated clicks.
+  void els.copyBtn.offsetWidth;
+  els.copyBtn.classList.add('error');
+  copyErrorTimer = setTimeout(() => {
+    copyErrorEl.classList.remove('visible');
+    els.copyBtn.classList.remove('error');
+    clearAllInvalid();
+  }, 4000);
+}
+
+els.copyBtn.addEventListener('click', async () => {
+  const result = await runCopyAction();
+  if (result === 'copied') flashCopyButton(els.copyBtn, 'Copied', 'copied');
+  else if (result === 'copy-failed') flashCopyButton(els.copyBtn, 'Copy failed', null);
+  // 'validation-failed' is already surfaced by showCopyError + field highlights
+});
+
+// Returns: 'copied' | 'validation-failed' | 'copy-failed' | 'no-html'
+// Shared by the main Copy HTML button and the modal's Copy button.
+async function runCopyAction() {
+  clearAllInvalid();
+  const missing = [];
+  if (!hasRichContent(bodyAboveQuill)) {
+    missing.push('body copy');
+    markInvalid(bodyAboveWrap);
+  }
+  if (!els.ctaText.value.trim()) {
+    missing.push('CTA text');
+    markInvalid(els.ctaText);
+  }
+
+  let phoneFormatError = false;
+  if (getCtaType() === 'phone') {
+    const ctaDest = els.ctaDestination.value.trim();
+    if (!ctaDest) {
+      missing.push('phone number');
+      markInvalid(els.ctaDestination);
+    } else if (!isValidPhone(ctaDest)) {
+      phoneFormatError = true;
+      markInvalid(els.ctaDestination);
+    }
+  }
+
+  if (missing.length) {
+    showCopyError(`Add ${missing.join(' and ')}`);
+    return 'validation-failed';
+  }
+  if (phoneFormatError) {
+    showCopyError('Check phone number format');
+    return 'validation-failed';
+  }
+
+  if (!lastHtml) { render(); if (!lastHtml) return 'no-html'; }
+
+  try {
+    await navigator.clipboard.writeText(lastHtml);
+    return 'copied';
+  } catch {
+    // Fallback for non-secure contexts (e.g. file:// in some browsers)
+    const ta = document.createElement('textarea');
+    ta.value = lastHtml;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch {}
+    document.body.removeChild(ta);
+    return ok ? 'copied' : 'copy-failed';
+  }
+}
+
+function flashCopyButton(btn, label, cls) {
+  const original = 'Copy HTML';
+  btn.textContent = label;
+  if (cls) btn.classList.add(cls);
+  setTimeout(() => {
+    btn.textContent = original;
+    if (cls) btn.classList.remove(cls);
+  }, 1500);
+}
+
+// --- Raw HTML inspection modal ---
+const htmlModal = document.getElementById('htmlModal');
+const htmlModalClose = document.getElementById('htmlModalClose');
+const rawHtmlEl = document.getElementById('rawHtml');
+const htmlMeta = document.getElementById('htmlMeta');
+const viewHtmlBtn = document.getElementById('viewHtmlBtn');
+const copyFromModal = document.getElementById('copyFromModal');
+
+function openHtmlModal() {
+  const html = lastHtml || '';
+  rawHtmlEl.value = html;
+  const kb = (new Blob([html]).size / 1024).toFixed(1);
+  const lines = html ? html.split('\n').length : 0;
+  htmlMeta.textContent = `${kb} KB · ${html.length.toLocaleString()} chars · ${lines.toLocaleString()} lines`;
+  htmlModal.classList.add('visible');
+  setTimeout(() => { rawHtmlEl.focus(); rawHtmlEl.setSelectionRange(0, 0); }, 50);
+}
+function closeHtmlModal() {
+  htmlModal.classList.remove('visible');
+}
+viewHtmlBtn.addEventListener('click', openHtmlModal);
+htmlModalClose.addEventListener('click', closeHtmlModal);
+htmlModal.addEventListener('click', (e) => {
+  if (e.target === htmlModal) closeHtmlModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && htmlModal.classList.contains('visible')) closeHtmlModal();
+});
+copyFromModal.addEventListener('click', async () => {
+  const result = await runCopyAction();
+  if (result === 'copied') flashCopyButton(copyFromModal, 'Copied', 'copied');
+  else if (result === 'copy-failed') flashCopyButton(copyFromModal, 'Copy failed', null);
+  else if (result === 'validation-failed') closeHtmlModal();
+});
+
+loadTestData();
+autoSizeTestData();
+render();
+</script>
+</body>
+</html>

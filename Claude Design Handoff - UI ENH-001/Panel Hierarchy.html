@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Email Builder · Panel Hierarchy Explorations</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+  /* Shared tokens used inside artboards (mid-fi only) */
+  .panel-root {
+    --bg: #fafafa;
+    --panel-bg: #ffffff;
+    --border: #e5e5e5;
+    --border-strong: #d4d4d4;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --muted-2: #9b9b9b;
+    --accent: #2563eb;
+    --radius: 6px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font);
+    color: var(--text);
+    font-size: 14px;
+    background: var(--panel-bg);
+    width: 100%;
+    height: 100%;
+  }
+  .panel-root h1.panel-title {
+    font-size: 18px;
+    margin: 0 0 18px;
+    font-weight: 600;
+  }
+  .panel-root input[type="text"],
+  .panel-root textarea,
+  .panel-root select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font);
+    font-size: 13px;
+    background: white;
+    color: var(--text);
+    outline: none;
+  }
+  .panel-root textarea { resize: vertical; min-height: 60px; line-height: 1.5; }
+  .panel-root .field { margin-bottom: 12px; }
+  .panel-root .field-label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+  .panel-root .hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .panel-root .mock-editor {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: white;
+    overflow: hidden;
+  }
+  .panel-root .mock-editor-toolbar {
+    background: #fafafa;
+    border-bottom: 1px solid var(--border);
+    padding: 6px 8px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .panel-root .mock-editor-toolbar .tb-btn {
+    width: 24px; height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+    font-size: 13px;
+    border-radius: 3px;
+    cursor: default;
+  }
+  .panel-root .mock-editor-toolbar .tb-btn:hover { background: #efefef; }
+  .panel-root .mock-editor-body {
+    padding: 10px 12px;
+    min-height: 80px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #2b2b2b;
+  }
+  .panel-root .mock-editor-body.placeholder { color: #9b9b9b; font-style: normal; }
+  .panel-root .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  /* CTA chip preview (used in several variants) */
+  .panel-root .cta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 6px 8px;
+    background: #f5f5f5;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .panel-root .cta-chip .pill {
+    background: #000;
+    color: #fff;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  /* Section label variants */
+  .panel-root .h2-cap {
+    font-size: 11px;
+    margin: 0 0 8px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 700;
+  }
+
+  /* Note styling reused across variants */
+  .panel-root .note {
+    padding: 8px 10px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: var(--radius);
+    font-size: 12px;
+    line-height: 1.45;
+    color: #78350f;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="variants.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>
