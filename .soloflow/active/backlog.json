@@ -1,17 +1,4 @@
 {
   "version": 2,
-  "tasks": {
-    "TASK-001": {
-      "status": "ready",
-      "depends_on": [],
-      "epic": "rich-text-link-ux",
-      "idea": "IDEA-001"
-    },
-    "TASK-002": {
-      "status": "ready",
-      "depends_on": ["TASK-001"],
-      "epic": "rich-text-link-ux",
-      "idea": "IDEA-001"
-    }
-  }
+  "tasks": {}
 }
