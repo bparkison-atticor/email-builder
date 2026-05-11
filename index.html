@@ -977,8 +977,10 @@ function applyLink() {
   // Quill's link format renders the <a> on next DOM flush; tag via microtask.
   if (type === 'phone') {
     queueMicrotask(() => {
-      editor.root.querySelectorAll(`a[href="${href}"]:not([data-link-type])`).forEach(a => {
-        a.setAttribute('data-link-type', 'phone');
+      editor.root.querySelectorAll('a:not([data-link-type])').forEach(a => {
+        if (a.getAttribute('href') === href) {
+          a.setAttribute('data-link-type', 'phone');
+        }
       });
     });
   }
