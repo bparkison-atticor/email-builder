@@ -840,12 +840,13 @@ const bodyBelowQuill = new Quill('#bodyBelow', {
 
 // --- Link insert modal state (TASK-001) ---
 let ownerEditor = null;
-let ownerRange = null;        // populated in TASK-002; reserved here
+let ownerRange = null;        // captured in openLinkModal; used in applyLink
 const linkModal = document.getElementById('linkModal');
 const linkDestination = document.getElementById('linkDestination');
 const linkDestinationLabel = document.getElementById('linkDestinationLabel');
 const linkDestinationHint = document.getElementById('linkDestinationHint');
 const linkTypeButtons = linkModal.querySelectorAll('.seg-control button[data-link-type]');
+const linkApply = document.getElementById('linkApply');
 
 function getLinkType() {
   const active = linkModal.querySelector('.seg-control button[data-link-type].active');
@@ -869,13 +870,60 @@ wireSegControl(linkTypeButtons, () => updateLinkFields());
 
 function openLinkModal(quill) {
   ownerEditor = quill;
-  // Reset segment to Phone
+
+  // Step 1: capture current selection (true = focus the editor first)
+  ownerRange = quill.getSelection(true);
+  if (!ownerRange) {
+    ownerRange = { index: quill.getLength() - 1, length: 0 };
+  }
+
+  // Step 3: if cursor with no selection, try to expand to cover the full link span
+  if (ownerRange.length === 0) {
+    const fmt = quill.getFormat(ownerRange.index, 1);
+    if (fmt.link) {
+      // Walk backward to find link start
+      let start = ownerRange.index;
+      while (start > 0 && quill.getFormat(start - 1, 1).link === fmt.link) {
+        start--;
+      }
+      // Walk forward to find link end
+      let end = ownerRange.index;
+      const docLen = quill.getLength();
+      while (end < docLen && quill.getFormat(end, 1).link === fmt.link) {
+        end++;
+      }
+      ownerRange = { index: start, length: end - start };
+    }
+  }
+
+  // Step 2: inspect existing link to pre-populate dialog
+  const format = quill.getFormat(ownerRange.index, Math.max(ownerRange.length, 1));
+  let segmentType = 'phone';
+  let prefilledValue = '';
+  if (format.link) {
+    const href = format.link;
+    if (href.startsWith('tel:')) {
+      segmentType = 'phone';
+      prefilledValue = href.slice(4).replace(/\D/g, '');
+    } else {
+      const varMatch = href.match(/^\{\{(.+)\}\}$/);
+      if (varMatch) {
+        segmentType = 'url';
+        prefilledValue = varMatch[1];
+      } else if (href) {
+        segmentType = 'url';
+        prefilledValue = href;
+      }
+    }
+  }
+
+  // Apply segment choice
   linkTypeButtons.forEach(b => {
-    const isPhone = b.dataset.linkType === 'phone';
-    b.classList.toggle('active', isPhone);
-    b.setAttribute('aria-pressed', String(isPhone));
+    const isActive = b.dataset.linkType === segmentType;
+    b.classList.toggle('active', isActive);
+    b.setAttribute('aria-pressed', String(isActive));
   });
-  linkDestination.value = '';
+  linkDestination.value = prefilledValue;
   updateLinkFields();
   linkModal.classList.add('visible');
   setTimeout(() => { linkDestination.focus(); }, 50);
@@ -900,8 +948,39 @@ linkModal.addEventListener('click', (e) => {
   if (e.target === linkModal) closeLinkModal();
 });
 
-// Apply stub — TASK-002 will replace with applyLink()
-document.getElementById('linkApply').addEventListener('click', closeLinkModal);
+// Apply link — inserts or updates a link over the captured range
+function applyLink() {
+  const value = (linkDestination.value || '').trim();
+  if (!value || !ownerEditor || !ownerRange) { closeLinkModal(); return; }
+  const type = getLinkType();
+  let href;
+  if (type === 'phone') {
+    const digits = value.replace(/\D/g, '');
+    if (!digits) { closeLinkModal(); return; }
+    href = `tel:${digits}`;
+  } else {
+    href = /^https?:\/\//i.test(value) ? value : `{{${value}}}`;
+  }
+  // If selection length is 0 (cursor only, no existing link found in step 3),
+  // insert the value itself as visible text and link it.
+  if (ownerRange.length === 0) {
+    ownerEditor.insertText(ownerRange.index, value, 'link', href, 'user');
+  } else {
+    ownerEditor.formatText(ownerRange.index, ownerRange.length, 'link', href, 'user');
+  }
+  // Tag phone links so richTextToMjText() can distinguish them from URL links.
+  // Quill's link format renders the <a> on next DOM flush; tag via microtask.
+  if (type === 'phone') {
+    queueMicrotask(() => {
+      ownerEditor.root.querySelectorAll(`a[href="${href}"]:not([data-link-type])`).forEach(a => {
+        a.setAttribute('data-link-type', 'phone');
+      });
+    });
+  }
+  closeLinkModal();
+  scheduleRender();
+}
+linkApply.addEventListener('click', applyLink);
 
 const ctaTypeButtons = document.querySelectorAll('.seg-control button[data-cta-type]');
 function getCtaType() {
@@ -1051,11 +1130,17 @@ function richTextToMjText(html, tpl) {
   // the 3-3-4 groups so we don't catch order IDs or other long digit runs.
   autoLinkPhones(div);
 
-  // Links: brand color + target="_blank". Auto-linked phones keep their own
-  // standard-blue style and don't need target=_blank (tel: links don't navigate).
-  div.querySelectorAll('a:not([data-autolinked])').forEach(a => {
+  // Brand color + target="_blank" only for non-phone links. Both auto-linked
+  // phones (data-autolinked="phone") and manually-inserted phone links from
+  // the link dialog (data-link-type="phone") keep standard-blue and no target.
+  div.querySelectorAll('a:not([data-autolinked]):not([data-link-type="phone"])').forEach(a => {
     a.setAttribute('style', `color:${tpl.ctaBackgroundColor};text-decoration:underline;`);
     a.setAttribute('target', '_blank');
+  });
+  div.querySelectorAll('a[data-link-type="phone"]').forEach(a => {
+    a.setAttribute('style', 'color:#0000ee;text-decoration:underline;');
+    // Strip the marker before emit; SendGrid doesn't care, but it keeps output clean.
+    a.removeAttribute('data-link-type');
   });
 
   // Paragraphs: consistent 14px bottom margin, zero top.
