@@ -952,6 +952,11 @@ linkModal.addEventListener('click', (e) => {
 function applyLink() {
   const value = (linkDestination.value || '').trim();
   if (!value || !ownerEditor || !ownerRange) { closeLinkModal(); return; }
+  // Capture editor + range into locals before closeLinkModal() nulls the
+  // module-scoped refs. The microtask below runs after closeLinkModal() and
+  // would otherwise read null.
+  const editor = ownerEditor;
+  const range = ownerRange;
   const type = getLinkType();
   let href;
   if (type === 'phone') {
@@ -963,16 +968,16 @@ function applyLink() {
   }
   // If selection length is 0 (cursor only, no existing link found in step 3),
   // insert the value itself as visible text and link it.
-  if (ownerRange.length === 0) {
-    ownerEditor.insertText(ownerRange.index, value, 'link', href, 'user');
+  if (range.length === 0) {
+    editor.insertText(range.index, value, 'link', href, 'user');
   } else {
-    ownerEditor.formatText(ownerRange.index, ownerRange.length, 'link', href, 'user');
+    editor.formatText(range.index, range.length, 'link', href, 'user');
   }
   // Tag phone links so richTextToMjText() can distinguish them from URL links.
   // Quill's link format renders the <a> on next DOM flush; tag via microtask.
   if (type === 'phone') {
     queueMicrotask(() => {
-      ownerEditor.root.querySelectorAll(`a[href="${href}"]:not([data-link-type])`).forEach(a => {
+      editor.root.querySelectorAll(`a[href="${href}"]:not([data-link-type])`).forEach(a => {
         a.setAttribute('data-link-type', 'phone');
       });
     });
