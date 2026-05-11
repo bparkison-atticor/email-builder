@@ -1,6 +1,6 @@
 ---
 sprint: SPRINT-001
-pending_count: 5
+pending_count: 4
 last_updated: "2026-05-11T16:29:11.382Z"
 ---
 # Findings Queue
@@ -9,11 +9,11 @@ last_updated: "2026-05-11T16:29:11.382Z"
 - **source:** SPRINT-001 (sprint-code-reviewer)
 - **type:** bug
 - **severity:** medium
-- **status:** open
+- **status:** resolved
 - **location:** index.html:974-978
 - **description:** applyLink phone-tagging microtask null-derefs ownerEditor — closeLinkModal() runs synchronously at line 980 BEFORE the queued microtask fires, setting ownerEditor=null. When the microtask executes, ownerEditor.root.querySelectorAll throws TypeError. Phone links inserted via the new modal therefore never receive the data-link-type="phone" marker, so richTextToMjText() at line 1136 treats them as URL links and applies brand color + target="_blank" — exactly the styling TASK-002 was meant to fix.
 - **suggested_action:** Capture the editor reference into a local before the microtask, OR run the tagging synchronously before closeLinkModal(). Preferred: replace queueMicrotask with a synchronous tag right after insertText/formatText — Quill 2 flushes link-format DOM updates synchronously in current versions, and a defensive same-tick re-query inside a try/catch is cheap. Add a regression check: insert a phone link via the modal, then inspect richTextToMjText output for color:#0000ee (not brand color).
-- **resolved_by:** 
+- **resolved_by:** b937740 — captured ownerEditor + ownerRange into locals at the top of applyLink() so the microtask closure holds a live reference after closeLinkModal() nulls the module-scoped refs. Same-tick fix on the run branch.
 
 
 
