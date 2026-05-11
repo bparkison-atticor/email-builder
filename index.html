@@ -501,6 +501,17 @@
     font-size: 12px;
     color: var(--muted);
   }
+
+  /* Link insert modal overrides */
+  #linkModal .modal {
+    max-width: 440px;
+    height: auto;
+    max-height: none;
+  }
+  #linkModal .modal-body {
+    flex-direction: column;
+    gap: 0;
+  }
 </style>
 </head>
 <body>
@@ -657,6 +668,45 @@
   </div>
 </div>
 
+<!-- Link insert modal -->
+<div class="modal-overlay" id="linkModal" role="dialog" aria-modal="true" aria-labelledby="linkModalTitle">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="linkModalTitle">Insert link</h2>
+      <button class="modal-close" id="linkModalClose" aria-label="Close" title="Close (Esc)">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Link type</label>
+        <div class="seg-control" role="tablist" aria-label="Link type">
+          <button type="button" class="active" data-link-type="phone" aria-pressed="true">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/>
+            </svg>
+            Phone
+          </button>
+          <button type="button" data-link-type="url" aria-pressed="false">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+            URL / variable
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <label id="linkDestinationLabel" for="linkDestination">Phone number</label>
+        <input type="text" id="linkDestination" placeholder="555-123-4567" autocomplete="off" />
+        <div class="hint" id="linkDestinationHint">Any format — non-digits stripped for tel: link.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" id="linkCancel">Cancel</button>
+      <button type="button" class="btn-primary" id="linkApply">Apply</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import mjml2html from 'https://esm.sh/mjml-browser@4.15.3';
 
@@ -787,6 +837,157 @@ const bodyBelowQuill = new Quill('#bodyBelow', {
   theme: 'snow',
   placeholder: 'Optional.'
 });
+
+// --- Link insert modal state (TASK-001) ---
+let ownerEditor = null;
+let ownerRange = null;        // captured in openLinkModal; used in applyLink
+const linkModal = document.getElementById('linkModal');
+const linkDestination = document.getElementById('linkDestination');
+const linkDestinationLabel = document.getElementById('linkDestinationLabel');
+const linkDestinationHint = document.getElementById('linkDestinationHint');
+const linkTypeButtons = linkModal.querySelectorAll('.seg-control button[data-link-type]');
+const linkApply = document.getElementById('linkApply');
+
+function getLinkType() {
+  const active = linkModal.querySelector('.seg-control button[data-link-type].active');
+  return active ? active.dataset.linkType : 'phone';
+}
+
+function updateLinkFields() {
+  const type = getLinkType();
+  if (type === 'phone') {
+    linkDestinationLabel.textContent = 'Phone number';
+    linkDestination.placeholder = '555-123-4567';
+    linkDestinationHint.textContent = 'Any format — non-digits stripped for tel: link.';
+  } else {
+    linkDestinationLabel.textContent = 'URL or {{variable}}';
+    linkDestination.placeholder = 'https://example.com or {{eligibilityLink}}';
+    linkDestinationHint.textContent = 'Enter https://… or {{variable}}.';
+  }
+}
+
+wireSegControl(linkTypeButtons, () => updateLinkFields());
+
+function openLinkModal(quill) {
+  ownerEditor = quill;
+
+  // Step 1: capture current selection (true = focus the editor first)
+  ownerRange = quill.getSelection(true);
+  if (!ownerRange) {
+    ownerRange = { index: quill.getLength() - 1, length: 0 };
+  }
+
+  // Step 3: if cursor with no selection, try to expand to cover the full link span
+  if (ownerRange.length === 0) {
+    const fmt = quill.getFormat(ownerRange.index, 1);
+    if (fmt.link) {
+      // Walk backward to find link start
+      let start = ownerRange.index;
+      while (start > 0 && quill.getFormat(start - 1, 1).link === fmt.link) {
+        start--;
+      }
+      // Walk forward to find link end
+      let end = ownerRange.index;
+      const docLen = quill.getLength();
+      while (end < docLen && quill.getFormat(end, 1).link === fmt.link) {
+        end++;
+      }
+      ownerRange = { index: start, length: end - start };
+    }
+  }
+
+  // Step 2: inspect existing link to pre-populate dialog
+  const format = quill.getFormat(ownerRange.index, Math.max(ownerRange.length, 1));
+  let segmentType = 'phone';
+  let prefilledValue = '';
+  if (format.link) {
+    const href = format.link;
+    if (href.startsWith('tel:')) {
+      segmentType = 'phone';
+      prefilledValue = href.slice(4).replace(/\D/g, '');
+    } else {
+      const varMatch = href.match(/^\{\{(.+)\}\}$/);
+      if (varMatch) {
+        segmentType = 'url';
+        prefilledValue = varMatch[1];
+      } else if (href) {
+        segmentType = 'url';
+        prefilledValue = href;
+      }
+    }
+  }
+
+  // Apply segment choice
+  linkTypeButtons.forEach(b => {
+    const isActive = b.dataset.linkType === segmentType;
+    b.classList.toggle('active', isActive);
+    b.setAttribute('aria-pressed', String(isActive));
+  });
+  linkDestination.value = prefilledValue;
+  updateLinkFields();
+  linkModal.classList.add('visible');
+  setTimeout(() => { linkDestination.focus(); }, 50);
+}
+
+function closeLinkModal() {
+  linkModal.classList.remove('visible');
+  if (ownerEditor) ownerEditor.focus();
+  ownerEditor = null;
+  ownerRange = null;
+}
+
+// Toolbar override — must happen after both Quill instances are created
+[bodyAboveQuill, bodyBelowQuill].forEach(q => {
+  q.getModule('toolbar').addHandler('link', () => openLinkModal(q));
+});
+
+// Link modal close affordances
+document.getElementById('linkModalClose').addEventListener('click', closeLinkModal);
+document.getElementById('linkCancel').addEventListener('click', closeLinkModal);
+linkModal.addEventListener('click', (e) => {
+  if (e.target === linkModal) closeLinkModal();
+});
+
+// Apply link — inserts or updates a link over the captured range
+function applyLink() {
+  const value = (linkDestination.value || '').trim();
+  if (!value || !ownerEditor || !ownerRange) { closeLinkModal(); return; }
+  // Capture editor + range into locals before closeLinkModal() nulls the
+  // module-scoped refs. The microtask below runs after closeLinkModal() and
+  // would otherwise read null.
+  const editor = ownerEditor;
+  const range = ownerRange;
+  const type = getLinkType();
+  let href;
+  if (type === 'phone') {
+    const digits = value.replace(/\D/g, '');
+    if (!digits) { closeLinkModal(); return; }
+    href = `tel:${digits}`;
+  } else {
+    href = /^https?:\/\//i.test(value) ? value : `{{${value}}}`;
+  }
+  // If selection length is 0 (cursor only, no existing link found in step 3),
+  // insert the value itself as visible text and link it.
+  if (range.length === 0) {
+    editor.insertText(range.index, value, 'link', href, 'user');
+  } else {
+    editor.formatText(range.index, range.length, 'link', href, 'user');
+  }
+  // Tag phone links so richTextToMjText() can distinguish them from URL links.
+  // Quill's link format renders the <a> on next DOM flush; tag via microtask.
+  if (type === 'phone') {
+    queueMicrotask(() => {
+      editor.root.querySelectorAll('a:not([data-link-type])').forEach(a => {
+        if (a.getAttribute('href') === href) {
+          a.setAttribute('data-link-type', 'phone');
+        }
+      });
+    });
+  }
+  closeLinkModal();
+  scheduleRender();
+}
+linkApply.addEventListener('click', applyLink);
 
 const ctaTypeButtons = document.querySelectorAll('.seg-control button[data-cta-type]');
 function getCtaType() {
@@ -936,11 +1137,17 @@ function richTextToMjText(html, tpl) {
   // the 3-3-4 groups so we don't catch order IDs or other long digit runs.
   autoLinkPhones(div);
 
-  // Links: brand color + target="_blank". Auto-linked phones keep their own
-  // standard-blue style and don't need target=_blank (tel: links don't navigate).
-  div.querySelectorAll('a:not([data-autolinked])').forEach(a => {
+  // Brand color + target="_blank" only for non-phone links. Both auto-linked
+  // phones (data-autolinked="phone") and manually-inserted phone links from
+  // the link dialog (data-link-type="phone") keep standard-blue and no target.
+  div.querySelectorAll('a:not([data-autolinked]):not([data-link-type="phone"])').forEach(a => {
     a.setAttribute('style', `color:${tpl.ctaBackgroundColor};text-decoration:underline;`);
     a.setAttribute('target', '_blank');
+  });
+  div.querySelectorAll('a[data-link-type="phone"]').forEach(a => {
+    a.setAttribute('style', 'color:#0000ee;text-decoration:underline;');
+    // Strip the marker before emit; SendGrid doesn't care, but it keeps output clean.
+    a.removeAttribute('data-link-type');
   });
 
   // Paragraphs: consistent 14px bottom margin, zero top.
@@ -1416,7 +1623,10 @@ htmlModal.addEventListener('click', (e) => {
   if (e.target === htmlModal) closeHtmlModal();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && htmlModal.classList.contains('visible')) closeHtmlModal();
+  if (e.key === 'Escape') {
+    if (linkModal.classList.contains('visible')) { closeLinkModal(); }
+    else if (htmlModal.classList.contains('visible')) { closeHtmlModal(); }
+  }
 });
 copyFromModal.addEventListener('click', async () => {
   const result = await runCopyAction();

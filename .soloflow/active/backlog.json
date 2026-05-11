@@ -1,17 +1,11 @@
 {
   "version": 2,
   "tasks": {
-    "TASK-001": {
+    "TASK-003": {
       "status": "ready",
-      "depends_on": [],
+      "depends_on": ["TASK-002"],
       "epic": "rich-text-link-ux",
-      "idea": "IDEA-001"
-    },
-    "TASK-002": {
-      "status": "ready",
-      "depends_on": ["TASK-001"],
-      "epic": "rich-text-link-ux",
-      "idea": "IDEA-001"
+      "idea": "SPRINT-001-compounder"
     }
   }
 }
