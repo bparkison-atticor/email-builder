@@ -722,23 +722,36 @@ import mjml2html from 'https://esm.sh/mjml-browser@4.15.3';
 // applyTestData() call). window.Handlebars is guaranteed defined here because
 // the CDN <script src> in <head> is synchronous and loads before this module.
 // ============================================================
+// Sentinel detection helper: returns true if the value is a missing-path chip
+// emitted by buildTestDataContext(). Used by block helpers to treat absent
+// test-data paths as falsy (else-branch routing).
+function isMissingChip(val) {
+  return (val instanceof Handlebars.SafeString) &&
+    String(val).startsWith('<span style="background:#fef08a');
+}
+
 // Block helper: type-coercing equality (e.g. "1" == 1 → true, per SendGrid semantics).
+// Missing-path chips route to the else branch so authors see falsy behavior.
 Handlebars.registerHelper('equals', function (a, b, options) {
+  if (isMissingChip(a) || isMissingChip(b)) return options.inverse(this);
   return (a == b) ? options.fn(this) : options.inverse(this);
 });
 
 // Block helper: logical inverse of equals.
 Handlebars.registerHelper('notEquals', function (a, b, options) {
+  if (isMissingChip(a) || isMissingChip(b)) return options.inverse(this);
   return (a != b) ? options.fn(this) : options.inverse(this);
 });
 
 // Block helper: numeric greater-than; Number() coercion handles string-valued paths.
 Handlebars.registerHelper('greaterThan', function (a, b, options) {
+  if (isMissingChip(a) || isMissingChip(b)) return options.inverse(this);
   return (Number(a) > Number(b)) ? options.fn(this) : options.inverse(this);
 });
 
 // Block helper: numeric less-than; symmetric to greaterThan.
 Handlebars.registerHelper('lessThan', function (a, b, options) {
+  if (isMissingChip(a) || isMissingChip(b)) return options.inverse(this);
   return (Number(a) < Number(b)) ? options.fn(this) : options.inverse(this);
 });
 
@@ -768,6 +781,22 @@ Handlebars.registerHelper('formatDate', function (value, format) {
     .replace(/HH/g, pad(d.getHours()))
     .replace(/mm/g, pad(d.getMinutes()))
     .replace(/ss/g, pad(d.getSeconds()));
+});
+
+// Fallback for top-level path misses that bypass the context Proxy (e.g., a root
+// key like {{TotallyMissingKey}} when no parent object exists in testData).
+// options.name holds the path string that Handlebars tried to resolve.
+Handlebars.registerHelper('helperMissing', function () {
+  const options = arguments[arguments.length - 1];
+  return new Handlebars.SafeString(
+    '<span style="background:#fef08a;padding:0 2px;border-radius:2px;font-family:monospace;font-size:0.9em">[' +
+    options.name + ' — not set]</span>'
+  );
+});
+
+// Fallback for block invocations against an unresolved helper — render else branch.
+Handlebars.registerHelper('blockHelperMissing', function (context, options) {
+  return options.inverse ? options.inverse(this) : '';
 });
 
 // ============================================================
@@ -1349,10 +1378,88 @@ let testData = {};
 let testDataValid = true;
 let testDataEnabled = localStorage.getItem('emailBuilder.testDataEnabled') !== 'false';
 
+// buildTestDataContext(data) — wraps the parsed test-data object in a Proxy so
+// that any key lookup that resolves to undefined emits a visible yellow chip
+// in the preview rather than silently rendering as an empty string.
+//
+// Design decisions:
+//   • `unsubscribe` is pre-seeded on the root data object before the Proxy is
+//     constructed so that {{{unsubscribe}}} resolves to '#unsubscribe-preview'
+//     with no chip (criterion 5).
+//   • Handlebars probes the context object with internal property names
+//     (__proto__, constructor, then, toString, valueOf, Symbol.*). Those must
+//     return undefined (not a chip) or Handlebars' machinery breaks. They are
+//     caught by: (a) a Symbol type-check, (b) an allowlist of string sentinels.
+//   • Sub-object keys return a recursively wrapped Proxy so nested paths like
+//     Client.FirstName traverse correctly.
+//   • Missing leaf keys return a Handlebars.SafeString chip. SafeString prevents
+//     double-escaping when output via {{double-brace}} mustaches (criterion 4).
+//   • isMissingChip() (above) lets the four block helpers treat these chips as
+//     falsy / else-branch (criterion 6).
+function buildTestDataContext(data) {
+  // Internal Handlebars property names that must NOT produce chips.
+  const INTERNAL_KEYS = new Set([
+    '__proto__', 'constructor', 'then', 'toString', 'valueOf',
+    'toJSON', 'inspect', 'nodeType', 'call', 'apply', 'bind',
+  ]);
+
+  function makeChip(path) {
+    return new Handlebars.SafeString(
+      '<span style="background:#fef08a;padding:0 2px;border-radius:2px;font-family:monospace;font-size:0.9em">[' +
+      path + ' — not set]</span>'
+    );
+  }
+
+  function wrapObject(obj, prefix) {
+    return new Proxy(obj, {
+      get(target, prop) {
+        // Non-string keys (Symbols, index probes, etc.) — pass through untouched.
+        if (typeof prop !== 'string') return target[prop];
+        // Internal Handlebars / JS engine sentinel names — return real value or
+        // undefined; never emit a chip for these.
+        if (INTERNAL_KEYS.has(prop)) return target[prop];
+        // Any key starting with __ is treated as an internal probe.
+        if (prop.startsWith('__')) return target[prop];
+
+        const fullPath = prefix ? prefix + '.' + prop : prop;
+        const val = target[prop];
+
+        if (val === undefined || val === null) {
+          // Missing leaf — return a SafeString chip.
+          return makeChip(fullPath);
+        }
+        if (typeof val === 'object') {
+          // Sub-object — recurse so nested paths are also chip-wrapped.
+          return wrapObject(val, fullPath);
+        }
+        // Primitive value present — return as-is.
+        return val;
+      }
+    });
+  }
+
+  // Pre-seed unsubscribe on the root data before wrapping so the Proxy sees it
+  // as a present value and returns it directly (no chip emitted).
+  const root = Object.assign({}, data, { unsubscribe: '#unsubscribe-preview' });
+  return wrapObject(root, '');
+}
+
 function applyTestData(html) {
   if (!testDataEnabled || !testDataValid) return html;
-  const context = { ...testData, unsubscribe: '#unsubscribe-preview' };
-  return Handlebars.compile(html)(context);
+  let template;
+  try {
+    template = Handlebars.compile(html);
+  } catch (e) {
+    setTestDataHint('Template error: ' + e.message, 'error');
+    return html;
+  }
+  const context = buildTestDataContext(testData);
+  try {
+    return template(context);
+  } catch (e) {
+    setTestDataHint('Template error: ' + e.message, 'error');
+    return html;
+  }
 }
 
 function setTestDataHint(text, kind) {
