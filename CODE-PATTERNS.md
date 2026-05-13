@@ -33,9 +33,22 @@ to a canonical example — read those for the actual implementation.
 
 ### `applyTestData`
 
-- **Location:** `index.html` ~line 1094
-- **Use it for:** Preview-only Handlebars substitution — resolves `{{dot.path}}` and `{{{triple}}}` tokens against the parsed test-data JSON object. Never applied to the copied / exported HTML.
-- **Canonical example:** called inside `render()` after `mjml2html()`.
+- **Location:** `index.html` ~line 1504
+- **Use it for:** Preview-only Handlebars substitution — compiles the rendered HTML with `Handlebars.compile()` and invokes the template against a Proxy-wrapped context built by `buildTestDataContext()`. Resolves `{{dot.path}}` / `{{{triple}}}` tokens, registered helpers (`#equals`, `#notEquals`, `#greaterThan`, `#lessThan`, `insert`, `formatDate`), and native Handlebars block helpers. Never applied to the copied / exported HTML.
+- **Canonical example:** called inside `render()` after `mjml2html()`; result is the iframe `srcdoc`.
+
+### `buildTestDataContext`
+
+- **Location:** `index.html` ~line 1404
+- **Use it for:** Wrapping a parsed test-data object in a Proxy so that any key lookup that resolves to `undefined` emits a visible yellow chip in the preview rather than silently rendering as an empty string. Used exclusively by `applyTestData()` — never applied to the copied / exported HTML.
+- **Critical Handlebars 4.7+ trap requirement:** the Proxy MUST include `has(target, prop)` and `getOwnPropertyDescriptor(target, prop)` traps in addition to the `get` trap. Handlebars' `lookupProperty` (`proto-access.js`) calls `Object.prototype.hasOwnProperty.call(obj, key)` to guard against prototype-pollution. `hasOwnProperty` does NOT go through the `get` trap — without `has` and `getOwnPropertyDescriptor`, every chip emitted from a nested path is silently stripped back to `undefined` before reaching rendered output. Fix landed in commit a16e93d. Any extension of `buildTestDataContext` must preserve all three traps.
+- **Internal-key allowlist:** `INTERNAL_KEYS` (a `Set`) + Symbol passthrough + `__`-prefix guard prevent chip leakage into Handlebars' own property probes. Extend `INTERNAL_KEYS` if new template patterns cause stray chips in non-preview output.
+
+### `humanizeTemplateError`
+
+- **Location:** `index.html` ~line 1476
+- **Use it for:** Translating raw Handlebars compile/render exception messages into plain-English user-facing strings. Pattern-matches known error shapes (unclosed block, mismatched tags, unbalanced mustache) and emits "Body copy: …" messages with concrete fix suggestions.
+- **Canonical example:** called from both catch arms inside `applyTestData()` before assigning `templateError`.
 
 ## Recurring Patterns
 
