@@ -1410,16 +1410,20 @@ function buildTestDataContext(data) {
     );
   }
 
+  // Predicate: true if the key should bypass chip injection (Handlebars internals,
+  // JS engine probes, Symbols, __-prefixed names). Used by all three traps below
+  // so they agree on what's "internal".
+  function isInternalKey(prop) {
+    if (typeof prop !== 'string') return true;
+    if (INTERNAL_KEYS.has(prop)) return true;
+    if (prop.startsWith('__')) return true;
+    return false;
+  }
+
   function wrapObject(obj, prefix) {
     return new Proxy(obj, {
       get(target, prop) {
-        // Non-string keys (Symbols, index probes, etc.) — pass through untouched.
-        if (typeof prop !== 'string') return target[prop];
-        // Internal Handlebars / JS engine sentinel names — return real value or
-        // undefined; never emit a chip for these.
-        if (INTERNAL_KEYS.has(prop)) return target[prop];
-        // Any key starting with __ is treated as an internal probe.
-        if (prop.startsWith('__')) return target[prop];
+        if (isInternalKey(prop)) return target[prop];
 
         const fullPath = prefix ? prefix + '.' + prop : prop;
         const val = target[prop];
@@ -1434,6 +1438,22 @@ function buildTestDataContext(data) {
         }
         // Primitive value present — return as-is.
         return val;
+      },
+      // Handlebars 4.7+ guards prototype-chain access via hasOwnProperty checks
+      // (lookupProperty in dist/cjs/handlebars/internal/proto-access.js). Without
+      // these traps, hasOwnProperty returns false for missing keys and our chip
+      // is stripped back to undefined before it reaches the rendered output.
+      has(target, prop) {
+        if (isInternalKey(prop)) return prop in target;
+        return true;
+      },
+      getOwnPropertyDescriptor(target, prop) {
+        const real = Object.getOwnPropertyDescriptor(target, prop);
+        if (real) return real;
+        if (isInternalKey(prop)) return undefined;
+        // Fake descriptor: hasOwnProperty only checks that the descriptor exists,
+        // not its contents. The actual value still flows through the `get` trap.
+        return { enumerable: true, configurable: true, writable: false, value: undefined };
       }
     });
   }
