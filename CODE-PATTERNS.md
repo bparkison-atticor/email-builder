@@ -57,6 +57,9 @@ to a canonical example — read those for the actual implementation.
 - **Template config schema.** Each brand is one object in `TEMPLATE_CONFIGS` (~line 664). Adding a brand means copying an existing entry and updating its keys; the render pipeline reads these at runtime.
 - **MJML as the output format.** All email layout is expressed as MJML, compiled to HTML via `mjml-browser` in the browser. Do not write raw `<table>` email HTML by hand.
 - **Validation before copy.** Any new required field should participate in the validation pass inside `runCopyAction()` — call `markInvalid()` on missing values and return early before copying.
+- **Error surface routing.** Two distinct error displays — pick the right one or marketers won't see the error:
+  - `#testDataHint` (`.hint` element below the JSON textarea, ~line 599) — JSON parse errors only, set via `setTestDataHint()`. Do NOT use for Handlebars compile or render errors.
+  - `#warn` (`.warn` banner above the preview iframe, ~line 648) — template compile errors, MJML warnings, and placeholder image notices. Set via `showWarn()`. Template errors are staged in the module-scope `templateError` variable (set inside `applyTestData()`) and folded in by `render()` at the `warnings.unshift(templateError)` call (~line 1607). Any new error that requires marketer attention during preview must go through `#warn`.
 
 `/sf:compound` will append patterns extracted from completed sprints to
 this file over time.
