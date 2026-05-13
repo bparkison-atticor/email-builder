@@ -13,14 +13,6 @@
     "created_at": "2026-05-13T12:25:17.000Z"
   },
   "tasks": {
-    "TASK-005": {
-      "status": "pending",
-      "depends_on": [
-        "TASK-004"
-      ],
-      "epic": "sendgrid-handlebars-preview",
-      "idea": "IDEA-001"
-    },
     "TASK-006": {
       "status": "pending",
       "depends_on": [
