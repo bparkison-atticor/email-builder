@@ -714,9 +714,11 @@ import mjml2html from 'https://esm.sh/mjml-browser@4.15.3';
 // ============================================================
 // SENDGRID HANDLEBARS HELPER SHIMS
 //
-// Registered helpers:  equals, notEquals, greaterThan, lessThan, insert, formatDate
-// Deferred (IDEA-001 Q3): #and, #or — semantics unverified against SendGrid engine.
+// Registered helpers:  equals, notEquals, greaterThan, lessThan, insert, formatDate, #and, #or
 // Do NOT re-register native Handlebars builtins: #if, #each, #unless, {{{raw}}}.
+//
+// #and / #or are variadic and use chip-aware truthiness — missing-data chips,
+// "", and "false" all count as falsy (matches Handlebars #if string semantics).
 //
 // Registration happens at module-evaluation time (before any render() or
 // applyTestData() call). window.Handlebars is guaranteed defined here because
@@ -728,6 +730,15 @@ import mjml2html from 'https://esm.sh/mjml-browser@4.15.3';
 function isMissingChip(val) {
   return (val instanceof Handlebars.SafeString) &&
     String(val).startsWith('<span style="background:#fef08a');
+}
+
+// Truthiness predicate used by #and / #or. Treats missing-data chips, empty
+// string, and the literal string "false" as falsy — matches Handlebars #if
+// string semantics and is consistent with how SendGrid evaluates these values.
+function isTruthy(val) {
+  if (isMissingChip(val)) return false;
+  if (val === '' || val === 'false') return false;
+  return Boolean(val);
 }
 
 // Block helper: type-coercing equality (e.g. "1" == 1 → true, per SendGrid semantics).
@@ -753,6 +764,27 @@ Handlebars.registerHelper('greaterThan', function (a, b, options) {
 Handlebars.registerHelper('lessThan', function (a, b, options) {
   if (isMissingChip(a) || isMissingChip(b)) return options.inverse(this);
   return (Number(a) < Number(b)) ? options.fn(this) : options.inverse(this);
+});
+
+// Block helper: variadic logical AND. Renders fn(this) only when every
+// positional arg is truthy (chip-aware; '' and 'false' count as falsy,
+// matching Handlebars #if string semantics).
+Handlebars.registerHelper('and', function () {
+  const options = arguments[arguments.length - 1];
+  for (let i = 0; i < arguments.length - 1; i++) {
+    if (!isTruthy(arguments[i])) return options.inverse(this);
+  }
+  return options.fn(this);
+});
+
+// Block helper: variadic logical OR. Renders fn(this) when any positional
+// arg is truthy (chip-aware; '' and 'false' count as falsy).
+Handlebars.registerHelper('or', function () {
+  const options = arguments[arguments.length - 1];
+  for (let i = 0; i < arguments.length - 1; i++) {
+    if (isTruthy(arguments[i])) return options.fn(this);
+  }
+  return options.inverse(this);
 });
 
 // Inline helper: resolve path value from context; fall back to default= literal.
