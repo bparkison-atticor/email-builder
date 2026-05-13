@@ -12,12 +12,5 @@
     "base_sha": "cd636dc2523cda39bd49b8338ef1e8bac9095686",
     "created_at": "2026-05-13T14:21:08.000Z"
   },
-  "tasks": {
-    "TASK-008": {
-      "status": "pending",
-      "depends_on": [],
-      "epic": "sendgrid-handlebars-preview",
-      "idea": "IDEA-001"
-    }
-  }
+  "tasks": {}
 }
