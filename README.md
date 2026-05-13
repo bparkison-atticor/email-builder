@@ -46,13 +46,47 @@ The server binds to `127.0.0.1` (localhost only) so nothing on your Wi-Fi can re
 
 ### Test data panel
 
-The yellow **Test data** card holds a JSON object used for preview-only Handlebars substitution. It mirrors SendGrid's "test data" panel — `{{Path.To.Value}}` and `{{{Path.To.Value}}}` tokens in the rendered HTML resolve against this object so you can see real names/links instead of raw tokens.
+The yellow **Test data** card holds a JSON object used for preview-only Handlebars substitution. It mirrors SendGrid's "test data" panel — `{{Path.To.Value}}` and `{{{Path.To.Value}}}` tokens in the rendered HTML resolve against this object so you can see real names/links instead of raw tokens. Powered by Handlebars 4.7 with shims for SendGrid's documented helper set, so the preview matches what SendGrid will produce at send time.
 
 - Substitution **only affects the live preview**. The HTML produced by **Copy HTML** and **View HTML** keeps the raw `{{tokens}}` intact.
 - The **Test data** toggle in the preview header (next to the viewport toggle) flips substitution on/off without losing the JSON. Toggle state and the JSON itself persist across reloads via `localStorage`.
 - `{{{unsubscribe}}}` resolves to a harmless `#unsubscribe-preview` href when no value is provided, so the unsubscribe link is clickable in preview without needing to define it.
-- Tokens with no matching path are left as-is in the preview (visible-on-miss), so missing data is obvious instead of silently blank.
+- Tokens with no matching path render as a yellow `[Path.Name — not set]` chip in the preview, so missing data is unmistakable instead of silently blank.
 - Invalid JSON disables substitution and shows the parse error under the textarea; the field outline turns red.
+
+#### Supported Handlebars helpers
+
+Block conditionals (all support `{{else}}`):
+
+- `{{#if value}} … {{else}} … {{/if}}`
+- `{{#unless value}} … {{/unless}}`
+- `{{#equals a b}} … {{/equals}}` — type-coercing (`"1" == 1` is true)
+- `{{#notEquals a b}} … {{/notEquals}}`
+- `{{#greaterThan a b}} … {{/greaterThan}}` / `{{#lessThan a b}} … {{/lessThan}}` — numeric, coerces string-valued paths
+- `{{#each items}} … {{this}} … {{/each}}`
+
+Inline helpers:
+
+- `{{insert Path.Name 'default=Customer'}}` — resolves the path; falls back to the literal after `default=` when the path is missing/null
+- `{{formatDate value 'MM/DD/YYYY'}}` — supports `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` tokens; returns the raw input unchanged when the date is invalid
+
+Conditional copy with nested branches (the Postman Law-style "case type" pattern) works:
+
+```handlebars
+{{#equals Client.CaseType "Social Security Disability Insurance"}}
+  navigating a disability claim
+{{else}}{{#equals Client.CaseType "Veterans Disability Claims"}}
+  pursuing a VA disability claim
+{{else}}
+  dealing with an injury
+{{/equals}}{{/equals}}
+```
+
+Missing paths inside a block-helper comparand are treated as falsy and route to the else branch — so `{{#equals Client.MissingField "X"}}…{{else}}…{{/equals}}` renders the else branch without throwing.
+
+#### Template syntax errors
+
+If the body copy has a syntax issue (unclosed `{{#…}}` block, mismatched tags, unbalanced `{{`), the preview shows a yellow warning banner directly above the iframe with a plain-English message (e.g. `Body copy: unclosed {{#equals}} block — add a matching {{/equals}}.`). The preview still renders the underlying email structure so you can keep editing; the banner clears as soon as the syntax is valid again.
 
 ### Validation and invalid-field highlighting
 
@@ -93,7 +127,7 @@ To add a new brand: copy one of the existing entries, give it a new key, edit th
 
 ## Scope
 
-**In:** single CTA, two rich-text body sections (bold / lists / links), multiple brand templates, live preview with desktop/mobile viewport toggle, raw HTML inspector modal, one-click copy with validation + invalid-field highlighting, plaintext phone auto-linking, preview-only Handlebars test data with `localStorage` persistence.
+**In:** single CTA, two rich-text body sections (bold / lists / links), multiple brand templates, live preview with desktop/mobile viewport toggle, raw HTML inspector modal, one-click copy with validation + invalid-field highlighting, plaintext phone auto-linking, preview-only Handlebars test data (full SendGrid helper dialect — `#if` / `#each` / `#equals` / `#notEquals` / `#greaterThan` / `#lessThan` / `insert` / `formatDate`) with missing-data chips, humanized syntax-error banner, and `localStorage` persistence.
 
 **Out:** multiple CTAs, image uploads, A/B variants, subject line injection, persistence of email content (only the test-data JSON and toggle state persist).
 
