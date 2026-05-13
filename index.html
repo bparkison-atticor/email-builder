@@ -6,6 +6,7 @@
 <title>Email Builder</title>
 <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/handlebars@4.7.8/dist/handlebars.min.js"></script>
 <!--
   HOW TO RUN
   This file uses ES modules and CDN imports, which browsers block on file://.
@@ -1289,31 +1290,10 @@ let testData = {};
 let testDataValid = true;
 let testDataEnabled = localStorage.getItem('emailBuilder.testDataEnabled') !== 'false';
 
-// Triple-brace tokens are unescaped in Handlebars/SendGrid; double-brace are HTML-escaped.
-// The path uses \w + dots, so block helpers ({{#if}}, {{/if}}, {{else}}, {{!comment}}) are
-// naturally skipped — they contain non-word chars that don't match this pattern.
-const HANDLEBARS_TOKEN = /\{\{(\{)?\s*([\w.]+)\s*(\})?\}\}/g;
-
-function resolveTokenPath(obj, path) {
-  return path.split('.').reduce((acc, key) => (acc == null ? acc : acc[key]), obj);
-}
-
 function applyTestData(html) {
   if (!testDataEnabled || !testDataValid) return html;
-  return html.replace(HANDLEBARS_TOKEN, (match, openTriple, path, closeTriple) => {
-    // Only treat as triple-brace if both sides match — otherwise it's a malformed token; skip.
-    const isTriple = !!openTriple && !!closeTriple;
-    if (!!openTriple !== !!closeTriple) return match;
-
-    // SendGrid injects {{{unsubscribe}}} at send time; in preview, give it a harmless href.
-    if (path === 'unsubscribe' && resolveTokenPath(testData, path) === undefined) {
-      return '#unsubscribe-preview';
-    }
-
-    const value = resolveTokenPath(testData, path);
-    if (value === undefined || value === null) return match; // visible-on-miss
-    return isTriple ? String(value) : escapeHtml(value);
-  });
+  const context = { ...testData, unsubscribe: '#unsubscribe-preview' };
+  return Handlebars.compile(html)(context);
 }
 
 function setTestDataHint(text, kind) {
