@@ -712,6 +712,65 @@
 import mjml2html from 'https://esm.sh/mjml-browser@4.15.3';
 
 // ============================================================
+// SENDGRID HANDLEBARS HELPER SHIMS
+//
+// Registered helpers:  equals, notEquals, greaterThan, lessThan, insert, formatDate
+// Deferred (IDEA-001 Q3): #and, #or — semantics unverified against SendGrid engine.
+// Do NOT re-register native Handlebars builtins: #if, #each, #unless, {{{raw}}}.
+//
+// Registration happens at module-evaluation time (before any render() or
+// applyTestData() call). window.Handlebars is guaranteed defined here because
+// the CDN <script src> in <head> is synchronous and loads before this module.
+// ============================================================
+// Block helper: type-coercing equality (e.g. "1" == 1 → true, per SendGrid semantics).
+Handlebars.registerHelper('equals', function (a, b, options) {
+  return (a == b) ? options.fn(this) : options.inverse(this);
+});
+
+// Block helper: logical inverse of equals.
+Handlebars.registerHelper('notEquals', function (a, b, options) {
+  return (a != b) ? options.fn(this) : options.inverse(this);
+});
+
+// Block helper: numeric greater-than; Number() coercion handles string-valued paths.
+Handlebars.registerHelper('greaterThan', function (a, b, options) {
+  return (Number(a) > Number(b)) ? options.fn(this) : options.inverse(this);
+});
+
+// Block helper: numeric less-than; symmetric to greaterThan.
+Handlebars.registerHelper('lessThan', function (a, b, options) {
+  return (Number(a) < Number(b)) ? options.fn(this) : options.inverse(this);
+});
+
+// Inline helper: resolve path value from context; fall back to default= literal.
+// typeof guard handles Handlebars passing its options object as the last arg
+// when no second positional argument is supplied by the caller.
+Handlebars.registerHelper('insert', function (value, defaultArg) {
+  if (value !== undefined && value !== null && value !== '') return value;
+  if (typeof defaultArg === 'string') {
+    const m = defaultArg.match(/^default=(.*)$/);
+    if (m) return m[1];
+  }
+  return '';
+});
+
+// Inline helper: format a date value using YYYY/MM/DD/HH/mm/ss tokens.
+// Returns raw input unchanged when date is invalid or format is not a string.
+Handlebars.registerHelper('formatDate', function (value, format) {
+  if (typeof format !== 'string') return value;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  const pad = (n) => String(n).padStart(2, '0');
+  return format
+    .replace(/YYYY/g, d.getFullYear())
+    .replace(/MM/g, pad(d.getMonth() + 1))
+    .replace(/DD/g, pad(d.getDate()))
+    .replace(/HH/g, pad(d.getHours()))
+    .replace(/mm/g, pad(d.getMinutes()))
+    .replace(/ss/g, pad(d.getSeconds()));
+});
+
+// ============================================================
 // TEMPLATE CONFIGS — edit brand assets here.
 //   bannerImageUrl     — publicly hosted image URL (CDN / SendGrid)
 //   bannerHref         — optional; wraps banner in a clickable link
