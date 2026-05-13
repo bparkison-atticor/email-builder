@@ -1377,6 +1377,11 @@ const SAMPLE_TEST_DATA = {
 let testData = {};
 let testDataValid = true;
 let testDataEnabled = localStorage.getItem('emailBuilder.testDataEnabled') !== 'false';
+// Module-scope flag set by applyTestData when Handlebars compile/render throws.
+// render() picks it up and folds it into the #warn banner alongside MJML warnings,
+// so the error appears above the preview where the marketer is already looking
+// (the body copy is where the syntax error came from — #testDataHint is the wrong place).
+let templateError = '';
 
 // buildTestDataContext(data) — wraps the parsed test-data object in a Proxy so
 // that any key lookup that resolves to undefined emits a visible yellow chip
@@ -1465,19 +1470,24 @@ function buildTestDataContext(data) {
 }
 
 function applyTestData(html) {
-  if (!testDataEnabled || !testDataValid) return html;
+  if (!testDataEnabled || !testDataValid) {
+    templateError = '';
+    return html;
+  }
   let template;
   try {
     template = Handlebars.compile(html);
   } catch (e) {
-    setTestDataHint('Template error: ' + e.message, 'error');
+    templateError = 'Body copy template error: ' + e.message;
     return html;
   }
   const context = buildTestDataContext(testData);
   try {
-    return template(context);
+    const out = template(context);
+    templateError = '';
+    return out;
   } catch (e) {
-    setTestDataHint('Template error: ' + e.message, 'error');
+    templateError = 'Body copy template error: ' + e.message;
     return html;
   }
 }
@@ -1561,6 +1571,7 @@ function render() {
       const suffix = result.errors.length > 3 ? ` (+${result.errors.length - 3} more)` : '';
       warnings.push(`MJML warning: ${msgs.join('; ')}${suffix}`);
     }
+    if (templateError) warnings.unshift(templateError);
     showWarn(warnings.join(' · '));
   } catch (e) {
     lastHtml = '';
