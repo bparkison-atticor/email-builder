@@ -1,5 +1,5 @@
 ---
-# soloflow-shadow: version=0.3.0-lite synced=2026-05-06T20:11:14.271Z
+# soloflow-shadow: version=0.3.0-lite synced=2026-05-13T18:24:03.835Z
 name: shadow-roadmap-researcher
 description: Performs focused research on a single dimension for roadmap generation — ecosystem, user needs, architecture, or risks
 model: sonnet
