@@ -34,7 +34,7 @@ to a canonical example — read those for the actual implementation.
 ### `applyTestData`
 
 - **Location:** `index.html` ~line 1504
-- **Use it for:** Preview-only Handlebars substitution — compiles the rendered HTML with `Handlebars.compile()` and invokes the template against a Proxy-wrapped context built by `buildTestDataContext()`. Resolves `{{dot.path}}` / `{{{triple}}}` tokens, registered helpers (`#equals`, `#notEquals`, `#greaterThan`, `#lessThan`, `insert`, `formatDate`), and native Handlebars block helpers. Never applied to the copied / exported HTML.
+- **Use it for:** Preview-only Handlebars substitution — compiles the rendered HTML with `Handlebars.compile()` and invokes the template against a Proxy-wrapped context built by `buildTestDataContext()`. Resolves `{{dot.path}}` / `{{{triple}}}` tokens, registered helpers (`#equals`, `#notEquals`, `#greaterThan`, `#lessThan`, `insert`, `formatDate`, `#and`, `#or`), and native Handlebars block helpers. Never applied to the copied / exported HTML.
 - **Canonical example:** called inside `render()` after `mjml2html()`; result is the iframe `srcdoc`.
 
 ### `buildTestDataContext`
