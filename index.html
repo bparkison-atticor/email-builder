@@ -6,6 +6,7 @@
 <title>Email Builder</title>
 <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/handlebars@4.7.8/dist/handlebars.min.js"></script>
 <!--
   HOW TO RUN
   This file uses ES modules and CDN imports, which browsers block on file://.
@@ -711,6 +712,94 @@
 import mjml2html from 'https://esm.sh/mjml-browser@4.15.3';
 
 // ============================================================
+// SENDGRID HANDLEBARS HELPER SHIMS
+//
+// Registered helpers:  equals, notEquals, greaterThan, lessThan, insert, formatDate
+// Deferred (IDEA-001 Q3): #and, #or — semantics unverified against SendGrid engine.
+// Do NOT re-register native Handlebars builtins: #if, #each, #unless, {{{raw}}}.
+//
+// Registration happens at module-evaluation time (before any render() or
+// applyTestData() call). window.Handlebars is guaranteed defined here because
+// the CDN <script src> in <head> is synchronous and loads before this module.
+// ============================================================
+// Sentinel detection helper: returns true if the value is a missing-path chip
+// emitted by buildTestDataContext(). Used by block helpers to treat absent
+// test-data paths as falsy (else-branch routing).
+function isMissingChip(val) {
+  return (val instanceof Handlebars.SafeString) &&
+    String(val).startsWith('<span style="background:#fef08a');
+}
+
+// Block helper: type-coercing equality (e.g. "1" == 1 → true, per SendGrid semantics).
+// Missing-path chips route to the else branch so authors see falsy behavior.
+Handlebars.registerHelper('equals', function (a, b, options) {
+  if (isMissingChip(a) || isMissingChip(b)) return options.inverse(this);
+  return (a == b) ? options.fn(this) : options.inverse(this);
+});
+
+// Block helper: logical inverse of equals.
+Handlebars.registerHelper('notEquals', function (a, b, options) {
+  if (isMissingChip(a) || isMissingChip(b)) return options.inverse(this);
+  return (a != b) ? options.fn(this) : options.inverse(this);
+});
+
+// Block helper: numeric greater-than; Number() coercion handles string-valued paths.
+Handlebars.registerHelper('greaterThan', function (a, b, options) {
+  if (isMissingChip(a) || isMissingChip(b)) return options.inverse(this);
+  return (Number(a) > Number(b)) ? options.fn(this) : options.inverse(this);
+});
+
+// Block helper: numeric less-than; symmetric to greaterThan.
+Handlebars.registerHelper('lessThan', function (a, b, options) {
+  if (isMissingChip(a) || isMissingChip(b)) return options.inverse(this);
+  return (Number(a) < Number(b)) ? options.fn(this) : options.inverse(this);
+});
+
+// Inline helper: resolve path value from context; fall back to default= literal.
+// typeof guard handles Handlebars passing its options object as the last arg
+// when no second positional argument is supplied by the caller.
+Handlebars.registerHelper('insert', function (value, defaultArg) {
+  if (value !== undefined && value !== null && value !== '') return value;
+  if (typeof defaultArg === 'string') {
+    const m = defaultArg.match(/^default=(.*)$/);
+    if (m) return m[1];
+  }
+  return '';
+});
+
+// Inline helper: format a date value using YYYY/MM/DD/HH/mm/ss tokens.
+// Returns raw input unchanged when date is invalid or format is not a string.
+Handlebars.registerHelper('formatDate', function (value, format) {
+  if (typeof format !== 'string') return value;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  const pad = (n) => String(n).padStart(2, '0');
+  return format
+    .replace(/YYYY/g, d.getFullYear())
+    .replace(/MM/g, pad(d.getMonth() + 1))
+    .replace(/DD/g, pad(d.getDate()))
+    .replace(/HH/g, pad(d.getHours()))
+    .replace(/mm/g, pad(d.getMinutes()))
+    .replace(/ss/g, pad(d.getSeconds()));
+});
+
+// Fallback for top-level path misses that bypass the context Proxy (e.g., a root
+// key like {{TotallyMissingKey}} when no parent object exists in testData).
+// options.name holds the path string that Handlebars tried to resolve.
+Handlebars.registerHelper('helperMissing', function () {
+  const options = arguments[arguments.length - 1];
+  return new Handlebars.SafeString(
+    '<span style="background:#fef08a;padding:0 2px;border-radius:2px;font-family:monospace;font-size:0.9em">[' +
+    options.name + ' — not set]</span>'
+  );
+});
+
+// Fallback for block invocations against an unresolved helper — render else branch.
+Handlebars.registerHelper('blockHelperMissing', function (context, options) {
+  return options.inverse ? options.inverse(this) : '';
+});
+
+// ============================================================
 // TEMPLATE CONFIGS — edit brand assets here.
 //   bannerImageUrl     — publicly hosted image URL (CDN / SendGrid)
 //   bannerHref         — optional; wraps banner in a clickable link
@@ -1288,32 +1377,152 @@ const SAMPLE_TEST_DATA = {
 let testData = {};
 let testDataValid = true;
 let testDataEnabled = localStorage.getItem('emailBuilder.testDataEnabled') !== 'false';
+// Module-scope flag set by applyTestData when Handlebars compile/render throws.
+// render() picks it up and folds it into the #warn banner alongside MJML warnings,
+// so the error appears above the preview where the marketer is already looking
+// (the body copy is where the syntax error came from — #testDataHint is the wrong place).
+let templateError = '';
 
-// Triple-brace tokens are unescaped in Handlebars/SendGrid; double-brace are HTML-escaped.
-// The path uses \w + dots, so block helpers ({{#if}}, {{/if}}, {{else}}, {{!comment}}) are
-// naturally skipped — they contain non-word chars that don't match this pattern.
-const HANDLEBARS_TOKEN = /\{\{(\{)?\s*([\w.]+)\s*(\})?\}\}/g;
+// buildTestDataContext(data) — wraps the parsed test-data object in a Proxy so
+// that any key lookup that resolves to undefined emits a visible yellow chip
+// in the preview rather than silently rendering as an empty string.
+//
+// Design decisions:
+//   • `unsubscribe` is pre-seeded on the root data object before the Proxy is
+//     constructed so that {{{unsubscribe}}} resolves to '#unsubscribe-preview'
+//     with no chip (criterion 5).
+//   • Handlebars probes the context object with internal property names
+//     (__proto__, constructor, then, toString, valueOf, Symbol.*). Those must
+//     return undefined (not a chip) or Handlebars' machinery breaks. They are
+//     caught by: (a) a Symbol type-check, (b) an allowlist of string sentinels.
+//   • Sub-object keys return a recursively wrapped Proxy so nested paths like
+//     Client.FirstName traverse correctly.
+//   • Missing leaf keys return a Handlebars.SafeString chip. SafeString prevents
+//     double-escaping when output via {{double-brace}} mustaches (criterion 4).
+//   • isMissingChip() (above) lets the four block helpers treat these chips as
+//     falsy / else-branch (criterion 6).
+function buildTestDataContext(data) {
+  // Internal Handlebars property names that must NOT produce chips.
+  const INTERNAL_KEYS = new Set([
+    '__proto__', 'constructor', 'then', 'toString', 'valueOf',
+    'toJSON', 'inspect', 'nodeType', 'call', 'apply', 'bind',
+  ]);
 
-function resolveTokenPath(obj, path) {
-  return path.split('.').reduce((acc, key) => (acc == null ? acc : acc[key]), obj);
+  function makeChip(path) {
+    return new Handlebars.SafeString(
+      '<span style="background:#fef08a;padding:0 2px;border-radius:2px;font-family:monospace;font-size:0.9em">[' +
+      path + ' — not set]</span>'
+    );
+  }
+
+  // Predicate: true if the key should bypass chip injection (Handlebars internals,
+  // JS engine probes, Symbols, __-prefixed names). Used by all three traps below
+  // so they agree on what's "internal".
+  function isInternalKey(prop) {
+    if (typeof prop !== 'string') return true;
+    if (INTERNAL_KEYS.has(prop)) return true;
+    if (prop.startsWith('__')) return true;
+    return false;
+  }
+
+  function wrapObject(obj, prefix) {
+    return new Proxy(obj, {
+      get(target, prop) {
+        if (isInternalKey(prop)) return target[prop];
+
+        const fullPath = prefix ? prefix + '.' + prop : prop;
+        const val = target[prop];
+
+        if (val === undefined || val === null) {
+          // Missing leaf — return a SafeString chip.
+          return makeChip(fullPath);
+        }
+        if (typeof val === 'object') {
+          // Sub-object — recurse so nested paths are also chip-wrapped.
+          return wrapObject(val, fullPath);
+        }
+        // Primitive value present — return as-is.
+        return val;
+      },
+      // Handlebars 4.7+ guards prototype-chain access via hasOwnProperty checks
+      // (lookupProperty in dist/cjs/handlebars/internal/proto-access.js). Without
+      // these traps, hasOwnProperty returns false for missing keys and our chip
+      // is stripped back to undefined before it reaches the rendered output.
+      has(target, prop) {
+        if (isInternalKey(prop)) return prop in target;
+        return true;
+      },
+      getOwnPropertyDescriptor(target, prop) {
+        const real = Object.getOwnPropertyDescriptor(target, prop);
+        if (real) return real;
+        if (isInternalKey(prop)) return undefined;
+        // Fake descriptor: hasOwnProperty only checks that the descriptor exists,
+        // not its contents. The actual value still flows through the `get` trap.
+        return { enumerable: true, configurable: true, writable: false, value: undefined };
+      }
+    });
+  }
+
+  // Pre-seed unsubscribe on the root data before wrapping so the Proxy sees it
+  // as a present value and returns it directly (no chip emitted).
+  const root = Object.assign({}, data, { unsubscribe: '#unsubscribe-preview' });
+  return wrapObject(root, '');
+}
+
+// Translate raw Handlebars error messages (which expose tokenizer internals like
+// "Parse error on line N: Expecting 'CLOSE_BLOCK', got 'EOF'") into something a
+// marketer can act on. The line number refers to compiled HTML they never see,
+// so it's stripped; the "Expecting X" tail is mapped to a plain-English fix.
+function humanizeTemplateError(message) {
+  if (!message) return 'Body copy: template syntax error.';
+
+  // Try to extract the offending helper/block name from a quoted source snippet.
+  const blockMatch = message.match(/\{\{#(\w+)/);
+  const blockName = blockMatch ? blockMatch[1] : null;
+
+  if (/Expecting 'CLOSE_BLOCK'/.test(message)) {
+    return blockName
+      ? `Body copy: unclosed {{#${blockName}}} block — add a matching {{/${blockName}}}.`
+      : 'Body copy: unclosed {{#…}} block — check for a missing closing tag like {{/if}} or {{/equals}}.';
+  }
+  const mismatch = message.match(/(\w+) doesn't match (\w+)/i);
+  if (mismatch) {
+    return `Body copy: mismatched template tags — {{#${mismatch[2]}}} closed with {{/${mismatch[1]}}}.`;
+  }
+  if (/Expecting 'CLOSE_RAW_BLOCK'/.test(message)) {
+    return 'Body copy: unclosed raw block — check your {{{{…}}}} tags.';
+  }
+  if (/Expecting 'CLOSE/.test(message)) {
+    return 'Body copy: unclosed {{ tag — check for a missing }}.';
+  }
+  if (/^Parse error/i.test(message)) {
+    return 'Body copy: template syntax error — check your {{…}} tags for typos or missing braces.';
+  }
+  // Render-time error (helper threw, etc.) — show its first line; drop stack noise.
+  return 'Body copy: ' + message.split('\n')[0];
 }
 
 function applyTestData(html) {
-  if (!testDataEnabled || !testDataValid) return html;
-  return html.replace(HANDLEBARS_TOKEN, (match, openTriple, path, closeTriple) => {
-    // Only treat as triple-brace if both sides match — otherwise it's a malformed token; skip.
-    const isTriple = !!openTriple && !!closeTriple;
-    if (!!openTriple !== !!closeTriple) return match;
-
-    // SendGrid injects {{{unsubscribe}}} at send time; in preview, give it a harmless href.
-    if (path === 'unsubscribe' && resolveTokenPath(testData, path) === undefined) {
-      return '#unsubscribe-preview';
-    }
-
-    const value = resolveTokenPath(testData, path);
-    if (value === undefined || value === null) return match; // visible-on-miss
-    return isTriple ? String(value) : escapeHtml(value);
-  });
+  if (!testDataEnabled || !testDataValid) {
+    templateError = '';
+    return html;
+  }
+  let template;
+  try {
+    template = Handlebars.compile(html);
+  } catch (e) {
+    templateError = humanizeTemplateError(e.message);
+    return html;
+  }
+  const context = buildTestDataContext(testData);
+  try {
+    const out = template(context);
+    templateError = '';
+    return out;
+  } catch (e) {
+    templateError = humanizeTemplateError(e.message);
+    return html;
+  }
 }
 
 function setTestDataHint(text, kind) {
@@ -1395,6 +1604,7 @@ function render() {
       const suffix = result.errors.length > 3 ? ` (+${result.errors.length - 3} more)` : '';
       warnings.push(`MJML warning: ${msgs.join('; ')}${suffix}`);
     }
+    if (templateError) warnings.unshift(templateError);
     showWarn(warnings.join(' · '));
   } catch (e) {
     lastHtml = '';

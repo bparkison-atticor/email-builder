@@ -1,6 +1,16 @@
 {
   "version": 2,
-  "sprint": null,
-  "run": null,
+  "sprint": {
+    "id": "SPRINT-002",
+    "status": "complete",
+    "started": "2026-05-13T00:00:00.000Z",
+    "execution_mode": "serial"
+  },
+  "run": {
+    "branch": "soloflow/run-20260513-122517-SPRINT-002",
+    "base_branch": "main",
+    "base_sha": "b5b84b98753672aacbfcc790f9c8da41ec73b10b",
+    "created_at": "2026-05-13T12:25:17.000Z"
+  },
   "tasks": {}
 }

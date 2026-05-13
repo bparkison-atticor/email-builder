@@ -6,24 +6,6 @@
       "depends_on": ["TASK-002"],
       "epic": "rich-text-link-ux",
       "idea": "SPRINT-001-compounder"
-    },
-    "TASK-004": {
-      "status": "ready",
-      "depends_on": [],
-      "epic": "sendgrid-handlebars-preview",
-      "idea": "IDEA-001"
-    },
-    "TASK-005": {
-      "status": "ready",
-      "depends_on": ["TASK-004"],
-      "epic": "sendgrid-handlebars-preview",
-      "idea": "IDEA-001"
-    },
-    "TASK-006": {
-      "status": "ready",
-      "depends_on": ["TASK-004", "TASK-005"],
-      "epic": "sendgrid-handlebars-preview",
-      "idea": "IDEA-001"
     }
   }
 }
