@@ -1469,6 +1469,39 @@ function buildTestDataContext(data) {
   return wrapObject(root, '');
 }
 
+// Translate raw Handlebars error messages (which expose tokenizer internals like
+// "Parse error on line N: Expecting 'CLOSE_BLOCK', got 'EOF'") into something a
+// marketer can act on. The line number refers to compiled HTML they never see,
+// so it's stripped; the "Expecting X" tail is mapped to a plain-English fix.
+function humanizeTemplateError(message) {
+  if (!message) return 'Body copy: template syntax error.';
+
+  // Try to extract the offending helper/block name from a quoted source snippet.
+  const blockMatch = message.match(/\{\{#(\w+)/);
+  const blockName = blockMatch ? blockMatch[1] : null;
+
+  if (/Expecting 'CLOSE_BLOCK'/.test(message)) {
+    return blockName
+      ? `Body copy: unclosed {{#${blockName}}} block — add a matching {{/${blockName}}}.`
+      : 'Body copy: unclosed {{#…}} block — check for a missing closing tag like {{/if}} or {{/equals}}.';
+  }
+  const mismatch = message.match(/(\w+) doesn't match (\w+)/i);
+  if (mismatch) {
+    return `Body copy: mismatched template tags — {{#${mismatch[2]}}} closed with {{/${mismatch[1]}}}.`;
+  }
+  if (/Expecting 'CLOSE_RAW_BLOCK'/.test(message)) {
+    return 'Body copy: unclosed raw block — check your {{{{…}}}} tags.';
+  }
+  if (/Expecting 'CLOSE/.test(message)) {
+    return 'Body copy: unclosed {{ tag — check for a missing }}.';
+  }
+  if (/^Parse error/i.test(message)) {
+    return 'Body copy: template syntax error — check your {{…}} tags for typos or missing braces.';
+  }
+  // Render-time error (helper threw, etc.) — show its first line; drop stack noise.
+  return 'Body copy: ' + message.split('\n')[0];
+}
+
 function applyTestData(html) {
   if (!testDataEnabled || !testDataValid) {
     templateError = '';
@@ -1478,7 +1511,7 @@ function applyTestData(html) {
   try {
     template = Handlebars.compile(html);
   } catch (e) {
-    templateError = 'Body copy template error: ' + e.message;
+    templateError = humanizeTemplateError(e.message);
     return html;
   }
   const context = buildTestDataContext(testData);
@@ -1487,7 +1520,7 @@ function applyTestData(html) {
     templateError = '';
     return out;
   } catch (e) {
-    templateError = 'Body copy template error: ' + e.message;
+    templateError = humanizeTemplateError(e.message);
     return html;
   }
 }
