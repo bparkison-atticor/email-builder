@@ -1674,6 +1674,16 @@ const HUMANIZE_FIXTURES = [
     expected_pattern: "unclosed {{ tag",
   },
   {
+    label: 'empty message (guard)',
+    input: "",
+    expected_pattern: "template syntax error.",
+  },
+  {
+    label: 'generic parse error (no token)',
+    input: "Parse error on line 1: invalid token",
+    expected_pattern: "check your {{…}} tags",
+  },
+  {
     label: 'fallback / render-time error',
     input: "TypeError: Cannot read properties of undefined",
     expected_pattern: "Body copy: TypeError",
