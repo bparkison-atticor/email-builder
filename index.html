@@ -513,6 +513,110 @@
     flex-direction: column;
     gap: 0;
   }
+
+  /* Developer test harness overlay */
+  .test-harness {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 24px;
+  }
+  .test-harness[hidden] { display: none; }
+  .test-harness-inner {
+    background: white;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 860px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+  }
+  .test-harness-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .test-harness-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .test-harness-header button {
+    background: #f5f5f5;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .test-harness-header button:hover { background: #e8e8e8; }
+  .test-harness-body {
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .harness-row {
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+  .harness-row.pass {
+    background: #f0fdf4;
+    border-color: #86efac;
+  }
+  .harness-row.fail {
+    background: #fefce8;
+    border-color: #fde047;
+  }
+  .harness-row-label {
+    font-weight: 700;
+    font-family: var(--font);
+    font-size: 13px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .harness-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .harness-row.pass .harness-badge { background: #dcfce7; color: #166534; }
+  .harness-row.fail .harness-badge { background: #fef08a; color: #713f12; }
+  .harness-field {
+    margin-top: 4px;
+    color: var(--muted);
+  }
+  .harness-field strong { color: var(--text); }
+  .harness-field pre {
+    margin: 2px 0 0 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: rgba(0,0,0,0.03);
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--text);
+  }
 </style>
 </head>
 <body>
@@ -708,15 +812,28 @@
   </div>
 </div>
 
+<!-- Developer test harness (hidden; Ctrl+Shift+T to open) -->
+<div id="testHarness" class="test-harness" hidden>
+  <div class="test-harness-inner">
+    <div class="test-harness-header">
+      <h3>humanizeTemplateError — fixture run</h3>
+      <button type="button" id="testHarnessClose">Close</button>
+    </div>
+    <div class="test-harness-body" id="testHarnessBody"></div>
+  </div>
+</div>
+
 <script type="module">
 import mjml2html from 'https://esm.sh/mjml-browser@4.15.3';
 
 // ============================================================
 // SENDGRID HANDLEBARS HELPER SHIMS
 //
-// Registered helpers:  equals, notEquals, greaterThan, lessThan, insert, formatDate
-// Deferred (IDEA-001 Q3): #and, #or — semantics unverified against SendGrid engine.
+// Registered helpers:  equals, notEquals, greaterThan, lessThan, insert, formatDate, #and, #or
 // Do NOT re-register native Handlebars builtins: #if, #each, #unless, {{{raw}}}.
+//
+// #and / #or are variadic and use chip-aware truthiness — missing-data chips,
+// "", and "false" all count as falsy (matches Handlebars #if string semantics).
 //
 // Registration happens at module-evaluation time (before any render() or
 // applyTestData() call). window.Handlebars is guaranteed defined here because
@@ -728,6 +845,15 @@ import mjml2html from 'https://esm.sh/mjml-browser@4.15.3';
 function isMissingChip(val) {
   return (val instanceof Handlebars.SafeString) &&
     String(val).startsWith('<span style="background:#fef08a');
+}
+
+// Truthiness predicate used by #and / #or. Treats missing-data chips, empty
+// string, and the literal string "false" as falsy — matches Handlebars #if
+// string semantics and is consistent with how SendGrid evaluates these values.
+function isTruthy(val) {
+  if (isMissingChip(val)) return false;
+  if (val === '' || val === 'false') return false;
+  return Boolean(val);
 }
 
 // Block helper: type-coercing equality (e.g. "1" == 1 → true, per SendGrid semantics).
@@ -753,6 +879,27 @@ Handlebars.registerHelper('greaterThan', function (a, b, options) {
 Handlebars.registerHelper('lessThan', function (a, b, options) {
   if (isMissingChip(a) || isMissingChip(b)) return options.inverse(this);
   return (Number(a) < Number(b)) ? options.fn(this) : options.inverse(this);
+});
+
+// Block helper: variadic logical AND. Renders fn(this) only when every
+// positional arg is truthy (chip-aware; '' and 'false' count as falsy,
+// matching Handlebars #if string semantics).
+Handlebars.registerHelper('and', function () {
+  const options = arguments[arguments.length - 1];
+  for (let i = 0; i < arguments.length - 1; i++) {
+    if (!isTruthy(arguments[i])) return options.inverse(this);
+  }
+  return options.fn(this);
+});
+
+// Block helper: variadic logical OR. Renders fn(this) when any positional
+// arg is truthy (chip-aware; '' and 'false' count as falsy).
+Handlebars.registerHelper('or', function () {
+  const options = arguments[arguments.length - 1];
+  for (let i = 0; i < arguments.length - 1; i++) {
+    if (isTruthy(arguments[i])) return options.fn(this);
+  }
+  return options.inverse(this);
 });
 
 // Inline helper: resolve path value from context; fall back to default= literal.
@@ -1502,6 +1649,57 @@ function humanizeTemplateError(message) {
   return 'Body copy: ' + message.split('\n')[0];
 }
 
+// Fixture table for the developer test harness (Ctrl+Shift+T).
+// Each entry exercises one branch of humanizeTemplateError; expected_pattern is
+// matched as a substring so minor wording tweaks don't break the assertion.
+const HUMANIZE_FIXTURES = [
+  {
+    label: 'unclosed block (named)',
+    input: "Parse error on line 3: ...\n{{#equals foo \"bar\"}}\n-----^\nExpecting 'CLOSE_BLOCK', got 'EOF'",
+    expected_pattern: "unclosed {{#equals}} block",
+  },
+  {
+    label: 'mismatched tags',
+    input: "equals doesn't match if",
+    expected_pattern: "mismatched template tags",
+  },
+  {
+    label: 'unclosed raw block',
+    input: "Expecting 'CLOSE_RAW_BLOCK', got 'EOF'",
+    expected_pattern: "unclosed raw block",
+  },
+  {
+    label: 'unclosed mustache',
+    input: "Expecting 'CLOSE', got 'EOF'",
+    expected_pattern: "unclosed {{ tag",
+  },
+  {
+    label: 'fallback / render-time error',
+    input: "TypeError: Cannot read properties of undefined",
+    expected_pattern: "Body copy: TypeError",
+  },
+];
+
+function renderTestHarness() {
+  const body = document.getElementById('testHarnessBody');
+  body.innerHTML = '';
+  for (const fixture of HUMANIZE_FIXTURES) {
+    const actual = humanizeTemplateError(fixture.input);
+    const pass = actual.includes(fixture.expected_pattern);
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input:</strong><pre>' + escapeHtml(fixture.input) + '</pre></div>' +
+      '<div class="harness-field"><strong>Expected pattern:</strong> <code>' + escapeHtml(fixture.expected_pattern) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual output:</strong> <code>' + escapeHtml(actual) + '</code></div>';
+    body.appendChild(row);
+  }
+}
+
 function applyTestData(html) {
   if (!testDataEnabled || !testDataValid) {
     templateError = '';
@@ -1833,10 +2031,26 @@ htmlModal.addEventListener('click', (e) => {
   if (e.target === htmlModal) closeHtmlModal();
 });
 document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.shiftKey && (e.key === 'T' || e.key === 't')) {
+    e.preventDefault();
+    const panel = document.getElementById('testHarness');
+    if (panel.hasAttribute('hidden')) {
+      renderTestHarness();
+      panel.removeAttribute('hidden');
+    } else {
+      panel.setAttribute('hidden', '');
+    }
+    return;
+  }
   if (e.key === 'Escape') {
+    const harness = document.getElementById('testHarness');
+    if (!harness.hasAttribute('hidden')) { harness.setAttribute('hidden', ''); return; }
     if (linkModal.classList.contains('visible')) { closeLinkModal(); }
     else if (htmlModal.classList.contains('visible')) { closeHtmlModal(); }
   }
+});
+document.getElementById('testHarnessClose').addEventListener('click', () => {
+  document.getElementById('testHarness').setAttribute('hidden', '');
 });
 copyFromModal.addEventListener('click', async () => {
   const result = await runCopyAction();
