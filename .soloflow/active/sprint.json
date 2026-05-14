@@ -12,11 +12,5 @@
     "base_sha": "09bd083c3813d80f2f1f96a31bc0b1bd25f06c97",
     "created_at": "2026-05-14T00:00:00.000Z"
   },
-  "tasks": {
-    "TASK-010": {
-      "status": "pending",
-      "depends_on": [],
-      "idea": "IDEA-002"
-    }
-  }
+  "tasks": {}
 }
