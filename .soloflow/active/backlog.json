@@ -12,6 +12,11 @@
       "depends_on": [],
       "epic": "sendgrid-handlebars-preview",
       "idea": "SPRINT-003-compound"
+    },
+    "TASK-010": {
+      "status": "ready",
+      "depends_on": [],
+      "idea": "IDEA-002"
     }
   }
 }
