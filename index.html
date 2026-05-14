@@ -1391,17 +1391,15 @@ function richTextToMjText(html, tpl) {
       const ul = document.createElement('ul');
       for (let i = start; i < end; i++) {
         const p = children[i];
-        // Strip the leading bullet character from the first leading text node.
-        for (const n of p.childNodes) {
-          if (n.nodeType === Node.TEXT_NODE) {
-            if (BULLET_PREFIX.test(n.nodeValue.trimStart())) {
-              n.nodeValue = n.nodeValue.replace(/^\s*/, '').replace(BULLET_PREFIX, '');
-            }
-            break;
+        // Strip the leading bullet character from the first child of the paragraph.
+        const firstChild = p.firstChild;
+        if (firstChild && firstChild.nodeType === Node.TEXT_NODE) {
+          if (BULLET_PREFIX.test(firstChild.nodeValue.trimStart())) {
+            firstChild.nodeValue = firstChild.nodeValue.replace(/^\s*/, '').replace(BULLET_PREFIX, '');
           }
+        } else if (firstChild) {
           // Leading element node with no prior text — fall back to innerHTML strip.
           p.innerHTML = p.innerHTML.replace(BULLET_PREFIX, '');
-          break;
         }
         const li = document.createElement('li');
         while (p.firstChild) li.appendChild(p.firstChild);
