@@ -1369,6 +1369,49 @@ function richTextToMjText(html, tpl) {
     ol.parentNode.replaceChild(fragment, ol);
   });
 
+  // Typed bullet paragraphs: convert <p> elements whose visible text begins with
+  // •, -, –, or * (followed by whitespace) into real <ul><li> elements so they
+  // route through the existing ul/ol and li styling passes below.
+  // Placed AFTER the Quill list conversion (toolbar lists are already <ul>/<ol>,
+  // not <p>) and BEFORE autoLinkPhones so phone numbers inside bullets are linked.
+  {
+    const BULLET_PREFIX = /^[•\-–*]\s+/;
+    const children = Array.from(div.children);
+    const runs = [];
+    let runStart = -1;
+    children.forEach((node, i) => {
+      const isBullet = node.tagName === 'P' && BULLET_PREFIX.test(node.textContent.trimStart());
+      if (isBullet && runStart === -1) runStart = i;
+      if (!isBullet && runStart !== -1) { runs.push([runStart, i]); runStart = -1; }
+    });
+    if (runStart !== -1) runs.push([runStart, children.length]);
+
+    for (let r = runs.length - 1; r >= 0; r--) {
+      const [start, end] = runs[r];
+      const ul = document.createElement('ul');
+      for (let i = start; i < end; i++) {
+        const p = children[i];
+        // Strip the leading bullet character from the first leading text node.
+        for (const n of p.childNodes) {
+          if (n.nodeType === Node.TEXT_NODE) {
+            if (BULLET_PREFIX.test(n.nodeValue.trimStart())) {
+              n.nodeValue = n.nodeValue.replace(/^\s*/, '').replace(BULLET_PREFIX, '');
+            }
+            break;
+          }
+          // Leading element node with no prior text — fall back to innerHTML strip.
+          p.innerHTML = p.innerHTML.replace(BULLET_PREFIX, '');
+          break;
+        }
+        const li = document.createElement('li');
+        while (p.firstChild) li.appendChild(p.firstChild);
+        ul.appendChild(li);
+      }
+      div.insertBefore(ul, children[start]);
+      for (let i = start; i < end; i++) children[i].remove();
+    }
+  }
+
   // Auto-link plaintext phone numbers in body copy. Requires separators between
   // the 3-3-4 groups so we don't catch order IDs or other long digit runs.
   autoLinkPhones(div);
