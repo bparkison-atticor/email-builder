@@ -1185,7 +1185,7 @@ function openLinkModal(quill) {
     const href = format.link;
     if (href.startsWith('tel:')) {
       segmentType = 'phone';
-      prefilledValue = href.slice(4).replace(/\D/g, '');
+      prefilledValue = phoneDigits(href.slice(4));
     } else {
       const varMatch = href.match(/^\{\{(.+)\}\}$/);
       if (varMatch) {
@@ -1239,14 +1239,8 @@ function applyLink() {
   const editor = ownerEditor;
   const range = ownerRange;
   const type = getLinkType();
-  let href;
-  if (type === 'phone') {
-    const digits = value.replace(/\D/g, '');
-    if (!digits) { closeLinkModal(); return; }
-    href = `tel:${digits}`;
-  } else {
-    href = /^https?:\/\//i.test(value) ? value : `{{${value}}}`;
-  }
+  const href = buildLinkHref(type, value);
+  if (type === 'phone' && href === 'tel:') { closeLinkModal(); return; }
   // If selection length is 0 (cursor only, no existing link found in step 3),
   // insert the value itself as visible text and link it.
   if (range.length === 0) {
@@ -1326,6 +1320,26 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+// Canonical phone-digit normalizer for href construction.
+// Preserves a leading "+" (E.164) by default. Pass { keepPlus: false }
+// when the consumer needs digits only (none currently — isValidPhone
+// does its own length check and is intentionally not routed through here).
+function phoneDigits(value, { keepPlus = true } = {}) {
+  return String(value || '').replace(keepPlus ? /[^\d+]/g : /\D/g, '');
+}
+
+// Canonical href builder shared by the rich-text link modal and the CTA field.
+// - phone: strip to digits (+ preserved) and prefix tel:
+// - url:   passthrough when it already looks like http(s)://, otherwise
+//          wrap as a Handlebars merge variable.
+function buildLinkHref(type, value) {
+  const v = String(value || '').trim();
+  if (type === 'phone') {
+    return `tel:${phoneDigits(v)}`;
+  }
+  return /^https?:\/\//i.test(v) ? v : `{{${v}}}`;
+}
+
 // Matches US phone numbers with separators between the 3-3-4 groups. The
 // separator requirement keeps us from auto-linking arbitrary 10-digit strings
 // (order IDs, account numbers). Optional leading +1 / 1 country code.
@@ -1358,7 +1372,7 @@ function autoLinkPhones(root) {
         frag.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
       }
       const a = document.createElement('a');
-      const digits = m[0].replace(/[^\d+]/g, '');
+      const digits = phoneDigits(m[0]);
       a.setAttribute('href', `tel:${digits}`);
       a.setAttribute('style', 'color:#0000ee;text-decoration:underline;');
       a.setAttribute('data-autolinked', 'phone');
@@ -1503,11 +1517,7 @@ function buildCtaHref() {
   const type = getCtaType();
   const value = (els.ctaDestination.value || '').trim();
   if (!value) return '#';
-  if (type === 'phone') {
-    const digits = value.replace(/[^\d+]/g, '');
-    return `tel:${digits}`;
-  }
-  return `{{${value}}}`;
+  return buildLinkHref(type, value);
 }
 
 function buildMjml() {
