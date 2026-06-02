@@ -1,7 +1,7 @@
 ---
 epic: module-toggle
 created: 2026-06-02T00:00:00Z
-status: active
+status: complete
 originating_ideas: [IDEA-003]
 ---
 
