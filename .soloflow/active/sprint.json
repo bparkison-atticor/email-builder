@@ -13,12 +13,6 @@
     "created_at": "2026-06-02T13:44:07.000Z"
   },
   "tasks": {
-    "TASK-011": {
-      "status": "pending",
-      "depends_on": [],
-      "epic": "module-toggle",
-      "idea": "IDEA-003"
-    },
     "TASK-012": {
       "status": "pending",
       "depends_on": [
