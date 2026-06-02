@@ -2169,6 +2169,8 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (linkModal.classList.contains('visible')) { closeLinkModal(); }
     else if (htmlModal.classList.contains('visible')) { closeHtmlModal(); }
+    // #testHarness is a dev-only overlay (Ctrl+Shift+T) that never stacks with
+    // linkModal/htmlModal, so handling it last in this else chain is intentional.
     else {
       const harness = document.getElementById('testHarness');
       if (harness.classList.contains('visible')) { harness.classList.remove('visible'); }
