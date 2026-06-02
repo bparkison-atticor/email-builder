@@ -13,12 +13,6 @@
     "created_at": "2026-06-02T13:44:07.000Z"
   },
   "tasks": {
-    "TASK-003": {
-      "status": "pending",
-      "depends_on": ["TASK-002"],
-      "epic": "rich-text-link-ux",
-      "idea": "SPRINT-001-compounder"
-    },
     "TASK-009": {
       "status": "pending",
       "depends_on": [],
@@ -33,13 +27,17 @@
     },
     "TASK-012": {
       "status": "pending",
-      "depends_on": ["TASK-011"],
+      "depends_on": [
+        "TASK-011"
+      ],
       "epic": "module-toggle",
       "idea": "IDEA-003"
     },
     "TASK-013": {
       "status": "pending",
-      "depends_on": ["TASK-012"],
+      "depends_on": [
+        "TASK-012"
+      ],
       "epic": "module-toggle",
       "idea": "IDEA-003"
     }
