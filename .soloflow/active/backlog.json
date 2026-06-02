@@ -1,4 +1,11 @@
 {
   "version": 2,
-  "tasks": {}
+  "tasks": {
+    "TASK-014": {
+      "status": "ready",
+      "depends_on": [],
+      "epic": null,
+      "idea": "IDEA-003"
+    }
+  }
 }
