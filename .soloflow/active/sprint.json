@@ -12,14 +12,5 @@
     "base_sha": "0421681c703c4350616773ef8acc3fe2e17f1af6",
     "created_at": "2026-06-02T13:44:07.000Z"
   },
-  "tasks": {
-    "TASK-013": {
-      "status": "pending",
-      "depends_on": [
-        "TASK-012"
-      ],
-      "epic": "module-toggle",
-      "idea": "IDEA-003"
-    }
-  }
+  "tasks": {}
 }
