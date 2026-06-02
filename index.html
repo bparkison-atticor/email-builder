@@ -2067,20 +2067,24 @@ async function runCopyAction() {
     missing.push('body copy');
     markInvalid(bodyAboveWrap);
   }
-  if (!els.ctaText.value.trim()) {
-    missing.push('CTA text');
-    markInvalid(els.ctaText);
-  }
 
+  const ctaOn = ctaToggle.isOn();
   let phoneFormatError = false;
-  if (getCtaType() === 'phone') {
-    const ctaDest = els.ctaDestination.value.trim();
-    if (!ctaDest) {
-      missing.push('phone number');
-      markInvalid(els.ctaDestination);
-    } else if (!isValidPhone(ctaDest)) {
-      phoneFormatError = true;
-      markInvalid(els.ctaDestination);
+  if (ctaOn) {
+    if (!els.ctaText.value.trim()) {
+      missing.push('CTA text');
+      markInvalid(els.ctaText);
+    }
+
+    if (getCtaType() === 'phone') {
+      const ctaDest = els.ctaDestination.value.trim();
+      if (!ctaDest) {
+        missing.push('phone number');
+        markInvalid(els.ctaDestination);
+      } else if (!isValidPhone(ctaDest)) {
+        phoneFormatError = true;
+        markInvalid(els.ctaDestination);
+      }
     }
   }
 
