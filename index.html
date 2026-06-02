@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Email Builder</title>
+<title>Loom | Email Template Builder</title>
 <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/handlebars@4.7.8/dist/handlebars.min.js"></script>
@@ -64,8 +64,13 @@
   }
   h1 {
     font-size: 18px;
-    margin: 0 0 18px;
+    margin: 0;
     font-weight: 600;
+  }
+  .app-subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 2px 0 18px;
   }
   .field { margin-bottom: 12px; }
   label {
@@ -622,7 +627,8 @@
 <body>
 <div class="app">
   <div class="panel form-panel">
-    <h1>Email Builder</h1>
+    <h1>Loom</h1>
+    <div class="app-subtitle">Email Template Builder</div>
 
     <div class="seg seg-meta">
       <div class="field">
@@ -992,6 +998,45 @@ const templates = {
       <p style="margin:0 0 4px 0;">This message was sent to: {{Client.Email}}</p>
       <p style="margin:0 0 4px 0;">This message was sent by: Disability Benefit Center</p>
       <p style="margin:0;">100 Grandview Pl, Suite 530, Birmingham, AL 35243</p>
+    `
+  },
+  kellerPostman: {
+    name: "Keller Postman — Attorney-Client",
+    bannerImageUrl: "https://cdn.mcauto-images-production.sendgrid.net/53a6f228e7d10c92/04d89848-a010-4269-aa0b-446fc30c3748/1875x469.png",
+    bannerAlt: "Keller Postman",
+    bannerWidth: "600px",
+    bannerHref: "https://www.kellerpostman.com",
+    ctaBackgroundColor: "#00b18b",
+    ctaTextColor: "#ffffff",
+    unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
+    disclosureHtml: `
+      <p style="font-size:10px;text-align:center;margin:0 0 6px 0;">* * *</p>
+      <p style="font-size:10px;color:#00b18b;margin:0 0 6px 0;">Keller Postman is an award-winning plaintiffs' law firm.</p>
+      <p style="font-size:10px;color:#445369;margin:0 0 6px 0;">We represent consumers, workers, and veterans harmed by the government and by large corporations. Our expert team of lawyers will fight for our clients to get the maximum recovery owed to them in every case.</p>
+      <p style="font-size:10px;text-align:center;margin:0 0 14px 0;"><a href="https://www.kellerpostman.com" style="color:#00b18b;text-decoration:none;">kellerpostman.com</a></p>
+      <p style="font-size:10px;color:#acacac;margin:0 0 10px 0;">You have received this email because you hired Keller Postman to represent you in a potential {{CaseType.FriendlyName}} claim. If you no longer wish to receive these messages, please contact us immediately.</p>
+      <p style="font-size:10px;color:#acacac;margin:0 0 4px 0;">This message was sent to: {{Client.Email}}</p>
+      <p style="font-size:10px;color:#acacac;margin:0 0 4px 0;">This message was sent by: Keller Postman LLC</p>
+      <p style="font-size:10px;color:#acacac;margin:0;">150 North Riverside Plaza, Suite 4100, Chicago, IL 60606</p>
+    `
+  },
+  kellerPostmanLead: {
+    name: "Keller Postman — Lead Outreach",
+    bannerHtml: `<div style="text-align:center;font-family:'Times New Roman',Times,serif;font-size:36px;line-height:1.2;color:#ffffff;padding:32px 0;"><span style="color:#ffffff;">Keller </span><span style="color:#20ce9c;">|</span><span style="color:#ffffff;"> Postman</span></div>`,
+    bannerBackgroundColor: "#00183e",
+    bannerHref: "https://www.kellerpostman.com",
+    ctaBackgroundColor: "#00183e",
+    ctaTextColor: "#ffffff",
+    unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
+    disclosureHtml: `
+      <p style="font-size:10px;text-align:center;margin:0 0 6px 0;">* * *</p>
+      <p style="font-size:10px;color:#00b18b;margin:0 0 6px 0;">Keller Postman is an award-winning plaintiffs' law firm.</p>
+      <p style="font-size:10px;color:#445369;margin:0 0 6px 0;">We represent consumers, workers, and veterans harmed by the government and by large corporations. Our expert team of lawyers will fight for our clients to get the maximum recovery owed to them in every case.</p>
+      <p style="font-size:10px;text-align:center;margin:0 0 14px 0;"><a href="https://www.kellerpostman.com" style="color:#00b18b;text-decoration:none;">kellerpostman.com</a></p>
+      <p style="font-size:10px;color:#acacac;margin:0 0 10px 0;">You are receiving this email because you contacted Keller Postman about a potential {{CaseType.FriendlyName}} claim. If you no longer wish to receive these messages, please use the unsubscribe link above.</p>
+      <p style="font-size:10px;color:#acacac;margin:0 0 4px 0;">This message was sent to: {{Client.Email}}</p>
+      <p style="font-size:10px;color:#acacac;margin:0 0 4px 0;">This message was sent by: Keller Postman LLC</p>
+      <p style="font-size:10px;color:#acacac;margin:0;">150 North Riverside Plaza, Suite 4100, Chicago, IL 60606</p>
     `
   },
   wettermarkKeith: {
@@ -1375,7 +1420,12 @@ function richTextToMjText(html, tpl) {
   // Placed AFTER the Quill list conversion (toolbar lists are already <ul>/<ol>,
   // not <p>) and BEFORE autoLinkPhones so phone numbers inside bullets are linked.
   {
-    const BULLET_PREFIX = /^[•\-–*]\s+/;
+    // Recognize the bullet glyphs real editors actually emit, not just U+2022.
+    // Copy from Word/Outlook (and content routed through them) yields private-use
+    // Symbol-font bullets (U+F0B7 etc.), square/circle bullets, or a middle dot —
+    // none of which are a literal U+2022. Trailing \s+ keeps prose that merely
+    // starts with a dash/em-dash ("— when, where...") from being mistaken for a list.
+    const BULLET_PREFIX = /^[*\-\u2022\u25E6\u25AA\u25AB\u2023\u2043\u2219\u00B7\u25CF\u25CB\u25A0\u25A1\u2013\uF0B7\uF0A7\uF076]\s+/;
     const children = Array.from(div.children);
     const runs = [];
     let runStart = -1;
@@ -1478,6 +1528,12 @@ function buildMjml() {
   const bannerHrefAttr = tpl.bannerHref
     ? ` href="${escapeHtml(tpl.bannerHref)}"`
     : '';
+  const bannerBgAttr = tpl.bannerBackgroundColor
+    ? ` background-color="${escapeHtml(tpl.bannerBackgroundColor)}"`
+    : ' background-color="#ffffff"';
+  const bannerBlock = tpl.bannerHtml
+    ? `<mj-text padding="0" align="center">${tpl.bannerHtml}</mj-text>`
+    : `<mj-image src="${escapeHtml(tpl.bannerImageUrl)}" alt="${escapeHtml(tpl.bannerAlt)}" width="${escapeHtml(tpl.bannerWidth)}" padding="0"${bannerHrefAttr} />`;
 
   return `<mjml>
   <mj-head>
@@ -1502,9 +1558,9 @@ function buildMjml() {
     </mj-attributes>
   </mj-head>
   <mj-body background-color="#f4f4f4">
-    <mj-section padding="0" background-color="#ffffff">
+    <mj-section padding="0"${bannerBgAttr}>
       <mj-column>
-        <mj-image src="${escapeHtml(tpl.bannerImageUrl)}" alt="${escapeHtml(tpl.bannerAlt)}" width="${escapeHtml(tpl.bannerWidth)}" padding="0"${bannerHrefAttr} />
+        ${bannerBlock}
       </mj-column>
     </mj-section>
     <mj-section padding="28px 24px 8px 24px" background-color="#ffffff">
@@ -1844,7 +1900,7 @@ function render() {
     // Aggregate non-fatal warnings from template state + MJML compiler output.
     const warnings = [];
     const tpl = templates[els.template.value];
-    if (tpl.bannerImageUrl.startsWith('REPLACE_')) {
+    if (tpl.bannerImageUrl && tpl.bannerImageUrl.startsWith('REPLACE_')) {
       warnings.push('Banner image URL is a placeholder — edit templates in index.html.');
     }
     if (result.errors && result.errors.length) {
