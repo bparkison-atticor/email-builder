@@ -1,7 +1,7 @@
 ---
 epic: sendgrid-handlebars-preview
 created: 2026-05-13T00:00:00Z
-status: active
+status: complete
 originating_ideas: [IDEA-001]
 ---
 
