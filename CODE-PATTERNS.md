@@ -50,6 +50,19 @@ to a canonical example — read those for the actual implementation.
 - **Use it for:** Translating raw Handlebars compile/render exception messages into plain-English user-facing strings. Pattern-matches known error shapes (unclosed block, mismatched tags, unbalanced mustache) and emits "Body copy: …" messages with concrete fix suggestions.
 - **Canonical example:** called from both catch arms inside `applyTestData()` before assigning `templateError`.
 
+### `createModuleToggle`
+
+- **Location:** `index.html` ~line 1920.
+- **Use it for:** Building an enable/disable toggle for an optional module. `createModuleToggle(id, label, defaultOn, onChange)` returns `{ element, isOn }`; caller appends `element` to the DOM. `onChange(state)` fires once on init and on every flip.
+- **Canonical example:** CTA toggle ~line 1992 (`createModuleToggle('cta', ...)`).
+- **Gotcha:** state persists under `emailBuilder.module.<id>`. The legacy `testDataEnabled` toggle uses a different key (`emailBuilder.testDataEnabled`) — migrating it onto this factory needs a one-time key migration or the saved preference resets.
+
+### `.seg-body` collapse primitive
+
+- **Location:** CSS ~line 122 (`.seg-body` / `.seg-body.collapsed`); first used by `#ctaBody` ~line 598.
+- **Use it for:** Animated max-height collapse of a module's field group when its toggle is OFF. Wrap collapsible fields in `<div class="seg-body" id="{module}Body">`; keep the `.seg-head` (which holds the toggle) outside the wrapper so the header stays visible. Toggle the `.collapsed` class from the module's `onChange`.
+- **Gotcha:** the expanded ceiling is `max-height: 1000px` — revisit only if a module body exceeds it.
+
 ## Recurring Patterns
 
 - **Single-file constraint.** All features are implemented inside `index.html` as inline CSS and vanilla JS. Do not introduce a build step, npm dependencies, React, or separate module files. CDN imports via `esm.sh` are acceptable for new libraries.
