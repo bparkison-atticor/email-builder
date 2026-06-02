@@ -350,7 +350,8 @@
     background: var(--border);
     flex-shrink: 0;
   }
-  .switch {
+  .switch,
+  .module-toggle {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -359,12 +360,14 @@
     cursor: pointer;
     user-select: none;
   }
-  .switch:focus-visible {
+  .switch:focus-visible,
+  .module-toggle:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
     border-radius: 4px;
   }
-  .switch .track {
+  .switch .track,
+  .module-toggle .track {
     width: 28px;
     height: 16px;
     background: #d4d4d8;
@@ -373,7 +376,8 @@
     transition: background 0.15s;
     flex-shrink: 0;
   }
-  .switch .track::after {
+  .switch .track::after,
+  .module-toggle .track::after {
     content: '';
     position: absolute;
     top: 2px;
@@ -384,9 +388,12 @@
     border-radius: 50%;
     transition: transform 0.15s;
   }
-  .switch.on .track { background: var(--accent); }
-  .switch.on .track::after { transform: translateX(12px); }
-  .switch.on { color: var(--text); }
+  .switch.on .track,
+  .module-toggle.on .track { background: var(--accent); }
+  .switch.on .track::after,
+  .module-toggle.on .track::after { transform: translateX(12px); }
+  .switch.on,
+  .module-toggle.on { color: var(--text); }
 
   .btn-toolbar {
     font-family: var(--font);
@@ -1900,6 +1907,62 @@ testDataSwitch.addEventListener('keydown', (e) => {
   }
 });
 syncTestDataSwitch();
+
+// ---------- Reusable module toggle factory ----------
+// Returns { element, isOn } — caller is responsible for DOM insertion.
+// State persists under `emailBuilder.module.<id>` in localStorage.
+function createModuleToggle(id, label, defaultOn, onChange) {
+  const key = `emailBuilder.module.${id}`;
+  const stored = localStorage.getItem(key);
+  // Mirror testDataEnabled init: missing key falls back to defaultOn;
+  // explicit 'false'/'true' overrides regardless of defaultOn.
+  let state;
+  if (stored === null) {
+    state = defaultOn;
+  } else {
+    state = stored !== 'false';
+  }
+
+  // Build DOM: <span class="module-toggle" role="switch" tabindex="0">
+  //              <span class="track"></span>
+  //              label text
+  //            </span>
+  const element = document.createElement('span');
+  element.className = 'module-toggle';
+  element.setAttribute('role', 'switch');
+  element.setAttribute('tabindex', '0');
+  element.setAttribute('aria-checked', String(state));
+
+  const track = document.createElement('span');
+  track.className = 'track';
+  element.appendChild(track);
+  element.appendChild(document.createTextNode(label));
+
+  function sync() {
+    element.classList.toggle('on', state);
+    element.setAttribute('aria-checked', String(state));
+  }
+
+  function flip() {
+    state = !state;
+    localStorage.setItem(key, String(state));
+    sync();
+    onChange(state);
+  }
+
+  element.addEventListener('click', flip);
+  element.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      flip();
+    }
+  });
+
+  sync();
+  onChange(state);
+
+  return { element, isOn: () => state };
+}
 
 // CTA preview chip — re-renders on CTA text edits and template switches so the
 // dashed chip mirrors what the email button will look like.
