@@ -1,5 +1,5 @@
 ---
-# soloflow-shadow: version=0.3.0-lite synced=2026-05-13T18:24:03.835Z
+# soloflow-shadow: version=0.3.1-lite synced=2026-06-02T18:34:07.920Z
 name: shadow-researcher
 description: Performs external ecosystem research for approved ideas — library comparisons, best practices, API docs, prior art
 model: sonnet
