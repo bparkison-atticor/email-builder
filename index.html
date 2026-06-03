@@ -1799,6 +1799,20 @@ const SAFE_ATTR_FIXTURES = [
     check: out => out === '<a href="#">{{label}}</a>',
     description: 'Missing attr {{link}} → #; content {{label}} → unchanged (Handlebars will chip it)',
   },
+  {
+    label: 'triple-brace {{{unsubscribe}}} kept intact when resolved via seeded context',
+    html: '<a href="{{{unsubscribe}}}" style="color:#6b6b6b">Unsubscribe</a>',
+    data: { unsubscribe: '#unsubscribe-preview' },
+    check: out => out === '<a href="{{{unsubscribe}}}" style="color:#6b6b6b">Unsubscribe</a>',
+    description: '{{{unsubscribe}}} inside href="…" must remain as-is (not become {#}) when the seeded context resolves it',
+  },
+  {
+    label: 'triple-brace {{{missingTriple}}} replaced with # when key absent',
+    html: '<a href="{{{missingTriple}}}">click</a>',
+    data: {},
+    check: out => out === '<a href="#">click</a>',
+    description: '{{{missingTriple}}} inside href="…" must collapse to # (not {#}) when key absent',
+  },
 ];
 
 function renderTestHarness() {
@@ -1895,8 +1909,19 @@ function safeAttrHtml(html, data) {
   // Match the attribute-value region between double-quotes, excluding " < >
   // so we stay within one attribute and don't cross tag boundaries.
   return html.replace(/="([^"<>]*)"/g, (match, val) => {
-    if (!/\{\{[^{}]*\}\}/.test(val)) return match;
-    const fixed = val.replace(/\{\{([^{}]*)\}\}/g, (tok, path) => {
+    // Quick bail-out: no {{ anywhere in the value.
+    if (!val.includes('{{')) return match;
+    // Process triple-brace tokens FIRST ({{{x}}}) so the inner double-brace
+    // regex does not partially match them and leave stray { } behind.
+    let fixed = val.replace(/\{\{\{([^{}]*)\}\}\}/g, (tok, path) => {
+      if (data && resolveTokenPath(path.trim(), data) !== undefined) return tok;
+      // Missing triple-brace token: replace whole token with # (safe placeholder).
+      return '#';
+    });
+    // Then handle remaining double-brace tokens ({{x}}), excluding triple-brace
+    // sequences: a negative lookbehind/lookahead ensures we don't re-match
+    // the interior of any {{{x}}} that was already handled (or kept) above.
+    fixed = fixed.replace(/(?<!\{)\{\{([^{}]*)\}\}(?!\})/g, (tok, path) => {
       // If the token resolves to a real primitive in test data, keep it.
       // Handlebars will substitute the resolved value (e.g. a URL).
       // Special built-in: Handlebars 'lookup', 'each', etc. — leave alone.
@@ -1904,6 +1929,7 @@ function safeAttrHtml(html, data) {
       // Missing key: replace with # to prevent chip HTML from shattering the attribute.
       return '#';
     });
+    if (fixed === val) return match;
     return '="' + fixed + '"';
   });
 }
@@ -1919,7 +1945,12 @@ function applyTestData(html) {
   // tokens are left intact so Handlebars can substitute the real URL.
   // Body-text {{tokens}} (element-content position) are unaffected and still receive
   // the yellow chip from buildTestDataContext.
-  const previewHtml = safeAttrHtml(html, testData);
+  //
+  // Use the same seeded root that buildTestDataContext uses so that {{{unsubscribe}}}
+  // (from DEFAULT_UNSUBSCRIBE) is recognised as a resolving token and kept intact
+  // rather than collapsed to {#}.
+  const seededData = Object.assign({}, testData, { unsubscribe: '#unsubscribe-preview' });
+  const previewHtml = safeAttrHtml(html, seededData);
   let template;
   try {
     template = Handlebars.compile(previewHtml);
