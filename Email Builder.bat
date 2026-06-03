@@ -23,8 +23,9 @@ if %ERRORLEVEL%==0 (
     echo  Email Builder running at %URL%
     echo  Leave this window open while using the tool.
     echo  Close this window to stop the server.
+    echo  Also accessible over LAN at http://[your-local-ip]:%PORT%
     echo.
-    python -m http.server %PORT% --bind 127.0.0.1
+    python -m http.server %PORT%
     goto :eof
 )
 
@@ -36,8 +37,9 @@ if %ERRORLEVEL%==0 (
     echo  Email Builder running at %URL%
     echo  Leave this window open while using the tool.
     echo  Close this window to stop the server.
+    echo  Also accessible over LAN at http://[your-local-ip]:%PORT%
     echo.
-    npx --yes serve . -l tcp://127.0.0.1:%PORT%
+    npx --yes serve . -l tcp://0.0.0.0:%PORT%
     goto :eof
 )
 
