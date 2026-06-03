@@ -759,7 +759,7 @@
 <div class="modal-overlay" id="testHarness" role="dialog" aria-modal="true" aria-labelledby="testHarnessTitle">
   <div class="modal">
     <div class="modal-header">
-      <h2 id="testHarnessTitle">humanizeTemplateError — fixture run</h2>
+      <h2 id="testHarnessTitle">Dev test harness — fixture run</h2>
       <button class="modal-close" id="testHarnessClose" aria-label="Close" title="Close (Esc)">×</button>
     </div>
     <div class="modal-body" id="testHarnessBody"></div>
@@ -1735,9 +1735,82 @@ const HUMANIZE_FIXTURES = [
   },
 ];
 
+// Fixtures for safeAttrHtml — the preview-only attribute-value pre-processor
+// that prevents missing-key chips from shattering anchor markup (TASK-015).
+//
+// Each fixture specifies:
+//   label        – human-readable test name shown in the harness
+//   html         – raw HTML string passed to safeAttrHtml()
+//   data         – (optional) test-data object passed as second arg; omit to
+//                  simulate "no test data" (all attr tokens → #)
+//   check(out)   – predicate that must return true for PASS
+//   description  – what the check validates (shown in harness output)
+const SAFE_ATTR_FIXTURES = [
+  {
+    label: 'missing URL var: {{missingVar}} in href replaced with # (no test data)',
+    html: '<a href="{{missingVar}}">Click</a>',
+    data: {},
+    check: out => out === '<a href="#">Click</a>',
+    description: '{{missingVar}} inside href="…" must become href="#" when key absent from test data',
+  },
+  {
+    label: 'missing URL var: {{eligibilityLink}} href not broken (no chip in attr)',
+    html: '<a href="{{eligibilityLink}}">CTA</a>',
+    data: {},
+    check: out => {
+      // Must not contain any HTML tag fragments inside the href value
+      const m = out.match(/href="([^"]*)"/);
+      return m && !/</.test(m[1]) && m[1] === '#';
+    },
+    description: 'href attribute value must be # with no embedded HTML when key absent',
+  },
+  {
+    label: 'resolved URL var: {{Request.UniqueUrl}} kept (resolves in test data)',
+    html: '<a href="{{Request.UniqueUrl}}">CTA</a>',
+    data: { Request: { UniqueUrl: 'https://example.com/claim' } },
+    check: out => out === '<a href="{{Request.UniqueUrl}}">CTA</a>',
+    description: '{{Request.UniqueUrl}} must be left intact when it resolves in test data',
+  },
+  {
+    label: 'plain URL (no token): href left unchanged',
+    html: '<a href="https://example.com/path">CTA</a>',
+    data: {},
+    check: out => out === '<a href="https://example.com/path">CTA</a>',
+    description: 'href with no {{}} token must pass through unchanged regardless of test data',
+  },
+  {
+    label: 'element-content {{token}} is NOT replaced (only attr values)',
+    html: '<p>Hello {{firstName}}</p>',
+    data: {},
+    check: out => out === '<p>Hello {{firstName}}</p>',
+    description: 'Text-node {{token}} must be left alone for Handlebars to chip-ify',
+  },
+  {
+    label: 'multiple missing {{tokens}} in same attribute: both replaced',
+    html: '<a href="{{baseUrl}}/{{slug}}">link</a>',
+    data: {},
+    check: out => out === '<a href="#/#">link</a>',
+    description: 'Each missing {{token}} in the attribute value must become #',
+  },
+  {
+    label: 'mixed: missing attr token → #, content token untouched',
+    html: '<a href="{{link}}">{{label}}</a>',
+    data: {},
+    check: out => out === '<a href="#">{{label}}</a>',
+    description: 'Missing attr {{link}} → #; content {{label}} → unchanged (Handlebars will chip it)',
+  },
+];
+
 function renderTestHarness() {
   const body = document.getElementById('testHarnessBody');
   body.innerHTML = '';
+
+  // --- Section 1: humanizeTemplateError fixtures ---
+  const h1 = document.createElement('h3');
+  h1.style.cssText = 'margin:0 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h1.textContent = 'humanizeTemplateError';
+  body.appendChild(h1);
+
   for (const fixture of HUMANIZE_FIXTURES) {
     const actual = humanizeTemplateError(fixture.input);
     const pass = actual.includes(fixture.expected_pattern);
@@ -1753,6 +1826,86 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Actual output:</strong> <code>' + escapeHtml(actual) + '</code></div>';
     body.appendChild(row);
   }
+
+  // --- Section 2: safeAttrHtml fixtures (TASK-015 regression) ---
+  const h2 = document.createElement('h3');
+  h2.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h2.textContent = 'safeAttrHtml — href/attr token pre-processing';
+  body.appendChild(h2);
+
+  for (const fixture of SAFE_ATTR_FIXTURES) {
+    const actual = safeAttrHtml(fixture.html, fixture.data);
+    const pass = fixture.check(actual);
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input HTML:</strong><pre>' + escapeHtml(fixture.html) + '</pre></div>' +
+      '<div class="harness-field"><strong>Check:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual output:</strong> <code>' + escapeHtml(actual) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
+    body.appendChild(row);
+  }
+}
+
+// resolveTokenPath(path, data) — walk a dot-separated path through `data`.
+// Returns the leaf value if it exists and is a non-null primitive, or
+// undefined if any segment is missing/null/object-without-the-next-segment.
+// Used by safeAttrHtml to decide whether a {{token}} will resolve to a real
+// value (leave it alone) or produce a missing-key chip (neutralise it).
+function resolveTokenPath(path, data) {
+  const parts = String(path).split('.');
+  let cur = data;
+  for (const part of parts) {
+    if (cur === null || cur === undefined || typeof cur !== 'object') return undefined;
+    cur = cur[part];
+  }
+  // Only consider primitive resolved values (string, number, boolean).
+  // An object node means there are more segments; return undefined to be safe.
+  return (cur !== null && cur !== undefined && typeof cur !== 'object') ? cur : undefined;
+}
+
+// safeAttrHtml — preview pre-processing step.
+// Replace {{token}} patterns that sit inside HTML attribute values (="…") with
+// a benign placeholder (#) when the token would NOT resolve from current test
+// data — i.e. only the tokens that will produce a missing-key chip.
+//
+// Why: the missing-key Proxy returns a SafeString chip containing HTML
+// (e.g. <span style="background:#fef08a;…">[foo — not set]</span>).
+// When that chip lands inside an attribute value (e.g. href="{{eligibilityLink}}")
+// its embedded double-quotes shatter the attribute and the browser discards the
+// element entirely. Replacing the token with # keeps the anchor intact, so the
+// CTA button stays visible while still signalling "no real URL".
+//
+// Tokens that DO resolve in test data (e.g. {{Request.UniqueUrl}}) are left
+// as-is so Handlebars can substitute the real value — the button renders with
+// the correct href.
+//
+// Scope: preview path only. `lastHtml` (used by Copy HTML / modal) is never
+// passed through this function, so the literal {{token}} is preserved there.
+//
+// Implementation: iterate over ="…" attribute-value substrings. Any that
+// contain a {{…}} token are inspected: tokens whose path resolves in `data`
+// are left alone; tokens whose path is missing are replaced with #. The regex
+// avoids crossing tag boundaries by limiting the value to [^"<>]* characters.
+function safeAttrHtml(html, data) {
+  // Match the attribute-value region between double-quotes, excluding " < >
+  // so we stay within one attribute and don't cross tag boundaries.
+  return html.replace(/="([^"<>]*)"/g, (match, val) => {
+    if (!/\{\{[^{}]*\}\}/.test(val)) return match;
+    const fixed = val.replace(/\{\{([^{}]*)\}\}/g, (tok, path) => {
+      // If the token resolves to a real primitive in test data, keep it.
+      // Handlebars will substitute the resolved value (e.g. a URL).
+      // Special built-in: Handlebars 'lookup', 'each', etc. — leave alone.
+      if (data && resolveTokenPath(path.trim(), data) !== undefined) return tok;
+      // Missing key: replace with # to prevent chip HTML from shattering the attribute.
+      return '#';
+    });
+    return '="' + fixed + '"';
+  });
 }
 
 function applyTestData(html) {
@@ -1760,9 +1913,16 @@ function applyTestData(html) {
     templateError = '';
     return html;
   }
+  // Pre-process: neutralise {{tokens}} inside attribute values so the missing-key
+  // chip (which contains HTML with embedded quotes) cannot shatter attribute markup.
+  // Only tokens that would NOT resolve from testData are replaced with #; resolved
+  // tokens are left intact so Handlebars can substitute the real URL.
+  // Body-text {{tokens}} (element-content position) are unaffected and still receive
+  // the yellow chip from buildTestDataContext.
+  const previewHtml = safeAttrHtml(html, testData);
   let template;
   try {
-    template = Handlebars.compile(html);
+    template = Handlebars.compile(previewHtml);
   } catch (e) {
     templateError = humanizeTemplateError(e.message);
     return html;
