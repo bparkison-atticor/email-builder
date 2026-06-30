@@ -13,24 +13,26 @@
     "created_at": "2026-06-30T10:30:37.000Z"
   },
   "tasks": {
-    "TASK-016": {
-      "status": "pending",
-      "depends_on": [],
-      "idea": "IDEA-004"
-    },
     "TASK-017": {
       "status": "pending",
-      "depends_on": ["TASK-016"],
+      "depends_on": [
+        "TASK-016"
+      ],
       "idea": "IDEA-004"
     },
     "TASK-018": {
       "status": "pending",
-      "depends_on": ["TASK-016", "TASK-017"],
+      "depends_on": [
+        "TASK-016",
+        "TASK-017"
+      ],
       "idea": "IDEA-004"
     },
     "TASK-019": {
       "status": "pending",
-      "depends_on": ["TASK-016"],
+      "depends_on": [
+        "TASK-016"
+      ],
       "idea": "IDEA-004"
     }
   }
