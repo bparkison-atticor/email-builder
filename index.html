@@ -1952,6 +1952,63 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — one or more assertions failed') + '</code></div>';
     body.appendChild(row);
   }
+
+  // --- Section 4: validatePromoFields fixtures (TASK-017) ---
+  const h4 = document.createElement('h3');
+  h4.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h4.textContent = 'validatePromoFields — blocking promo validation';
+  body.appendChild(h4);
+
+  const PROMO_VALIDATION_FIXTURES = [
+    {
+      label: 'All valid — no errors',
+      input: { headline: 'Save 30%', imageUrl: 'https://example.com/promo.png', url: 'https://example.com/?utm_source=email' },
+      check: (r) => r.missing.length === 0 && r.formatErrors.length === 0,
+      description: 'missing empty, formatErrors empty',
+    },
+    {
+      label: 'Empty headline — missing promo headline',
+      input: { headline: '', imageUrl: 'https://example.com/promo.png', url: 'https://example.com/' },
+      check: (r) => r.missing.includes('promo headline') && r.formatErrors.length === 0,
+      description: 'missing includes "promo headline"',
+    },
+    {
+      label: 'http:// image URL — formatErrors, not missing',
+      input: { headline: 'Sale', imageUrl: 'http://example.com/promo.png', url: 'https://example.com/' },
+      check: (r) => !r.missing.includes('promo image URL') && r.formatErrors.some(e => e.startsWith('promo image URL')),
+      description: 'formatErrors includes https image message; missing does NOT include promo image URL',
+    },
+    {
+      label: 'http:// destination URL — formatErrors, not missing',
+      input: { headline: 'Sale', imageUrl: 'https://example.com/promo.png', url: 'http://example.com/' },
+      check: (r) => !r.missing.includes('promo destination URL') && r.formatErrors.some(e => e.startsWith('promo destination URL')),
+      description: 'formatErrors includes https url message; missing does NOT include promo destination URL',
+    },
+    {
+      label: 'Empty image URL — missing, no https format error for image',
+      input: { headline: 'Sale', imageUrl: '', url: 'https://example.com/' },
+      check: (r) => r.missing.includes('promo image URL') && !r.formatErrors.some(e => e.startsWith('promo image URL')),
+      description: 'missing includes "promo image URL"; formatErrors has no image entry (empty takes precedence)',
+    },
+  ];
+
+  for (const fixture of PROMO_VALIDATION_FIXTURES) {
+    const result = validatePromoFields(fixture.input);
+    const pass = fixture.check(result);
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input:</strong> <code>' + escapeHtml(JSON.stringify(fixture.input)) + '</code></div>' +
+      '<div class="harness-field"><strong>Check:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>missing:</strong> <code>' + escapeHtml(JSON.stringify(result.missing)) + '</code></div>' +
+      '<div class="harness-field"><strong>formatErrors:</strong> <code>' + escapeHtml(JSON.stringify(result.formatErrors)) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
+    body.appendChild(row);
+  }
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
@@ -2163,6 +2220,12 @@ function render() {
       warnings.push(`MJML warning: ${msgs.join('; ')}${suffix}`);
     }
     if (templateError) warnings.unshift(templateError);
+    if (promoToggle.isOn()) {
+      const promoUrlVal = els.promoUrl.value.trim();
+      if (promoUrlVal && isHttpsUrl(promoUrlVal) && !promoUrlVal.includes('utm_')) {
+        warnings.push('Promo card URL has no UTM params — Gmail does not click-track it, so add utm_source/utm_medium for attribution.');
+      }
+    }
     showWarn(warnings.join(' · '));
   } catch (e) {
     lastHtml = '';
@@ -2326,6 +2389,21 @@ function isValidPhone(value) {
   return digits.length >= 7 && digits.length <= 15;
 }
 
+function isHttpsUrl(value) {
+  return typeof value === 'string' && /^https:\/\//i.test(value.trim());
+}
+// Returns { missing: string[], formatErrors: string[] } — pure, testable.
+function validatePromoFields({ headline, imageUrl, url }) {
+  const missing = [];
+  const formatErrors = [];
+  if (!headline || !headline.trim()) missing.push('promo headline');
+  if (!imageUrl || !imageUrl.trim()) missing.push('promo image URL');
+  else if (!isHttpsUrl(imageUrl)) formatErrors.push('promo image URL must start with https://');
+  if (!url || !url.trim()) missing.push('promo destination URL');
+  else if (!isHttpsUrl(url)) formatErrors.push('promo destination URL must start with https://');
+  return { missing, formatErrors };
+}
+
 // Invalid-field highlighting
 const bodyAboveWrap = document.getElementById('bodyAbove').closest('.rich-editor-wrap');
 const invalidEls = new Set();
@@ -2346,6 +2424,18 @@ els.ctaText.addEventListener('input', () => {
 els.ctaDestination.addEventListener('input', () => {
   els.ctaDestination.classList.remove('invalid');
   invalidEls.delete(els.ctaDestination);
+});
+els.promoHeadline.addEventListener('input', () => {
+  els.promoHeadline.classList.remove('invalid');
+  invalidEls.delete(els.promoHeadline);
+});
+els.promoImageUrl.addEventListener('input', () => {
+  els.promoImageUrl.classList.remove('invalid');
+  invalidEls.delete(els.promoImageUrl);
+});
+els.promoUrl.addEventListener('input', () => {
+  els.promoUrl.classList.remove('invalid');
+  invalidEls.delete(els.promoUrl);
 });
 bodyAboveQuill.on('text-change', () => {
   bodyAboveWrap.classList.remove('invalid');
@@ -2406,12 +2496,45 @@ async function runCopyAction() {
     }
   }
 
+  let promoFormatError = false;
+  let promoFormatMessage = '';
+  if (promoToggle.isOn()) {
+    const promoResult = validatePromoFields({
+      headline: els.promoHeadline.value,
+      imageUrl: els.promoImageUrl.value,
+      url: els.promoUrl.value,
+    });
+    const fieldMap = {
+      'promo headline': els.promoHeadline,
+      'promo image URL': els.promoImageUrl,
+      'promo destination URL': els.promoUrl,
+    };
+    for (const label of promoResult.missing) {
+      missing.push(label);
+      markInvalid(fieldMap[label]);
+    }
+    if (promoResult.formatErrors.length) {
+      promoFormatError = true;
+      promoFormatMessage = promoResult.formatErrors[0];
+      // Mark the relevant input invalid.
+      if (promoResult.formatErrors[0].startsWith('promo image URL')) {
+        markInvalid(els.promoImageUrl);
+      } else {
+        markInvalid(els.promoUrl);
+      }
+    }
+  }
+
   if (missing.length) {
     showCopyError(`Add ${missing.join(' and ')}`);
     return 'validation-failed';
   }
   if (phoneFormatError) {
     showCopyError('Check phone number format');
+    return 'validation-failed';
+  }
+  if (promoFormatError) {
+    showCopyError(promoFormatMessage);
     return 'validation-failed';
   }
 
