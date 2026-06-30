@@ -255,8 +255,10 @@
     margin-bottom: 10px;
   }
   .seg.seg-cta  { background: #f7f7f8; border-color: #e0e0e2; }
+  .seg.seg-promo { background: #f7f8fb; border-color: #e0e3ea; }
   .seg.seg-test { background: #fffaf0; border-color: #fde68a; }
   .seg.seg-meta { background: transparent; border: none; padding: 0; margin-bottom: 18px; }
+  .seg-promo .seg-head .module-toggle { margin-left: auto; }
   .seg-head {
     display: flex;
     align-items: center;
@@ -574,6 +576,31 @@
         <label for="preheader">Preheader</label>
         <input type="text" id="preheader" maxlength="150" placeholder="e.g. See if you qualify for benefits today" />
         <div class="hint">Appears next to the subject in the inbox. <span id="preheaderCount">0</span> chars · aim for under 90. Subject line is set in SendGrid, not here.</div>
+      </div>
+    </div>
+
+    <div class="seg seg-promo">
+      <div class="seg-head">
+        <span class="seg-title">Gmail Promo Tab</span>
+        <span class="seg-tag">optional</span>
+        <!-- promo toggle appended here by JS -->
+      </div>
+      <div class="seg-body collapsed" id="promoBody">
+        <div class="field">
+          <label for="promoHeadline">Headline</label>
+          <input type="text" id="promoHeadline" placeholder="e.g. 30% off your first order" />
+        </div>
+        <div class="field">
+          <label for="promoImageUrl">Promo image URL</label>
+          <input type="text" id="promoImageUrl" placeholder="https://…/promo.png" />
+          <div class="hint">Must be a public <strong>https://</strong> PNG or JPEG, at least 256×256.</div>
+        </div>
+        <div class="field">
+          <label for="promoUrl">Destination URL</label>
+          <input type="text" id="promoUrl" placeholder="https://…" />
+          <div class="hint">Where the promo card click goes. Add UTM params here — Gmail does not click-track this URL.</div>
+        </div>
+        <!-- TASK-019 inserts the static ops-doc block here -->
       </div>
     </div>
 
@@ -1030,6 +1057,10 @@ const els = {
   ctaText: document.getElementById('ctaText'),
   ctaBody: document.getElementById('ctaBody'),
   ctaDestination: document.getElementById('ctaDestination'),
+  promoHeadline: document.getElementById('promoHeadline'),
+  promoImageUrl: document.getElementById('promoImageUrl'),
+  promoUrl: document.getElementById('promoUrl'),
+  promoBody: document.getElementById('promoBody'),
   ctaDestinationLabel: document.getElementById('ctaDestinationLabel'),
   ctaDestinationHint: document.getElementById('ctaDestinationHint'),
   preview: document.getElementById('preview'),
@@ -1878,6 +1909,49 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
     body.appendChild(row);
   }
+
+  // --- Section 3: clearPromoFields fixtures (TASK-016) ---
+  const h3 = document.createElement('h3');
+  h3.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h3.textContent = 'clearPromoFields — clear values, persist toggle state';
+  body.appendChild(h3);
+
+  {
+    const LS_KEY = 'emailBuilder.module.promo';
+    const priorValue = localStorage.getItem(LS_KEY);
+    // Seed inputs with non-empty values and set the localStorage key to 'true'.
+    els.promoHeadline.value = 'Seed headline';
+    els.promoImageUrl.value = 'https://example.com/promo.png';
+    els.promoUrl.value = 'https://example.com/?utm_source=email';
+    localStorage.setItem(LS_KEY, 'true');
+    // Run the function under test.
+    clearPromoFields();
+    // Assertions.
+    const inputsCleared = (
+      els.promoHeadline.value === '' &&
+      els.promoImageUrl.value === '' &&
+      els.promoUrl.value === ''
+    );
+    const togglePersisted = localStorage.getItem(LS_KEY) === 'true';
+    const pass = inputsCleared && togglePersisted;
+    // Restore localStorage to its prior state.
+    if (priorValue === null) {
+      localStorage.removeItem(LS_KEY);
+    } else {
+      localStorage.setItem(LS_KEY, priorValue);
+    }
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>clearPromoFields empties all three inputs without touching localStorage toggle key</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Inputs cleared:</strong> <code>' + String(inputsCleared) + '</code></div>' +
+      '<div class="harness-field"><strong>Toggle key preserved (emailBuilder.module.promo === \'true\'):</strong> <code>' + String(togglePersisted) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — one or more assertions failed') + '</code></div>';
+    body.appendChild(row);
+  }
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
@@ -2219,6 +2293,23 @@ function onCtaToggle(isOn) {
 const ctaToggle = createModuleToggle('cta', 'Call to action', true, onCtaToggle);
 document.querySelector('.seg-cta .seg-head').appendChild(ctaToggle.element);
 
+// Promo module toggle — collapses the Gmail Promo Tab fields when OFF.
+// Module-scope so TASK-017 and TASK-018 can read promoToggle.isOn().
+function onPromoToggle(isOn) {
+  els.promoBody.classList.toggle('collapsed', !isOn);
+  scheduleRender();
+}
+const promoToggle = createModuleToggle('promo', 'Gmail Promo Tab', false, onPromoToggle);
+document.querySelector('.seg-promo .seg-head').appendChild(promoToggle.element);
+
+// clearPromoFields — empties the three promo inputs on every load.
+// Toggle state (localStorage) is intentionally NOT touched — only field values reset.
+function clearPromoFields() {
+  els.promoHeadline.value = '';
+  els.promoImageUrl.value = '';
+  els.promoUrl.value = '';
+}
+
 // Copy validation
 function hasRichContent(quill) {
   const html = quill.root.innerHTML;
@@ -2425,6 +2516,7 @@ copyFromModal.addEventListener('click', async () => {
 loadTestData();
 autoSizeTestData();
 updateCtaPreview();
+clearPromoFields();
 render();
 </script>
 </body>
