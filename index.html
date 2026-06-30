@@ -1507,6 +1507,7 @@ function buildCtaHref() {
 function buildMjml() {
   const tpl = templates[els.template.value];
   if (!tpl) return '';
+  const promoJsonLd = buildPromoJsonLd();
   const ctaText = (els.ctaText.value || '').trim() || 'Click Here';
   const ctaHref = buildCtaHref();
   // tel: links must not open in a new tab — iOS Mail silently fails the
@@ -1535,7 +1536,7 @@ function buildMjml() {
       <meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no" />
       <meta name="x-apple-disable-message-reformatting" />
     </mj-raw>
-    <mj-style>
+    ${promoJsonLd ? `<mj-raw>\n      ${promoJsonLd}\n    </mj-raw>\n    ` : ''}<mj-style>
       a[x-apple-data-detectors] {
         color: inherit !important;
         text-decoration: none !important;
@@ -1585,6 +1586,59 @@ ${ctaToggle.isOn() ? `        <mj-button href="${escapeHtml(ctaHref)}" target="$
 }
 
 let lastHtml = '';
+
+// --- Gmail Promotions tab annotation helpers (TASK-018) ---
+
+// Pure: assembles a PromotionCard JSON-LD object, serialises it, escapes '<'
+// as < so a literal </script> in any field value cannot close the tag,
+// and returns the full <script type="application/ld+json">…</script> block.
+// price, when provided, is serialised as a STRING per the schema.org spec.
+// Exported-like (module-scope) so the test harness can call it directly.
+function serializePromoCard({ headline, imageUrl, url, price, priceCurrency }) {
+  const card = {
+    '@context': 'http://schema.org/',
+    '@type': 'PromotionCard',
+    headline,
+    image: imageUrl,
+    url,
+  };
+  if (price !== undefined && price !== null && price !== '') {
+    card.price = String(price);
+    if (priceCurrency) card.priceCurrency = priceCurrency;
+  }
+  // Escape '<' so no value can inject '</script>' and break out of the tag.
+  const json = JSON.stringify(card, null, 2).replace(/</g, '\\u003c');
+  return `<script type="application/ld+json">\n${json}\n<\/script>`;
+}
+
+// Maps known JSON.stringify failure messages to marketer-readable copy.
+// Never surfaces the raw exception text (CLAUDE.md requirement).
+function humanizePromoError(message) {
+  if (!message) return 'Promo card: could not build the annotation — check the promo fields.';
+  if (/circular/i.test(message)) {
+    return 'Promo card: a field value could not be serialized — remove special objects from the promo fields.';
+  }
+  return 'Promo card: could not build the annotation — check the promo fields.';
+}
+
+// Gated wrapper: returns the full <mj-raw>…</mj-raw> inner content string
+// (just the <script> block, without the mj-raw wrapper — the caller adds
+// the mj-raw tags). Returns '' when the toggle is off, fields are invalid,
+// or serialisation fails (failure routed through humanizePromoError).
+function buildPromoJsonLd() {
+  if (!promoToggle.isOn()) return '';
+  const headline = (els.promoHeadline.value || '').trim();
+  const imageUrl = (els.promoImageUrl.value || '').trim();
+  const url = (els.promoUrl.value || '').trim();
+  const { missing, formatErrors } = validatePromoFields({ headline, imageUrl, url });
+  if (missing.length || formatErrors.length) return '';
+  try {
+    return serializePromoCard({ headline, imageUrl, url });
+  } catch (e) {
+    showWarn(humanizePromoError(e.message));
+    return '';
+  }
+}
 
 // --- Test data (preview-only Handlebars substitution) ---
 // Mirrors SendGrid's "test data" panel: parses a JSON object and resolves
@@ -2024,6 +2078,137 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Check:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
       '<div class="harness-field"><strong>missing:</strong> <code>' + escapeHtml(JSON.stringify(result.missing)) + '</code></div>' +
       '<div class="harness-field"><strong>formatErrors:</strong> <code>' + escapeHtml(JSON.stringify(result.formatErrors)) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  // --- Section 5: serializePromoCard fixtures (TASK-018) ---
+  const h5 = document.createElement('h3');
+  h5.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h5.textContent = 'serializePromoCard — JSON-LD block generation';
+  body.appendChild(h5);
+
+  const PROMO_JSONLD_FIXTURES = [
+    {
+      label: 'Valid input: block JSON.parses with correct @type and @context',
+      input: { headline: 'Save 30%', imageUrl: 'https://example.com/promo.png', url: 'https://example.com/?utm_source=email' },
+      check(block) {
+        const m = block.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+        if (!m) return false;
+        try {
+          const obj = JSON.parse(m[1]);
+          return obj['@type'] === 'PromotionCard' && obj['@context'] === 'http://schema.org/';
+        } catch { return false; }
+      },
+      description: 'Extracted JSON parses; @type === "PromotionCard" and @context === "http://schema.org/"',
+    },
+    {
+      label: 'Headline containing </script>: block does not terminate early and still parses',
+      input: { headline: 'Sale </script><b>injected</b>', imageUrl: 'https://example.com/img.png', url: 'https://example.com/' },
+      check(block) {
+        // The raw string </script> must not appear literally in the output.
+        if (block.includes('</script>') && block.indexOf('</script>') !== block.lastIndexOf('</script>')) {
+          // More than one </script> means injection succeeded — FAIL
+          return false;
+        }
+        // The JSON inside the one closing tag must still parse.
+        const m = block.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+        if (!m) return false;
+        try {
+          JSON.parse(m[1]);
+          return true;
+        } catch { return false; }
+      },
+      description: 'No premature </script> closing; JSON inside the block still parses',
+    },
+    {
+      label: 'price present: typeof parsed.price === "string"',
+      input: { headline: '20% off', imageUrl: 'https://example.com/img.png', url: 'https://example.com/', price: 49.99, priceCurrency: 'USD' },
+      check(block) {
+        const m = block.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+        if (!m) return false;
+        try {
+          const obj = JSON.parse(m[1]);
+          return typeof obj.price === 'string' && obj.price === '49.99';
+        } catch { return false; }
+      },
+      description: 'price serialized as string "49.99", not number 49.99',
+    },
+    {
+      label: 'price absent: no price key in output',
+      input: { headline: 'Big Sale', imageUrl: 'https://example.com/img.png', url: 'https://example.com/' },
+      check(block) {
+        const m = block.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+        if (!m) return false;
+        try {
+          const obj = JSON.parse(m[1]);
+          return !Object.prototype.hasOwnProperty.call(obj, 'price');
+        } catch { return false; }
+      },
+      description: 'no price key emitted when price is not provided',
+    },
+  ];
+
+  for (const fixture of PROMO_JSONLD_FIXTURES) {
+    let block, pass;
+    try {
+      block = serializePromoCard(fixture.input);
+      pass = fixture.check(block);
+    } catch (e) {
+      block = '(threw: ' + e.message + ')';
+      pass = false;
+    }
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input:</strong> <code>' + escapeHtml(JSON.stringify(fixture.input)) + '</code></div>' +
+      '<div class="harness-field"><strong>Check:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Output block:</strong><pre>' + escapeHtml(block) + '</pre></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  // --- Section 6: humanizePromoError fixtures (TASK-018) ---
+  const h6 = document.createElement('h3');
+  h6.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h6.textContent = 'humanizePromoError — JSON-LD serialisation error humanization';
+  body.appendChild(h6);
+
+  const PROMO_HUMANIZE_FIXTURES = [
+    {
+      label: 'Circular structure error: describes the problem',
+      input: 'Converting circular structure to JSON',
+      expected_pattern: 'could not be serialized',
+    },
+    {
+      label: 'Empty message (guard): safe fallback',
+      input: '',
+      expected_pattern: 'could not build the annotation',
+    },
+    {
+      label: 'Unknown error message: safe fallback',
+      input: 'Some unexpected error that we have never seen before',
+      expected_pattern: 'could not build the annotation',
+    },
+  ];
+
+  for (const fixture of PROMO_HUMANIZE_FIXTURES) {
+    const actual = humanizePromoError(fixture.input);
+    const pass = actual.includes(fixture.expected_pattern);
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input:</strong><pre>' + escapeHtml(fixture.input) + '</pre></div>' +
+      '<div class="harness-field"><strong>Expected pattern:</strong> <code>' + escapeHtml(fixture.expected_pattern) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual output:</strong> <code>' + escapeHtml(actual) + '</code></div>' +
       '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
     body.appendChild(row);
   }
