@@ -1984,6 +1984,31 @@ function applyTestData(html) {
   }
 }
 
+// Preview-only: intercept link clicks inside the iframe so a click opens the
+// destination in a new browser tab instead of navigating the preview frame
+// (which would replace the rendered email until the next render). In-page
+// anchors (e.g. the seeded #unsubscribe-preview) are swallowed harmlessly.
+// Never injected into lastHtml / the copied + exported HTML.
+const PREVIEW_LINK_HANDLER = `
+<script>
+(function(){
+  document.addEventListener('click', function(e){
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a) return;
+    e.preventDefault();
+    var href = a.getAttribute('href');
+    if (!href || href.charAt(0) === '#') return;
+    window.open(href, '_blank', 'noopener');
+  }, true);
+})();
+<\/script>`;
+
+function withPreviewLinkHandler(html) {
+  return html.indexOf('</body>') !== -1
+    ? html.replace('</body>', PREVIEW_LINK_HANDLER + '</body>')
+    : html + PREVIEW_LINK_HANDLER;
+}
+
 function setTestDataHint(text, kind) {
   els.testDataHint.textContent = text;
   els.testDataHint.classList.remove('error', 'success');
@@ -2049,7 +2074,7 @@ function render() {
     const result = mjml2html(mjml, { validationLevel: 'soft' });
     lastHtml = result.html;
     // Preview gets test-data substitution; lastHtml stays pure for Copy HTML / modal.
-    els.preview.srcdoc = applyTestData(result.html);
+    els.preview.srcdoc = withPreviewLinkHandler(applyTestData(result.html));
 
     // Aggregate non-fatal warnings from template state + MJML compiler output.
     const warnings = [];
