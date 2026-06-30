@@ -1,7 +1,7 @@
 ---
 epic: gmail-promo-annotations
 created: 2026-06-30T00:00:00Z
-status: active
+status: complete
 originating_ideas: [IDEA-004]
 ---
 
