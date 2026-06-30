@@ -236,6 +236,8 @@
     color: var(--muted);
     margin-top: 4px;
   }
+  .promo-ops ul { margin: 6px 0 0; padding-left: 18px; }
+  .promo-ops li { margin-bottom: 4px; }
   .warn {
     font-size: 12px;
     color: var(--danger);
@@ -255,8 +257,10 @@
     margin-bottom: 10px;
   }
   .seg.seg-cta  { background: #f7f7f8; border-color: #e0e0e2; }
+  .seg.seg-promo { background: #f7f8fb; border-color: #e0e3ea; }
   .seg.seg-test { background: #fffaf0; border-color: #fde68a; }
   .seg.seg-meta { background: transparent; border: none; padding: 0; margin-bottom: 18px; }
+  .seg-promo .seg-head .module-toggle { margin-left: auto; }
   .seg-head {
     display: flex;
     align-items: center;
@@ -574,6 +578,43 @@
         <label for="preheader">Preheader</label>
         <input type="text" id="preheader" maxlength="150" placeholder="e.g. See if you qualify for benefits today" />
         <div class="hint">Appears next to the subject in the inbox. <span id="preheaderCount">0</span> chars · aim for under 90. Subject line is set in SendGrid, not here.</div>
+      </div>
+    </div>
+
+    <div class="seg seg-promo">
+      <div class="seg-head">
+        <span class="seg-title">Gmail Promo Tab</span>
+        <span class="seg-tag">optional</span>
+        <!-- promo toggle appended here by JS -->
+      </div>
+      <div class="seg-body collapsed" id="promoBody">
+        <div class="field">
+          <label for="promoHeadline">Headline</label>
+          <input type="text" id="promoHeadline" placeholder="e.g. 30% off your first order" />
+        </div>
+        <div class="field">
+          <label for="promoImageUrl">Promo image URL</label>
+          <input type="text" id="promoImageUrl" placeholder="https://…/promo.png" />
+          <div class="hint">Must be a public <strong>https://</strong> PNG or JPEG, at least 256×256.</div>
+        </div>
+        <div class="field">
+          <label for="promoUrl">Destination URL</label>
+          <input type="text" id="promoUrl" placeholder="https://…" />
+          <div class="hint">Where the promo card click goes. Add UTM params here — Gmail does not click-track this URL.</div>
+        </div>
+        <div class="promo-ops hint">
+          <strong>Before Gmail will show this card:</strong>
+          <ul>
+            <li>Register your sending domain: email a sample to <code>schema.whitelisting+sample@gmail.com</code> and submit the Google registration form.</li>
+            <li>For image cards (required for image rendering), also request allowlisting via <code>p-Promo-Outreach@google.com</code>.</li>
+            <li>SPF, DKIM, and DMARC must all pass for the sending domain.</li>
+            <li>Maintain good sender reputation — low spam complaint rates.</li>
+            <li>Annotations are cached per sender; changes may take time to appear.</li>
+            <li>Gmail does not click-track the card URL — add UTM params in the Destination URL above.</li>
+            <li>Test rendering with Google's
+              <a href="https://developers.google.com/workspace/gmail/promotab/preview" target="_blank" rel="noopener noreferrer">Promotions Annotation Preview</a> tool.</li>
+          </ul>
+        </div>
       </div>
     </div>
 
@@ -1030,6 +1071,10 @@ const els = {
   ctaText: document.getElementById('ctaText'),
   ctaBody: document.getElementById('ctaBody'),
   ctaDestination: document.getElementById('ctaDestination'),
+  promoHeadline: document.getElementById('promoHeadline'),
+  promoImageUrl: document.getElementById('promoImageUrl'),
+  promoUrl: document.getElementById('promoUrl'),
+  promoBody: document.getElementById('promoBody'),
   ctaDestinationLabel: document.getElementById('ctaDestinationLabel'),
   ctaDestinationHint: document.getElementById('ctaDestinationHint'),
   preview: document.getElementById('preview'),
@@ -1476,6 +1521,7 @@ function buildCtaHref() {
 function buildMjml() {
   const tpl = templates[els.template.value];
   if (!tpl) return '';
+  const promoJsonLd = buildPromoJsonLd();
   const ctaText = (els.ctaText.value || '').trim() || 'Click Here';
   const ctaHref = buildCtaHref();
   // tel: links must not open in a new tab — iOS Mail silently fails the
@@ -1504,7 +1550,7 @@ function buildMjml() {
       <meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no" />
       <meta name="x-apple-disable-message-reformatting" />
     </mj-raw>
-    <mj-style>
+    ${promoJsonLd ? `<mj-raw>\n      ${promoJsonLd}\n    </mj-raw>\n    ` : ''}<mj-style>
       a[x-apple-data-detectors] {
         color: inherit !important;
         text-decoration: none !important;
@@ -1554,6 +1600,59 @@ ${ctaToggle.isOn() ? `        <mj-button href="${escapeHtml(ctaHref)}" target="$
 }
 
 let lastHtml = '';
+
+// --- Gmail Promotions tab annotation helpers (TASK-018) ---
+
+// Pure: assembles a PromotionCard JSON-LD object, serialises it, escapes '<'
+// as < so a literal </script> in any field value cannot close the tag,
+// and returns the full <script type="application/ld+json">…</script> block.
+// price, when provided, is serialised as a STRING per the schema.org spec.
+// Exported-like (module-scope) so the test harness can call it directly.
+function serializePromoCard({ headline, imageUrl, url, price, priceCurrency }) {
+  const card = {
+    '@context': 'http://schema.org/',
+    '@type': 'PromotionCard',
+    headline,
+    image: imageUrl,
+    url,
+  };
+  if (price !== undefined && price !== null && price !== '') {
+    card.price = String(price);
+    if (priceCurrency) card.priceCurrency = priceCurrency;
+  }
+  // Escape '<' so no value can inject '</script>' and break out of the tag.
+  const json = JSON.stringify(card, null, 2).replace(/</g, '\\u003c');
+  return `<script type="application/ld+json">\n${json}\n<\/script>`;
+}
+
+// Maps known JSON.stringify failure messages to marketer-readable copy.
+// Never surfaces the raw exception text (CLAUDE.md requirement).
+function humanizePromoError(message) {
+  if (!message) return 'Promo card: could not build the annotation — check the promo fields.';
+  if (/circular/i.test(message)) {
+    return 'Promo card: a field value could not be serialized — remove special objects from the promo fields.';
+  }
+  return 'Promo card: could not build the annotation — check the promo fields.';
+}
+
+// Gated wrapper: returns the full <mj-raw>…</mj-raw> inner content string
+// (just the <script> block, without the mj-raw wrapper — the caller adds
+// the mj-raw tags). Returns '' when the toggle is off, fields are invalid,
+// or serialisation fails (failure routed through humanizePromoError).
+function buildPromoJsonLd() {
+  if (!promoToggle.isOn()) return '';
+  const headline = (els.promoHeadline.value || '').trim();
+  const imageUrl = (els.promoImageUrl.value || '').trim();
+  const url = (els.promoUrl.value || '').trim();
+  const { missing, formatErrors } = validatePromoFields({ headline, imageUrl, url });
+  if (missing.length || formatErrors.length) return '';
+  try {
+    return serializePromoCard({ headline, imageUrl, url });
+  } catch (e) {
+    showWarn(humanizePromoError(e.message));
+    return '';
+  }
+}
 
 // --- Test data (preview-only Handlebars substitution) ---
 // Mirrors SendGrid's "test data" panel: parses a JSON object and resolves
@@ -1878,6 +1977,281 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
     body.appendChild(row);
   }
+
+  // --- Section 3: clearPromoFields fixtures (TASK-016) ---
+  const h3 = document.createElement('h3');
+  h3.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h3.textContent = 'clearPromoFields — clear values, persist toggle state';
+  body.appendChild(h3);
+
+  {
+    const LS_KEY = 'emailBuilder.module.promo';
+    const priorValue = localStorage.getItem(LS_KEY);
+    // Seed inputs with non-empty values and set the localStorage key to 'true'.
+    els.promoHeadline.value = 'Seed headline';
+    els.promoImageUrl.value = 'https://example.com/promo.png';
+    els.promoUrl.value = 'https://example.com/?utm_source=email';
+    localStorage.setItem(LS_KEY, 'true');
+    // Run the function under test.
+    clearPromoFields();
+    // Assertions.
+    const inputsCleared = (
+      els.promoHeadline.value === '' &&
+      els.promoImageUrl.value === '' &&
+      els.promoUrl.value === ''
+    );
+    const togglePersisted = localStorage.getItem(LS_KEY) === 'true';
+    const pass = inputsCleared && togglePersisted;
+    // Restore localStorage to its prior state.
+    if (priorValue === null) {
+      localStorage.removeItem(LS_KEY);
+    } else {
+      localStorage.setItem(LS_KEY, priorValue);
+    }
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>clearPromoFields empties all three inputs without touching localStorage toggle key</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Inputs cleared:</strong> <code>' + String(inputsCleared) + '</code></div>' +
+      '<div class="harness-field"><strong>Toggle key preserved (emailBuilder.module.promo === \'true\'):</strong> <code>' + String(togglePersisted) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — one or more assertions failed') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  // --- Section 4: validatePromoFields fixtures (TASK-017) ---
+  const h4 = document.createElement('h3');
+  h4.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h4.textContent = 'validatePromoFields — blocking promo validation';
+  body.appendChild(h4);
+
+  const PROMO_VALIDATION_FIXTURES = [
+    {
+      label: 'All valid — no errors',
+      input: { headline: 'Save 30%', imageUrl: 'https://example.com/promo.png', url: 'https://example.com/?utm_source=email' },
+      check: (r) => r.missing.length === 0 && r.formatErrors.length === 0,
+      description: 'missing empty, formatErrors empty',
+    },
+    {
+      label: 'Empty headline — missing promo headline',
+      input: { headline: '', imageUrl: 'https://example.com/promo.png', url: 'https://example.com/' },
+      check: (r) => r.missing.includes('promo headline') && r.formatErrors.length === 0,
+      description: 'missing includes "promo headline"',
+    },
+    {
+      label: 'http:// image URL — formatErrors, not missing',
+      input: { headline: 'Sale', imageUrl: 'http://example.com/promo.png', url: 'https://example.com/' },
+      check: (r) => !r.missing.includes('promo image URL') && r.formatErrors.some(e => e.startsWith('promo image URL')),
+      description: 'formatErrors includes https image message; missing does NOT include promo image URL',
+    },
+    {
+      label: 'http:// destination URL — formatErrors, not missing',
+      input: { headline: 'Sale', imageUrl: 'https://example.com/promo.png', url: 'http://example.com/' },
+      check: (r) => !r.missing.includes('promo destination URL') && r.formatErrors.some(e => e.startsWith('promo destination URL')),
+      description: 'formatErrors includes https url message; missing does NOT include promo destination URL',
+    },
+    {
+      label: 'Empty image URL — missing, no https format error for image',
+      input: { headline: 'Sale', imageUrl: '', url: 'https://example.com/' },
+      check: (r) => r.missing.includes('promo image URL') && !r.formatErrors.some(e => e.startsWith('promo image URL')),
+      description: 'missing includes "promo image URL"; formatErrors has no image entry (empty takes precedence)',
+    },
+    {
+      label: 'Empty destination URL — missing, no https format error for url',
+      input: { headline: 'Sale', imageUrl: 'https://example.com/promo.png', url: '' },
+      check: (r) => r.missing.includes('promo destination URL') && !r.formatErrors.some(e => e.startsWith('promo destination URL')),
+      description: 'missing includes "promo destination URL"; formatErrors has no url entry (empty takes precedence)',
+    },
+    {
+      label: 'Whitespace-only headline — treated as missing',
+      input: { headline: '   ', imageUrl: 'https://example.com/promo.png', url: 'https://example.com/' },
+      check: (r) => r.missing.includes('promo headline') && r.formatErrors.length === 0,
+      description: 'headline "   " trims to empty; missing includes "promo headline"',
+    },
+    {
+      label: 'Both URLs http:// — two independent formatErrors entries',
+      input: { headline: 'Sale', imageUrl: 'http://example.com/promo.png', url: 'http://example.com/' },
+      check: (r) => r.missing.length === 0 && r.formatErrors.some(e => e.startsWith('promo image URL')) && r.formatErrors.some(e => e.startsWith('promo destination URL')),
+      description: 'missing empty; formatErrors has both image and destination URL entries',
+    },
+  ];
+
+  for (const fixture of PROMO_VALIDATION_FIXTURES) {
+    const result = validatePromoFields(fixture.input);
+    const pass = fixture.check(result);
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input:</strong> <code>' + escapeHtml(JSON.stringify(fixture.input)) + '</code></div>' +
+      '<div class="harness-field"><strong>Check:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>missing:</strong> <code>' + escapeHtml(JSON.stringify(result.missing)) + '</code></div>' +
+      '<div class="harness-field"><strong>formatErrors:</strong> <code>' + escapeHtml(JSON.stringify(result.formatErrors)) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  // --- Section 5: serializePromoCard fixtures (TASK-018) ---
+  const h5 = document.createElement('h3');
+  h5.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h5.textContent = 'serializePromoCard — JSON-LD block generation';
+  body.appendChild(h5);
+
+  const PROMO_JSONLD_FIXTURES = [
+    {
+      label: 'Valid input: block JSON.parses with correct @type and @context',
+      input: { headline: 'Save 30%', imageUrl: 'https://example.com/promo.png', url: 'https://example.com/?utm_source=email' },
+      check(block) {
+        const m = block.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+        if (!m) return false;
+        try {
+          const obj = JSON.parse(m[1]);
+          return obj['@type'] === 'PromotionCard' && obj['@context'] === 'http://schema.org/';
+        } catch { return false; }
+      },
+      description: 'Extracted JSON parses; @type === "PromotionCard" and @context === "http://schema.org/"',
+    },
+    {
+      label: 'Headline containing </script>: block does not terminate early and still parses',
+      input: { headline: 'Sale </script><b>injected</b>', imageUrl: 'https://example.com/img.png', url: 'https://example.com/' },
+      check(block) {
+        // The raw string </script> must not appear literally in the output.
+        if (block.includes('</script>') && block.indexOf('</script>') !== block.lastIndexOf('</script>')) {
+          // More than one </script> means injection succeeded — FAIL
+          return false;
+        }
+        // The JSON inside the one closing tag must still parse.
+        const m = block.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+        if (!m) return false;
+        try {
+          JSON.parse(m[1]);
+          return true;
+        } catch { return false; }
+      },
+      description: 'No premature </script> closing; JSON inside the block still parses',
+    },
+    {
+      label: 'price present: typeof parsed.price === "string"',
+      input: { headline: '20% off', imageUrl: 'https://example.com/img.png', url: 'https://example.com/', price: 49.99, priceCurrency: 'USD' },
+      check(block) {
+        const m = block.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+        if (!m) return false;
+        try {
+          const obj = JSON.parse(m[1]);
+          return typeof obj.price === 'string' && obj.price === '49.99';
+        } catch { return false; }
+      },
+      description: 'price serialized as string "49.99", not number 49.99',
+    },
+    {
+      label: 'price absent: no price key in output',
+      input: { headline: 'Big Sale', imageUrl: 'https://example.com/img.png', url: 'https://example.com/' },
+      check(block) {
+        const m = block.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+        if (!m) return false;
+        try {
+          const obj = JSON.parse(m[1]);
+          return !Object.prototype.hasOwnProperty.call(obj, 'price');
+        } catch { return false; }
+      },
+      description: 'no price key emitted when price is not provided',
+    },
+    {
+      label: 'price=0 (falsy but present): serialized as string "0", not dropped',
+      input: { headline: 'Free Tier', imageUrl: 'https://example.com/img.png', url: 'https://example.com/', price: 0, priceCurrency: 'USD' },
+      check(block) {
+        const m = block.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+        if (!m) return false;
+        try {
+          const obj = JSON.parse(m[1]);
+          return Object.prototype.hasOwnProperty.call(obj, 'price') && obj.price === '0';
+        } catch { return false; }
+      },
+      description: 'price=0 is not dropped by falsy guard; serialized as string "0"',
+    },
+    {
+      label: 'priceCurrency present in output when price and priceCurrency provided',
+      input: { headline: 'Members Sale', imageUrl: 'https://example.com/img.png', url: 'https://example.com/', price: 99, priceCurrency: 'USD' },
+      check(block) {
+        const m = block.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+        if (!m) return false;
+        try {
+          const obj = JSON.parse(m[1]);
+          return obj.priceCurrency === 'USD';
+        } catch { return false; }
+      },
+      description: 'priceCurrency key present in JSON output with value "USD"',
+    },
+  ];
+
+  for (const fixture of PROMO_JSONLD_FIXTURES) {
+    let block, pass;
+    try {
+      block = serializePromoCard(fixture.input);
+      pass = fixture.check(block);
+    } catch (e) {
+      block = '(threw: ' + e.message + ')';
+      pass = false;
+    }
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input:</strong> <code>' + escapeHtml(JSON.stringify(fixture.input)) + '</code></div>' +
+      '<div class="harness-field"><strong>Check:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Output block:</strong><pre>' + escapeHtml(block) + '</pre></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  // --- Section 6: humanizePromoError fixtures (TASK-018) ---
+  const h6 = document.createElement('h3');
+  h6.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h6.textContent = 'humanizePromoError — JSON-LD serialisation error humanization';
+  body.appendChild(h6);
+
+  const PROMO_HUMANIZE_FIXTURES = [
+    {
+      label: 'Circular structure error: describes the problem',
+      input: 'Converting circular structure to JSON',
+      expected_pattern: 'could not be serialized',
+    },
+    {
+      label: 'Empty message (guard): safe fallback',
+      input: '',
+      expected_pattern: 'could not build the annotation',
+    },
+    {
+      label: 'Unknown error message: safe fallback',
+      input: 'Some unexpected error that we have never seen before',
+      expected_pattern: 'could not build the annotation',
+    },
+  ];
+
+  for (const fixture of PROMO_HUMANIZE_FIXTURES) {
+    const actual = humanizePromoError(fixture.input);
+    const pass = actual.includes(fixture.expected_pattern);
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input:</strong><pre>' + escapeHtml(fixture.input) + '</pre></div>' +
+      '<div class="harness-field"><strong>Expected pattern:</strong> <code>' + escapeHtml(fixture.expected_pattern) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual output:</strong> <code>' + escapeHtml(actual) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
+    body.appendChild(row);
+  }
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
@@ -2089,6 +2463,12 @@ function render() {
       warnings.push(`MJML warning: ${msgs.join('; ')}${suffix}`);
     }
     if (templateError) warnings.unshift(templateError);
+    if (promoToggle.isOn()) {
+      const promoUrlVal = els.promoUrl.value.trim();
+      if (promoUrlVal && isHttpsUrl(promoUrlVal) && !promoUrlVal.includes('utm_')) {
+        warnings.push('Promo card URL has no UTM params — Gmail does not click-track it, so add utm_source/utm_medium for attribution.');
+      }
+    }
     showWarn(warnings.join(' · '));
   } catch (e) {
     lastHtml = '';
@@ -2219,6 +2599,23 @@ function onCtaToggle(isOn) {
 const ctaToggle = createModuleToggle('cta', 'Call to action', true, onCtaToggle);
 document.querySelector('.seg-cta .seg-head').appendChild(ctaToggle.element);
 
+// Promo module toggle — collapses the Gmail Promo Tab fields when OFF.
+// Module-scope so TASK-017 and TASK-018 can read promoToggle.isOn().
+function onPromoToggle(isOn) {
+  els.promoBody.classList.toggle('collapsed', !isOn);
+  scheduleRender();
+}
+const promoToggle = createModuleToggle('promo', 'Gmail Promo Tab', false, onPromoToggle);
+document.querySelector('.seg-promo .seg-head').appendChild(promoToggle.element);
+
+// clearPromoFields — empties the three promo inputs on every load.
+// Toggle state (localStorage) is intentionally NOT touched — only field values reset.
+function clearPromoFields() {
+  els.promoHeadline.value = '';
+  els.promoImageUrl.value = '';
+  els.promoUrl.value = '';
+}
+
 // Copy validation
 function hasRichContent(quill) {
   const html = quill.root.innerHTML;
@@ -2233,6 +2630,21 @@ function isValidPhone(value) {
   // 7–15 digits covers US local through international E.164 length.
   const digits = value.replace(/\D/g, '');
   return digits.length >= 7 && digits.length <= 15;
+}
+
+function isHttpsUrl(value) {
+  return typeof value === 'string' && /^https:\/\//i.test(value.trim());
+}
+// Returns { missing: string[], formatErrors: string[] } — pure, testable.
+function validatePromoFields({ headline, imageUrl, url }) {
+  const missing = [];
+  const formatErrors = [];
+  if (!headline || !headline.trim()) missing.push('promo headline');
+  if (!imageUrl || !imageUrl.trim()) missing.push('promo image URL');
+  else if (!isHttpsUrl(imageUrl)) formatErrors.push('promo image URL must start with https://');
+  if (!url || !url.trim()) missing.push('promo destination URL');
+  else if (!isHttpsUrl(url)) formatErrors.push('promo destination URL must start with https://');
+  return { missing, formatErrors };
 }
 
 // Invalid-field highlighting
@@ -2255,6 +2667,18 @@ els.ctaText.addEventListener('input', () => {
 els.ctaDestination.addEventListener('input', () => {
   els.ctaDestination.classList.remove('invalid');
   invalidEls.delete(els.ctaDestination);
+});
+els.promoHeadline.addEventListener('input', () => {
+  els.promoHeadline.classList.remove('invalid');
+  invalidEls.delete(els.promoHeadline);
+});
+els.promoImageUrl.addEventListener('input', () => {
+  els.promoImageUrl.classList.remove('invalid');
+  invalidEls.delete(els.promoImageUrl);
+});
+els.promoUrl.addEventListener('input', () => {
+  els.promoUrl.classList.remove('invalid');
+  invalidEls.delete(els.promoUrl);
 });
 bodyAboveQuill.on('text-change', () => {
   bodyAboveWrap.classList.remove('invalid');
@@ -2315,12 +2739,45 @@ async function runCopyAction() {
     }
   }
 
+  let promoFormatError = false;
+  let promoFormatMessage = '';
+  if (promoToggle.isOn()) {
+    const promoResult = validatePromoFields({
+      headline: els.promoHeadline.value,
+      imageUrl: els.promoImageUrl.value,
+      url: els.promoUrl.value,
+    });
+    const fieldMap = {
+      'promo headline': els.promoHeadline,
+      'promo image URL': els.promoImageUrl,
+      'promo destination URL': els.promoUrl,
+    };
+    for (const label of promoResult.missing) {
+      missing.push(label);
+      markInvalid(fieldMap[label]);
+    }
+    if (promoResult.formatErrors.length) {
+      promoFormatError = true;
+      promoFormatMessage = promoResult.formatErrors[0];
+      // Mark the relevant input invalid.
+      if (promoResult.formatErrors[0].startsWith('promo image URL')) {
+        markInvalid(els.promoImageUrl);
+      } else {
+        markInvalid(els.promoUrl);
+      }
+    }
+  }
+
   if (missing.length) {
     showCopyError(`Add ${missing.join(' and ')}`);
     return 'validation-failed';
   }
   if (phoneFormatError) {
     showCopyError('Check phone number format');
+    return 'validation-failed';
+  }
+  if (promoFormatError) {
+    showCopyError(promoFormatMessage);
     return 'validation-failed';
   }
 
@@ -2425,6 +2882,7 @@ copyFromModal.addEventListener('click', async () => {
 loadTestData();
 autoSizeTestData();
 updateCtaPreview();
+clearPromoFields();
 render();
 </script>
 </body>

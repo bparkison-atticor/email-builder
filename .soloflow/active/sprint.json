@@ -1,16 +1,16 @@
 {
   "version": 2,
   "sprint": {
-    "id": "SPRINT-005",
+    "id": "SPRINT-006",
     "status": "complete",
-    "started": "2026-06-02T00:00:00.000Z",
+    "started": "2026-06-30T00:00:00.000Z",
     "execution_mode": "serial"
   },
   "run": {
-    "branch": "soloflow/run-20260602-134407-SPRINT-005",
+    "branch": "soloflow/run-20260630-103037-SPRINT-006",
     "base_branch": "main",
-    "base_sha": "0421681c703c4350616773ef8acc3fe2e17f1af6",
-    "created_at": "2026-06-02T13:44:07.000Z"
+    "base_sha": "1fc16940c5b40857706737860a4d2fa565bc768a",
+    "created_at": "2026-06-30T10:30:37.000Z"
   },
   "tasks": {}
 }
