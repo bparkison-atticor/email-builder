@@ -1604,8 +1604,8 @@ let lastHtml = '';
 // --- Gmail Promotions tab annotation helpers (TASK-018) ---
 
 // Pure: assembles a PromotionCard JSON-LD object, serialises it, escapes '<'
-// as < so a literal </script> in any field value cannot close the tag,
-// and returns the full <script type="application/ld+json">…</script> block.
+// as < so a literal <\/script> in any field value cannot close the tag,
+// and returns the full <script type="application/ld+json">…<\/script> block.
 // price, when provided, is serialised as a STRING per the schema.org spec.
 // Exported-like (module-scope) so the test harness can call it directly.
 function serializePromoCard({ headline, imageUrl, url, price, priceCurrency }) {
@@ -1620,7 +1620,7 @@ function serializePromoCard({ headline, imageUrl, url, price, priceCurrency }) {
     card.price = String(price);
     if (priceCurrency) card.priceCurrency = priceCurrency;
   }
-  // Escape '<' so no value can inject '</script>' and break out of the tag.
+  // Escape '<' so no value can inject '<\/script>' and break out of the tag.
   const json = JSON.stringify(card, null, 2).replace(/</g, '\\u003c');
   return `<script type="application/ld+json">\n${json}\n<\/script>`;
 }
@@ -2117,12 +2117,12 @@ function renderTestHarness() {
       description: 'Extracted JSON parses; @type === "PromotionCard" and @context === "http://schema.org/"',
     },
     {
-      label: 'Headline containing </script>: block does not terminate early and still parses',
-      input: { headline: 'Sale </script><b>injected</b>', imageUrl: 'https://example.com/img.png', url: 'https://example.com/' },
+      label: 'Headline containing <\/script>: block does not terminate early and still parses',
+      input: { headline: 'Sale <\/script><b>injected</b>', imageUrl: 'https://example.com/img.png', url: 'https://example.com/' },
       check(block) {
-        // The raw string </script> must not appear literally in the output.
-        if (block.includes('</script>') && block.indexOf('</script>') !== block.lastIndexOf('</script>')) {
-          // More than one </script> means injection succeeded — FAIL
+        // The raw string <\/script> must not appear literally in the output.
+        if (block.includes('<\/script>') && block.indexOf('<\/script>') !== block.lastIndexOf('<\/script>')) {
+          // More than one <\/script> means injection succeeded — FAIL
           return false;
         }
         // The JSON inside the one closing tag must still parse.
@@ -2133,7 +2133,7 @@ function renderTestHarness() {
           return true;
         } catch { return false; }
       },
-      description: 'No premature </script> closing; JSON inside the block still parses',
+      description: 'No premature <\/script> closing; JSON inside the block still parses',
     },
     {
       label: 'price present: typeof parsed.price === "string"',
@@ -2250,6 +2250,48 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Expected pattern:</strong> <code>' + escapeHtml(fixture.expected_pattern) + '</code></div>' +
       '<div class="harness-field"><strong>Actual output:</strong> <code>' + escapeHtml(actual) + '</code></div>' +
       '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  // --- Section 7: script-not-truncated regression guard (TASK-020) ---
+  // Asserts that the module script body was NOT truncated by the HTML parser.
+  // Strategy: if the script was truncated, render() never ran and lastHtml is
+  // empty; if promoToggle was never defined the typeof check fails; and the
+  // promo toggle DOM element would be absent. All three must pass.
+  const h7 = document.createElement('h3');
+  h7.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h7.textContent = 'Script-not-truncated guard — TASK-020 regression';
+  body.appendChild(h7);
+
+  const TRUNCATION_GUARDS = [
+    {
+      label: 'render() executed: lastHtml is non-empty after initial render',
+      check() { return typeof lastHtml === 'string' && lastHtml.length > 0; },
+      description: 'lastHtml populated means render() ran (script was not truncated before it)',
+    },
+    {
+      label: 'promoToggle defined: module initialisation ran past the toggle wiring',
+      check() { return typeof promoToggle !== 'undefined' && promoToggle !== null; },
+      description: 'promoToggle object exists — toggle wiring code executed',
+    },
+    {
+      label: 'Promo toggle DOM element present: .seg-promo .module-toggle exists in document',
+      check() { return document.querySelector('.seg-promo .seg-head .module-toggle') !== null; },
+      description: 'Toggle element found in DOM — module markup and JS both ran',
+    },
+  ];
+
+  for (const guard of TRUNCATION_GUARDS) {
+    const pass = (() => { try { return guard.check(); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(guard.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(guard.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — script was truncated or wiring did not run') + '</code></div>';
     body.appendChild(row);
   }
 }
