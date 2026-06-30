@@ -2147,6 +2147,32 @@ function renderTestHarness() {
       },
       description: 'no price key emitted when price is not provided',
     },
+    {
+      label: 'price=0 (falsy but present): serialized as string "0", not dropped',
+      input: { headline: 'Free Tier', imageUrl: 'https://example.com/img.png', url: 'https://example.com/', price: 0, priceCurrency: 'USD' },
+      check(block) {
+        const m = block.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+        if (!m) return false;
+        try {
+          const obj = JSON.parse(m[1]);
+          return Object.prototype.hasOwnProperty.call(obj, 'price') && obj.price === '0';
+        } catch { return false; }
+      },
+      description: 'price=0 is not dropped by falsy guard; serialized as string "0"',
+    },
+    {
+      label: 'priceCurrency present in output when price and priceCurrency provided',
+      input: { headline: 'Members Sale', imageUrl: 'https://example.com/img.png', url: 'https://example.com/', price: 99, priceCurrency: 'USD' },
+      check(block) {
+        const m = block.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+        if (!m) return false;
+        try {
+          const obj = JSON.parse(m[1]);
+          return obj.priceCurrency === 'USD';
+        } catch { return false; }
+      },
+      description: 'priceCurrency key present in JSON output with value "USD"',
+    },
   ];
 
   for (const fixture of PROMO_JSONLD_FIXTURES) {
