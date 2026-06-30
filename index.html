@@ -236,6 +236,8 @@
     color: var(--muted);
     margin-top: 4px;
   }
+  .promo-ops ul { margin: 6px 0 0; padding-left: 18px; }
+  .promo-ops li { margin-bottom: 4px; }
   .warn {
     font-size: 12px;
     color: var(--danger);
@@ -600,7 +602,19 @@
           <input type="text" id="promoUrl" placeholder="https://…" />
           <div class="hint">Where the promo card click goes. Add UTM params here — Gmail does not click-track this URL.</div>
         </div>
-        <!-- TASK-019 inserts the static ops-doc block here -->
+        <div class="promo-ops hint">
+          <strong>Before Gmail will show this card:</strong>
+          <ul>
+            <li>Register your sending domain: email a sample to <code>schema.whitelisting+sample@gmail.com</code> and submit the Google registration form.</li>
+            <li>For image cards (required for image rendering), also request allowlisting via <code>p-Promo-Outreach@google.com</code>.</li>
+            <li>SPF, DKIM, and DMARC must all pass for the sending domain.</li>
+            <li>Maintain good sender reputation — low spam complaint rates.</li>
+            <li>Annotations are cached per sender; changes may take time to appear.</li>
+            <li>Gmail does not click-track the card URL — add UTM params in the Destination URL above.</li>
+            <li>Test rendering with Google's
+              <a href="https://developers.google.com/workspace/gmail/promotab/preview" target="_blank" rel="noopener noreferrer">Promotions Annotation Preview</a> tool.</li>
+          </ul>
+        </div>
       </div>
     </div>
 
