@@ -6,6 +6,26 @@
       "depends_on": [],
       "epic": null,
       "idea": "IDEA-003"
+    },
+    "TASK-016": {
+      "status": "ready",
+      "depends_on": [],
+      "idea": "IDEA-004"
+    },
+    "TASK-017": {
+      "status": "ready",
+      "depends_on": ["TASK-016"],
+      "idea": "IDEA-004"
+    },
+    "TASK-018": {
+      "status": "ready",
+      "depends_on": ["TASK-016", "TASK-017"],
+      "idea": "IDEA-004"
+    },
+    "TASK-019": {
+      "status": "ready",
+      "depends_on": ["TASK-016"],
+      "idea": "IDEA-004"
     }
   }
 }
