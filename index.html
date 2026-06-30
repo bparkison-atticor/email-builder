@@ -1990,6 +1990,24 @@ function renderTestHarness() {
       check: (r) => r.missing.includes('promo image URL') && !r.formatErrors.some(e => e.startsWith('promo image URL')),
       description: 'missing includes "promo image URL"; formatErrors has no image entry (empty takes precedence)',
     },
+    {
+      label: 'Empty destination URL — missing, no https format error for url',
+      input: { headline: 'Sale', imageUrl: 'https://example.com/promo.png', url: '' },
+      check: (r) => r.missing.includes('promo destination URL') && !r.formatErrors.some(e => e.startsWith('promo destination URL')),
+      description: 'missing includes "promo destination URL"; formatErrors has no url entry (empty takes precedence)',
+    },
+    {
+      label: 'Whitespace-only headline — treated as missing',
+      input: { headline: '   ', imageUrl: 'https://example.com/promo.png', url: 'https://example.com/' },
+      check: (r) => r.missing.includes('promo headline') && r.formatErrors.length === 0,
+      description: 'headline "   " trims to empty; missing includes "promo headline"',
+    },
+    {
+      label: 'Both URLs http:// — two independent formatErrors entries',
+      input: { headline: 'Sale', imageUrl: 'http://example.com/promo.png', url: 'http://example.com/' },
+      check: (r) => r.missing.length === 0 && r.formatErrors.some(e => e.startsWith('promo image URL')) && r.formatErrors.some(e => e.startsWith('promo destination URL')),
+      description: 'missing empty; formatErrors has both image and destination URL entries',
+    },
   ];
 
   for (const fixture of PROMO_VALIDATION_FIXTURES) {
