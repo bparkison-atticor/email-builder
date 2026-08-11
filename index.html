@@ -3091,7 +3091,86 @@ function outlookDarkTransform(html) {
   return injectPreviewStyle(remapInlineColors(html), css);
 }
 
-function appleMailDarkTransform(html) { /* DARK_TRANSFORM_STUB — implemented in TASK-023 */ return html; }
+// ---------------------------------------------------------------------
+// Apple Mail CSS-respecting simulation (TASK-023).
+//
+// Apple Mail (macOS 12.4+ / iOS 13+, per caniemail's primary data file)
+// is the ONLY one of the three simulated surfaces that is OPT-IN rather
+// than forced: it honors the `prefers-color-scheme` media query and the
+// `color-scheme` / `supported-color-schemes` meta, and does nothing on
+// its own when neither is present. Mail 12 and earlier used a
+// meta-tag-only mechanism and is out of scope for this simulation.
+//
+// Gmail and Outlook (TASK-021/022) are both "forced" clients: they
+// repaint every email regardless of what the email itself declares.
+// Apple Mail is the "optional dark mode" case in that taxonomy, which is
+// precisely why its faithful simulation can be a no-op.
+//
+// This whole design rests on a premise about THIS APP's compiler:
+// buildMjml() emits no dark-mode CSS today (verified: no
+// prefers-color-scheme / color-scheme in the compiled output), so the
+// honest simulation of "opt-in, nothing to opt into" is identity.
+// Harness Section 10's drift-guard fixture asserts that premise against
+// the live compiled output on every harness run — see its description
+// for the remediation if it ever fails.
+// ---------------------------------------------------------------------
+
+// detectAuthorDarkScheme(html) — classifies an HTML string into one of
+// three author-dark-CSS states: 'authored' (a real
+// @media (prefers-color-scheme: dark) block, or the CSS property form
+// used outside a media query), 'meta-only' (a bare color-scheme /
+// supported-color-schemes signal with no actual dark rules behind it),
+// or 'none' (neither).
+//
+// BRANCH ORDER IS LOAD-BEARING: the string `prefers-color-scheme`
+// contains `color-scheme` as a substring, so the 'authored' check MUST
+// run before the 'meta-only' check — swapping these two branches would
+// silently misclassify every authored-dark-CSS input as meta-only. Do
+// not reorder.
+function detectAuthorDarkScheme(html) {
+  if (/prefers-color-scheme/i.test(html)) return 'authored';
+  if (/name=["']?(?:color-scheme|supported-color-schemes)/i.test(html)) return 'meta-only';
+  // The [;{"'\s] prefix requires a preceding delimiter so this cannot
+  // match inside the substring "prefers-color-scheme:" — belt-and-braces
+  // given the authored check above already short-circuits that case.
+  if (/[;{"'\s]color-scheme\s*:/i.test(html)) return 'meta-only';
+  return 'none';
+}
+
+// appleMailDarkTransform(html) — see the surface-behavior comment above.
+function appleMailDarkTransform(html) {
+  const scheme = detectAuthorDarkScheme(html);
+  if (scheme === 'none') {
+    // Identity, by design: no marker, no injected stylesheet, nothing.
+    // Apple Mail does not force a transform, and this app's compiler
+    // authors no dark-mode CSS to opt into, so the faithful simulation
+    // is the untouched input. Injecting even the EB-DARKSIM marker here
+    // would make the "renders unchanged" claim false and would break
+    // the strict-identity fixture (Section 10) that pins it.
+    return html;
+  }
+  if (scheme === 'meta-only') {
+    // Apple's documented fallback when color-scheme / supported-color-schemes
+    // is present but no dark rules are authored: a partial invert (light
+    // backgrounds go dark, dark text goes light). remapInlineColors
+    // (TASK-022) already implements exactly that transform, so it is
+    // reused as-is rather than duplicated.
+    return remapInlineColors(html);
+  }
+  // scheme === 'authored' — unreachable today (see the Section 10 drift
+  // guard). Routed to the same partial-invert fallback as a conservative
+  // placeholder so nothing throws if this branch is ever hit ahead of a
+  // real fix.
+  // TODO: the correct behavior is to honor the author's own rules by
+  // unwrapping @media (prefers-color-scheme: dark) blocks into
+  // unconditional CSS, rather than approximating with remapInlineColors.
+  // Not implemented now — brace-balanced CSS parsing here would be
+  // speculative code against a compiler that emits nothing to unwrap
+  // (see the plan's Hardest Decision). The Section 10 drift guard will
+  // fail loudly the moment this branch becomes reachable, which is the
+  // signal to do the real implementation then.
+  return remapInlineColors(html);
+}
 const DARK_MODE_TRANSFORMS = { gmail: gmailDarkTransform, outlook: outlookDarkTransform, applemail: appleMailDarkTransform };
 
 // applyDarkMode(html) — preview-only step in the srcdoc transform chain.
@@ -3273,7 +3352,7 @@ document.querySelector('.preview-header-left').insertAdjacentHTML('beforeend',
   '<div class="seg-control" role="group" aria-label="Dark mode client" id="darkClientControl" style="width:auto" hidden>' +
     '<button type="button" class="active" data-dm="gmail" aria-pressed="true" title="Gmail mobile app (iOS) — inverts the entire email, then re-inverts images">Gmail</button>' +
     '<button type="button" data-dm="outlook" aria-pressed="false" title="Outlook.com / OWA (web) — selectively repairs contrast instead of inverting">Outlook</button>' +
-    '<button type="button" data-dm="applemail" aria-pressed="false" title="Apple Mail macOS 12.4+ / iOS 13+ — opt-in; renders unchanged against today\'s output">Apple Mail</button>' +
+    '<button type="button" data-dm="applemail" aria-pressed="false" title="Apple Mail (macOS 12.4+ / iOS 13+) — respects author dark-mode CSS; this email has none, so it renders unchanged">Apple Mail</button>' +
   '</div>'
 );
 
