@@ -2681,9 +2681,14 @@ const DARK_MODE_TRANSFORMS = { gmail: gmailDarkTransform, outlook: outlookDarkTr
 // has no registered transform. Never applied to lastHtml (Copy HTML /
 // View HTML source) — see render()'s wiring.
 function applyDarkMode(html) {
-  if (!darkModeEnabled) return html;
+  // Both early returns below also clear darkModeError: without this, a
+  // stale "could not be applied" warning from a previous transform throw
+  // stayed pinned in #warn after the marketer switched dark mode back OFF
+  // or picked a client with no registered transform, even though the
+  // preview is the ordinary untransformed email and nothing is wrong.
+  if (!darkModeEnabled) { darkModeError = ''; return html; }
   const transform = DARK_MODE_TRANSFORMS[darkModeClient];
-  if (!transform) return html;
+  if (!transform) { darkModeError = ''; return html; }
   try {
     const result = transform(html);
     darkModeError = '';
