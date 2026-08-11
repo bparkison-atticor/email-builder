@@ -1,43 +1,6 @@
 {
   "version": 2,
   "tasks": {
-    "TASK-014": {
-      "status": "ready",
-      "depends_on": [],
-      "epic": null,
-      "idea": "IDEA-003"
-    },
-    "TASK-021": {
-      "status": "ready",
-      "depends_on": [
-        "TASK-014"
-      ],
-      "idea": "IDEA-005"
-    },
-    "TASK-022": {
-      "status": "ready",
-      "depends_on": [
-        "TASK-021"
-      ],
-      "idea": "IDEA-005"
-    },
-    "TASK-023": {
-      "status": "ready",
-      "depends_on": [
-        "TASK-021",
-        "TASK-022"
-      ],
-      "idea": "IDEA-005"
-    },
-    "TASK-024": {
-      "status": "ready",
-      "depends_on": [
-        "TASK-021",
-        "TASK-022",
-        "TASK-023"
-      ],
-      "idea": "IDEA-005"
-    },
     "TASK-025": {
       "status": "ready",
       "depends_on": [],
