@@ -1,7 +1,7 @@
 ---
 sprint: SPRINT-007
-pending_count: 7
-last_updated: "2026-08-11T22:02:28.063Z"
+pending_count: 10
+last_updated: "2026-08-11T23:14:00.000Z"
 ---
 # Findings Queue
 
@@ -104,3 +104,33 @@ last_updated: "2026-08-11T22:02:28.063Z"
 - **location:** .soloflow/active/plans/dark-mode-preview/TASK-022-plan.md (Test Strategy fixture 9)
 - **description:** The plan's chosen fixture for proving the 4.5:1 contrast guard is live (#767676) cannot demonstrate it under the plan's own remapLightness formula. Verified numerically (Node cross-check, and cross-validated against the published fact that #808080 has a 5.32:1 ratio against pure black): for any achromatic (grayscale) input with HSL lightness < 0.5, remapLightness's dark branch (L prime = 0.90 - L*0.40) always lands in the range [0.70, 0.90], and the crossover HSL lightness where a gray's contrast against #1b1b1b drops below 4.5 is only about 0.51 -- always below that floor. So contrastRatio(remapLightness(#767676), '#1b1b1b') is ~8.52, never <4.5, and the guard cannot fire for any gray, not just this one. The guard only fires for saturated hues where WCAG luminance weighting (0.0722 for blue) diverges sharply from HSL lightness -- confirmed by a full hue/lightness sweep finding failing cases only in a narrow blue band (h~=240, l~=0.46-0.49).
 - **suggested_action:** Executor substituted #0000ee (the classic browser default :link blue) for the 'guard exercised' Section 9 fixture instead of #767676 -- verified pre-lift contrast 4.323 (fails 4.5), post-lift 4.812 (passes) after exactly one +0.02 lightness iteration. No plan change needed since the fixture list is illustrative once implemented; flagging so a future reader of the plan text isn't misled by the #767676 example.
+
+## FIND-SPRINT-007-11
+- **source:** TASK-022 (code-reviewer)
+- **type:** improvement
+- **severity:** low
+- **status:** open
+- **location:** index.html:3070, index.html:3073
+- **description:** Neither regex in `remapInlineColors` is anchored to an attribute-name boundary, so both match more than the two attribute shapes they document. Confirmed by extracting the shipped functions verbatim and running them under Node: `<td data-style="color:#333333">` becomes `data-style="color:#d1d1d1"`, `<td xstyle="color:#333333">` likewise, `<td data-bgcolor="#ffffff">` becomes `#1a1a1a`, and a plain text node reading `style="color:#333333"` is rewritten as well. What makes this worth queuing is not the behavior (inert today) but the function's own comment, which asserts a guarantee half of which does not hold: "every other attribute (including href) is untouched because neither regex can match outside those two attribute shapes." The href half is genuinely true — `[^"]*` cannot cross a quote, which is the boundary property the whole design rests on — but the attribute-name half is not, and a future maintainer extending this pass will reasonably trust the stronger claim. No impact today: mjml-browser emits no attribute names ending in `style`/`bgcolor`, the verifier confirmed all 8 templates survive uncorrupted, and the transform is preview-only so nothing can reach the copied HTML.
+- **suggested_action:** Anchor both patterns to a name boundary and narrow the comment to the claim that actually holds. Lookbehind form: `/(?<![-\w])style="([^"]*)"/gi` and `/(?<![-\w])bgcolor=(["'])([^"']*)\1/gi`. If lookbehind support is a concern, capture the preceding character instead (`/([\s"'])style="([^"]*)"/gi`, re-emitting `$1`) — attributes are always whitespace-separated so no overlap hazard. Natural home is TASK-024 (epic finish), alongside the other harness/comment tidying.
+- **resolved_by:** 
+
+## FIND-SPRINT-007-12
+- **source:** TASK-022 (code-reviewer)
+- **type:** improvement
+- **severity:** medium
+- **status:** open
+- **location:** index.html:3089 (vs. index.html:2987)
+- **description:** `OUTLOOK_DARK_SURFACE = '#1b1b1b'` (index.html:2987) is the declared simulated surface that every foreground contrast decision in `remapForegroundValue`/`liftForContrast` is measured against, but `outlookDarkTransform` re-states the same value as a bare literal in its injected canvas rule (`'html { background-color: #1b1b1b !important; }'`) rather than interpolating the constant. Two sources of truth for one semantic value. The failure mode if they drift is silent and invisible to every ground-truth check: tuning `OUTLOOK_DARK_SURFACE` while calibrating the contrast guard leaves the preview painting the old canvas color, so the guard certifies 4.5:1 against a surface the marketer is not actually looking at, with no test, type, or lint signal. They agree today, so nothing is currently wrong. Secondary note: this also leaves the comment added to `injectPreviewStyle` in commit d931119 ("TASK-022's outlookDarkTransform is the first transform whose css could plausibly carry interpolated color values") describing something the code does not yet do — interpolating the constant would make the comment true and give the new `</style` neutralization a live caller.
+- **suggested_action:** Build the rule as `'html { background-color: ' + OUTLOOK_DARK_SURFACE + ' !important; }'`. Safe as of d931119: `injectPreviewStyle` now neutralizes a literal `</style` in its `css` argument and already uses function replacers throughout, so an interpolated value cannot terminate the style element or be read as a `$`-substitution pattern.
+- **resolved_by:** 
+
+## FIND-SPRINT-007-13
+- **source:** TASK-022 (code-reviewer)
+- **type:** cleanup
+- **severity:** low
+- **status:** open
+- **location:** index.html:2989
+- **description:** `const BACKGROUND_COLOR_PROPS = ['background-color', 'bgcolor'];` — the `'bgcolor'` member is unreachable in any meaningful sense. `BACKGROUND_COLOR_PROPS` is consulted only by `remapDeclarations`, which only ever runs on the contents of a `style` attribute, and `bgcolor:` is not a CSS property there; the real `bgcolor` *attribute* path in `remapInlineColors` (index.html:3073) calls `remapBackgroundValue` directly without consulting the list. The only input the member can act on is an invalid `style="bgcolor:#fff"` declaration the browser ignores anyway. Not an executor error — the plan's step 3 names "background-color, background, and bgcolor" as the background property set — but as shipped it implies style-attribute `bgcolor` declarations are a supported input path, which they are not.
+- **suggested_action:** Either reduce the array to `['background-color']` (the `background` shorthand is already special-cased above it), or keep the member and add a trailing comment noting it exists only to mirror the attribute name handled separately at index.html:3073.
+- **resolved_by:** 
