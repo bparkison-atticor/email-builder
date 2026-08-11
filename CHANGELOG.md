@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-11 — Keller Postman lead outreach wordmark size
+
+### Changed
+- **`kellerPostmanLead` banner wordmark** enlarged from 36px to 48px — the text "Keller | Postman" header read too small against the navy band. Padding unchanged.
+
+## 2026-07-21 — New brand: Keches Law Group (lead outreach)
+
+### Added
+- **`kechesLead` template config.** "Keches Law Group — Lead Outreach" brand. Banner is the firm's white horizontal logo (SendGrid CDN, 600×149) centered at 300px on a brand-blue `#245280` band via `bannerHtml`/`bannerBackgroundColor`. CTA color `#245280` (per brand guidelines). Lead-outreach disclosure copy ("You are receiving this email because you contacted…") with the firm's Bridgewater, MA address.
+
 ## 2026-04-29 — UI ENH-001: Form panel & preview top bar redesign
 
 Implements the [Claude Design Handoff - UI ENH-001](Claude%20Design%20Handoff%20-%20UI%20ENH-001/README.md) spec. Recreates the design inside the existing single-file `index.html` — no React, no build step, no new dependencies. MJML pipeline, Quill editors, copy-HTML flow, raw-HTML modal, validation behavior, and tweak-mode protocol are all unchanged.
