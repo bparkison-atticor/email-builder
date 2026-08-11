@@ -1,9 +1,9 @@
 ---
-pending_count: 1
+pending_count: 2
 buckets:
   decisions: 0
   actions: 0
-  testing: 1
+  testing: 2
   deferred_visual: 0
 items: []
 ---
@@ -28,6 +28,17 @@ _No items._
     - "AC#1 end-to-end: JSON-LD mj-raw survives mjml2html compile intact and parseable in compiled <head>"
   level: goal_backward
   severity: medium
+
+- task: TASK-020
+  type: action_required
+  bucket: testing
+  plan_ref: .soloflow/active/plans/TASK-020-plan.md
+  action: "Open index.html in a browser; confirm a template renders in the preview and the Gmail Promo Tab toggle is interactive, then run the in-browser harness (Ctrl+Shift+T) and confirm Section 7 (script-not-truncated guard) shows three PASS rows."
+  blocked_checks:
+    - AC1 user-visible render + interactive toggle
+    - Section 7 guard live execution
+  level: requirements
+  severity: low
 
 ## Deferred Visual
 
