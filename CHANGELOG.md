@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-08-11 — Dark mode preview simulation (Gmail / Outlook / Apple Mail)
+
+Closes the `dark-mode-preview` epic (IDEA-005, TASK-021 through TASK-024). Preview-only — no change to `buildMjml()` output or the HTML produced by Copy HTML / View HTML.
+
+### Added
+- **Dark mode switch + client picker.** New `module-toggle` in the preview header (next to the Test data toggle) flips a preview-only `darkModeEnabled` flag; a three-option `.seg-control` (Gmail / Outlook / Apple Mail) picks which client's behavior to simulate, shown only while the switch is on. Neither the switch nor the picker selection persists across reloads — deliberate, unlike the Test data toggle's `localStorage` persistence.
+- **`applyDarkMode(html)`** runs as the last step of the `srcdoc` transform chain (`applyDarkMode(applyTestData(result.html))`), so the simulation composes with live test-data substitution. `lastHtml` — the source for **Copy HTML** and **View HTML** — is assigned directly from the compiler output before this step and is never passed through it, so the copied/exported HTML stays byte-identical regardless of dark-mode state.
+- **`gmailDarkTransform`** simulates the Gmail iOS app: a CSS `invert(100%) hue-rotate(180deg)` filter on `<body>`, re-applied to `img`/`video`/`svg` so media isn't double-inverted, plus an explicit inverted `<html>` background to close a canvas seam some browsers otherwise leave white. Chosen over Gmail web, which leaves the email body untouched entirely — simulating it would teach the marketer nothing.
+- **`outlookDarkTransform`** simulates Outlook.com / OWA's selective contrast repair: inline background and text colors are remapped (light backgrounds darken, already-dark colors are left alone, dark text is lifted and contrast-checked against a simulated `#1b1b1b` surface). Chosen over Outlook desktop's full invert, which would look near-identical to the Gmail option and make the picker uninformative.
+- **`appleMailDarkTransform`** simulates Apple Mail (macOS 12.4+ / iOS 13+), the only opt-in surface of the three. It classifies the compiled HTML via `detectAuthorDarkScheme` ('authored' / 'meta-only' / 'none') and, since this builder's compiler emits no `prefers-color-scheme` / `color-scheme` CSS today, renders the email **unchanged** — the faithful simulation of "nothing to opt into."
+- **`.preview-stage.dark`** darkens the chrome around the iframe (`#1a1a1a`) so the Apple Mail no-op still reads as a deliberate result rather than a broken toggle.
+- **Test harness Sections 8–10.** New predicate-fixture sections for the Gmail transform (marker injection, filter placement, canvas-seam fix, and a preview-only purity guard asserting `lastHtml` never carries the `EB-DARKSIM` marker regardless of toggle state); the Outlook transform (background/text remap, brand-color preservation, href/background-image safety); and the Apple Mail transform plus `detectAuthorDarkScheme`'s three-way classification, including a drift guard that fails loudly the moment `buildMjml()` starts emitting author dark-mode CSS — the signal to implement the transform's currently-unreachable `'authored'` branch.
+
 ## 2026-08-11 — Keller Postman lead outreach wordmark size
 
 ### Changed
