@@ -220,6 +220,8 @@
     display: flex;
     align-items: center;
     gap: 14px;
+    flex-wrap: wrap;
+    row-gap: 8px;
   }
   .preview-stage {
     flex: 1;
@@ -242,6 +244,15 @@
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     margin: 16px 0;
   }
+  /* Chrome around the iframe (not the email itself) so a no-op client
+     transform (Apple Mail, TASK-023) is still legibly different from
+     "the toggle is broken" (IDEA-005 / TASK-021). */
+  .preview-stage.dark { background: #1a1a1a; }
+  /* Required: the author rule `.seg-control { display: inline-flex; }`
+     beats the UA stylesheet's `[hidden] { display: none }`, so without
+     this the `hidden` attribute on #darkClientControl silently does
+     nothing (TASK-021). */
+  .seg-control[hidden] { display: none; }
   .hint {
     font-size: 12px;
     color: var(--muted);
@@ -1739,6 +1750,15 @@ let testDataEnabled = true;
 // (the body copy is where the syntax error came from — #testDataHint is the wrong place).
 let templateError = '';
 
+// Dark-mode preview state. Deliberately NOT persisted to localStorage —
+// this is a review-time lens like the desktop/mobile viewport switcher,
+// not a content decision like testDataEnabled. Locked by IDEA-005.
+let darkModeEnabled = false;
+let darkModeClient = 'gmail';
+// Set by applyDarkMode when a transform throws; folded into #warn by render().
+// Same staging pattern as templateError.
+let darkModeError = '';
+
 // buildTestDataContext(data) — wraps the parsed test-data object in a Proxy so
 // that any key lookup that resolves to undefined emits a visible yellow chip
 // in the preview rather than silently rendering as an empty string.
@@ -2344,6 +2364,93 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — script was truncated or wiring did not run') + '</code></div>';
     body.appendChild(row);
   }
+
+  // --- Section 8: dark-mode preview transforms — Gmail (TASK-021) ---
+  // Every function under test is pure string-in/string-out, so fixtures
+  // are literal HTML strings — no mocking needed. Fixture 8 is the
+  // highest-value regression lock in the whole epic: it must stay in the
+  // harness for the life of the feature.
+  const h8 = document.createElement('h3');
+  h8.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h8.textContent = 'Dark-mode preview transforms — Gmail';
+  body.appendChild(h8);
+
+  const DARK_MODE_FIXTURES = [
+    {
+      label: 'applyDarkMode is identity when off',
+      check() {
+        const saved = darkModeEnabled;
+        darkModeEnabled = false;
+        try {
+          return applyDarkMode('<body>x</body>') === '<body>x</body>';
+        } finally {
+          darkModeEnabled = saved;
+        }
+      },
+      description: 'applyDarkMode must return its input unchanged when darkModeEnabled is false.',
+    },
+    {
+      label: 'Gmail transform: EB-DARKSIM marker present',
+      check() { return gmailDarkTransform('<html><head></head><body>x</body></html>').includes('EB-DARKSIM'); },
+      description: 'The injected stylesheet must carry the EB-DARKSIM marker.',
+    },
+    {
+      label: 'Gmail transform: body double-invert filter present',
+      check() {
+        const out = gmailDarkTransform('<html><head></head><body>x</body></html>');
+        return /body\s*\{[^}]*filter:\s*invert\(100%\)\s*hue-rotate\(180deg\)/.test(out);
+      },
+      description: 'The body selector must carry filter: invert(100%) hue-rotate(180deg).',
+    },
+    {
+      label: 'Gmail transform: media counter-filter present',
+      check() {
+        const out = gmailDarkTransform('<html><head></head><body>x</body></html>');
+        return /img,\s*video,\s*svg\s*\{[^}]*filter:\s*invert\(100%\)\s*hue-rotate\(180deg\)/.test(out);
+      },
+      description: 'img, video, svg must carry the same filter declaration to cancel the parent inversion.',
+    },
+    {
+      label: 'Gmail transform: html background-color present',
+      check() { return gmailDarkTransform('<html><head></head><body>x</body></html>').includes('html { background-color: #0b0b0b'); },
+      description: 'html background-color must be set explicitly so no white canvas seam shows through the body filter.',
+    },
+    {
+      label: 'Gmail transform: injected before </head>',
+      check() {
+        const out = gmailDarkTransform('<html><head></head><body>x</body></html>');
+        return out.indexOf('EB-DARKSIM') < out.indexOf('</head>');
+      },
+      description: 'The injected <style> block must appear before </head> when a head exists.',
+    },
+    {
+      label: 'Gmail transform: falls back to post-<body> insertion with no </head>',
+      check() {
+        const out = gmailDarkTransform('<body>x</body>');
+        return out.includes('EB-DARKSIM') && out.indexOf('EB-DARKSIM') > out.indexOf('<body>');
+      },
+      description: 'With no </head> in the compiled HTML, the style block must be inserted immediately after the opening <body> tag.',
+    },
+    {
+      label: 'Preview-only purity guard: lastHtml never carries EB-DARKSIM',
+      check() { return typeof lastHtml === 'string' && lastHtml.indexOf('EB-DARKSIM') === -1; },
+      description: 'lastHtml (Copy HTML / View HTML source) must never carry a preview-only dark-mode stylesheet, regardless of toggle state.',
+    },
+  ];
+
+  for (const fixture of DARK_MODE_FIXTURES) {
+    const pass = (() => { try { return fixture.check(); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
+    body.appendChild(row);
+  }
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
@@ -2475,6 +2582,120 @@ function withPreviewLinkHandler(html) {
     : html + PREVIEW_LINK_HANDLER;
 }
 
+// injectPreviewStyle(html, css) — inserts a <style> block carrying `css`
+// into `html`: immediately before </head> when present, else immediately
+// after the opening <body ...> tag when present, else prepended to `html`.
+// Every .replace() call here uses a function replacer (not a string
+// replacement) so that a literal $&, $', $` etc. inside `css` can never be
+// interpreted by the JS engine as a substitution pattern.
+function injectPreviewStyle(html, css) {
+  const styleBlock = '<style type="text/css">' + css + '</style>';
+  if (html.indexOf('</head>') !== -1) {
+    return html.replace('</head>', () => styleBlock + '</head>');
+  }
+  const bodyMatch = html.match(/<body[^>]*>/i);
+  if (bodyMatch) {
+    return html.replace(bodyMatch[0], () => bodyMatch[0] + styleBlock);
+  }
+  return styleBlock + html;
+}
+
+// ---------------------------------------------------------------------
+// Dark-mode preview transforms (IDEA-005 / TASK-021, extended by
+// TASK-022, TASK-023). Each picker option simulates ONE NAMED SURFACE,
+// not "the brand's dark mode" — dark-mode behavior splits by platform,
+// not by brand. The surface is disclosed to the marketer via each
+// picker button's `title` tooltip.
+//
+//   Picker option | Simulated surface                 | Why this surface
+//   --------------|------------------------------------|----------------------------
+//   Gmail         | Gmail mobile app, iOS              | Gmail web leaves the email
+//                 |                                    | body untouched (chrome-only
+//                 |                                    | dark mode) — simulating it
+//                 |                                    | would be a no-op that
+//                 |                                    | teaches the marketer
+//                 |                                    | nothing. iOS's full CSS
+//                 |                                    | filter inversion is both
+//                 |                                    | the documented mechanism
+//                 |                                    | and the worst case in the
+//                 |                                    | Gmail family, matching a
+//                 |                                    | risk-spotting preview.
+//   Outlook       | Outlook.com / OWA (web)            | Outlook Windows desktop is
+//                 |                                    | a full invert, which would
+//                 |                                    | render near-identical to
+//                 |                                    | Gmail's — uninformative.
+//                 |                                    | OWA's selective contrast
+//                 |                                    | repair surfaces a different
+//                 |                                    | failure class (dark brand
+//                 |                                    | colors surviving un-inverted
+//                 |                                    | next to newly-darkened
+//                 |                                    | surroundings). Implemented
+//                 |                                    | in TASK-022.
+//   Apple Mail    | Apple Mail macOS 12.4+ / iOS 13+   | The only one of the three
+//                 |                                    | that is opt-in rather than
+//                 |                                    | forced; its honest behavior
+//                 |                                    | against today's compiler
+//                 |                                    | output is "renders
+//                 |                                    | unchanged". Implemented in
+//                 |                                    | TASK-023.
+//
+// These behaviors are community-reverse-engineered, unversioned by the
+// vendors, and should be re-checked against caniemail.com / hteumeuleu's
+// email-bugs repo periodically.
+// ---------------------------------------------------------------------
+
+// gmailDarkTransform(html) — simulates Gmail's iOS app dark mode: a CSS
+// filter double-invert. The whole body is inverted, then media is
+// re-inverted so photos/video/svg render right-side-up and correctly
+// colored — exactly the mechanism Gmail iOS itself uses.
+function gmailDarkTransform(html) {
+  const css = [
+    '/* EB-DARKSIM gmail — preview only, never present in copied HTML */',
+    // (b) The html background is set explicitly: when <html> has no
+    // background of its own, the body's background propagates to the
+    // canvas and escapes the body filter — Firefox in particular then
+    // paints a white canvas behind the inverted body. #0b0b0b is the
+    // inverted equivalent of MJML's default #f4f4f4 body background, so
+    // the seam is invisible.
+    'html { background-color: #0b0b0b !important; }',
+    // (a) hue-rotate(180deg) after invert(100%) restores hue so blues
+    // stay blue instead of flipping to orange.
+    'body { filter: invert(100%) hue-rotate(180deg) !important; }',
+    // (c) Re-applying the identical filter to media cancels the parent
+    // inversion — exactly what Gmail iOS does so photos aren't inverted.
+    'img, video, svg { filter: invert(100%) hue-rotate(180deg) !important; }',
+  ].join('\n');
+  // Not simulated: CSS background-image values cannot be counter-filtered
+  // by this technique (there is no element to target them with), and
+  // Gmail Android is reported to additionally invert small images
+  // (<100px) — a divergence deliberately left out of this simulation.
+  return injectPreviewStyle(html, css);
+}
+
+function outlookDarkTransform(html) { /* DARK_TRANSFORM_STUB — implemented in TASK-022 */ return html; }
+function appleMailDarkTransform(html) { /* DARK_TRANSFORM_STUB — implemented in TASK-023 */ return html; }
+const DARK_MODE_TRANSFORMS = { gmail: gmailDarkTransform, outlook: outlookDarkTransform, applemail: appleMailDarkTransform };
+
+// applyDarkMode(html) — preview-only step in the srcdoc transform chain.
+// Returns `html` unchanged when dark mode is off or the selected client
+// has no registered transform. Never applied to lastHtml (Copy HTML /
+// View HTML source) — see render()'s wiring.
+function applyDarkMode(html) {
+  if (!darkModeEnabled) return html;
+  const transform = DARK_MODE_TRANSFORMS[darkModeClient];
+  if (!transform) return html;
+  try {
+    const result = transform(html);
+    darkModeError = '';
+    return result;
+  } catch (e) {
+    // Do not interpolate e.message — per CLAUDE.md, nothing raw reaches
+    // the marketer, and this string is already action-neutral/complete.
+    darkModeError = 'Dark-mode preview could not be applied — showing the untransformed email.';
+    return html;
+  }
+}
+
 function setTestDataHint(text, kind) {
   els.testDataHint.textContent = text;
   els.testDataHint.classList.remove('error', 'success');
@@ -2540,7 +2761,11 @@ function render() {
     const result = mjml2html(mjml, { validationLevel: 'soft' });
     lastHtml = result.html;
     // Preview gets test-data substitution; lastHtml stays pure for Copy HTML / modal.
-    els.preview.srcdoc = withPreviewLinkHandler(applyTestData(result.html));
+    // Order: applyDarkMode runs after applyTestData so the marketer sees the
+    // dark-mode result of the actual substituted copy, and before
+    // withPreviewLinkHandler so the injected click-handler <script> is never
+    // a target of any dark-mode transform.
+    els.preview.srcdoc = withPreviewLinkHandler(applyDarkMode(applyTestData(result.html)));
 
     // Aggregate non-fatal warnings from template state + MJML compiler output.
     const warnings = [];
@@ -2555,6 +2780,7 @@ function render() {
       warnings.push(`MJML warning: ${msgs.join('; ')}${suffix}`);
     }
     if (templateError) warnings.unshift(templateError);
+    if (darkModeError) warnings.push(darkModeError);
     if (promoToggle.isOn()) {
       const promoUrlVal = els.promoUrl.value.trim();
       if (promoUrlVal && isHttpsUrl(promoUrlVal) && !promoUrlVal.includes('utm_')) {
@@ -2608,6 +2834,51 @@ function onTestDataToggle(isOn) {
 const testDataToggle = createModuleToggle('testData', 'Test data', true, onTestDataToggle);
 testDataToggle.element.title = 'Substitute {{tokens}} in preview';
 document.querySelector('.preview-header-left').appendChild(testDataToggle.element);
+
+// Dark-mode preview controls (IDEA-005 / TASK-021). Runtime-inserted, same
+// as the Test data toggle above: static markup here would render before
+// that toggle, since TASK-014 appends it at runtime. Deliberately hand-rolled
+// rather than createModuleToggle() — that factory persists to localStorage
+// under emailBuilder.module.<id>, and dark-mode state must NOT be persisted
+// (locked at the idea checkpoint). Reuses the factory's module-toggle /
+// track markup shape so it shares the same CSS.
+document.querySelector('.preview-header-left').insertAdjacentHTML('beforeend',
+  '<span class="divider" aria-hidden="true"></span>' +
+  '<span class="module-toggle" role="switch" aria-checked="false" tabindex="0" id="darkModeSwitch" title="Simulate a dark-mode email client in the preview (preview only)">' +
+    '<span class="track"></span>Dark mode' +
+  '</span>' +
+  '<div class="seg-control" role="group" aria-label="Dark mode client" id="darkClientControl" style="width:auto" hidden>' +
+    '<button type="button" class="active" data-dm="gmail" aria-pressed="true" title="Gmail mobile app (iOS) — inverts the entire email, then re-inverts images">Gmail</button>' +
+    '<button type="button" data-dm="outlook" aria-pressed="false" title="Outlook.com / OWA (web) — selectively repairs contrast instead of inverting">Outlook</button>' +
+    '<button type="button" data-dm="applemail" aria-pressed="false" title="Apple Mail macOS 12.4+ / iOS 13+ — opt-in; renders unchanged against today\'s output">Apple Mail</button>' +
+  '</div>'
+);
+
+const darkModeSwitch = document.getElementById('darkModeSwitch');
+const darkClientControl = document.getElementById('darkClientControl');
+function syncDarkModeSwitch() {
+  darkModeSwitch.classList.toggle('on', darkModeEnabled);
+  darkModeSwitch.setAttribute('aria-checked', String(darkModeEnabled));
+  darkClientControl.hidden = !darkModeEnabled;
+  previewStage.classList.toggle('dark', darkModeEnabled);
+}
+function flipDarkMode() {
+  darkModeEnabled = !darkModeEnabled;
+  syncDarkModeSwitch();
+  scheduleRender();
+}
+darkModeSwitch.addEventListener('click', flipDarkMode);
+darkModeSwitch.addEventListener('keydown', (e) => {
+  if (e.key === ' ' || e.key === 'Enter') {
+    e.preventDefault();
+    flipDarkMode();
+  }
+});
+syncDarkModeSwitch();
+wireSegControl(darkClientControl.querySelectorAll('button[data-dm]'), (btn) => {
+  darkModeClient = btn.dataset.dm;
+  scheduleRender();
+});
 
 // ---------- Reusable module toggle factory ----------
 // Returns { element, isOn } — caller is responsible for DOM insertion.
