@@ -2436,6 +2436,18 @@ function renderTestHarness() {
       check() { return typeof lastHtml === 'string' && lastHtml.indexOf('EB-DARKSIM') === -1; },
       description: 'lastHtml (Copy HTML / View HTML source) must never carry a preview-only dark-mode stylesheet, regardless of toggle state.',
     },
+    {
+      label: 'injectPreviewStyle: literal </style> inside css is neutralized',
+      check() {
+        const out = injectPreviewStyle(
+          '<html><head></head><body>x</body></html>',
+          '/* EB-DARKSIM test */ body { color: red; } </style><img src=x onerror=1>'
+        );
+        const first = out.indexOf('</style>');
+        return first !== -1 && out.indexOf('</style>', first + 1) === -1;
+      },
+      description: 'A literal </style> sequence inside the css argument must not terminate the injected <style> element early — exactly one real </style> may appear in the output.',
+    },
   ];
 
   for (const fixture of DARK_MODE_FIXTURES) {
@@ -2589,7 +2601,16 @@ function withPreviewLinkHandler(html) {
 // replacement) so that a literal $&, $', $` etc. inside `css` can never be
 // interpreted by the JS engine as a substitution pattern.
 function injectPreviewStyle(html, css) {
-  const styleBlock = '<style type="text/css">' + css + '</style>';
+  // Neutralize a literal </style (case-insensitively) inside `css` before
+  // concatenating: without this, an interpolated value carrying that
+  // sequence would terminate the injected <style> element early and have
+  // its remainder parsed as HTML in the preview iframe, which is
+  // same-origin with the app and already hosts an injected <script>
+  // (PREVIEW_LINK_HANDLER). Unexploitable while every caller used a
+  // compile-time literal; TASK-022's outlookDarkTransform is the first
+  // transform whose css could plausibly carry interpolated color values.
+  const safeCss = String(css).replace(/<\/style/gi, '<\\/style');
+  const styleBlock = '<style type="text/css">' + safeCss + '</style>';
   if (html.indexOf('</head>') !== -1) {
     return html.replace('</head>', () => styleBlock + '</head>');
   }
