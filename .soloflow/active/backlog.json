@@ -9,7 +9,9 @@
     },
     "TASK-021": {
       "status": "ready",
-      "depends_on": [],
+      "depends_on": [
+        "TASK-014"
+      ],
       "idea": "IDEA-005"
     },
     "TASK-022": {

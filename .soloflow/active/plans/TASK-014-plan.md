@@ -10,15 +10,15 @@ files_readonly:
   - ARCHITECTURE.md
   - .soloflow/archive/done/module-toggle/EPIC-module-toggle.md
 acceptance_criteria:
-  - criterion: "The static `#testDataSwitch` markup at index.html:672-675 (`<span class=\"switch on\" ... id=\"testDataSwitch\" title=\"...\">`) is removed and replaced at runtime by a `createModuleToggle()`-produced element inserted into `.preview-header-left` after the `.divider` at index.html:671. There is no longer a hand-rolled switch element in the HTML source for test data."
+  - criterion: "The static `#testDataSwitch` markup at index.html:736-739 (`<span class=\"switch on\" ... id=\"testDataSwitch\" title=\"...\">`) is removed and replaced at runtime by a `createModuleToggle()`-produced element inserted into `.preview-header-left` after the `.divider` at index.html:735. There is no longer a hand-rolled switch element in the HTML source for test data."
     verification: "grep -n 'id=\"testDataSwitch\"' index.html returns 0 matches. grep -n 'class=\"switch' index.html returns 0 matches (the only `.switch`-class element in the document was #testDataSwitch). In the running app, the 'Test data' toggle still appears in the preview header toolbar, after the viewport segmented control and divider, in the same visual position as before."
   - criterion: "LOAD-BEARING: A user who previously turned test data OFF (legacy localStorage key `emailBuilder.testDataEnabled` === 'false') still sees test data OFF after the migration, even though the factory reads the new key `emailBuilder.module.testData`. A one-time migration copies the legacy value into the new key when the new key is absent."
-    verification: "Manual: (a) In devtools console run `localStorage.setItem('emailBuilder.testDataEnabled','false'); localStorage.removeItem('emailBuilder.module.testData');` then reload. The Test data toggle renders OFF (aria-checked=\"false\", no `.on` class) and the preview shows raw `{{tokens}}`. (b) Run `localStorage.setItem('emailBuilder.testDataEnabled','true'); localStorage.removeItem('emailBuilder.module.testData');` then reload — toggle renders ON. (c) With NO key for either, reload — toggle defaults ON (matches prior `!== 'false'` default at index.html:1571)."
-  - criterion: "The module-scoped `testDataEnabled` variable read by `applyTestData` at index.html:1759 stays in sync with the toggle. Flipping the toggle changes the preview substitution and re-renders, identical to the prior `flipTestData` behavior."
+    verification: "Manual: (a) In devtools console run `localStorage.setItem('emailBuilder.testDataEnabled','false'); localStorage.removeItem('emailBuilder.module.testData');` then reload. The Test data toggle renders OFF (aria-checked=\"false\", no `.on` class) and the preview shows raw `{{tokens}}`. (b) Run `localStorage.setItem('emailBuilder.testDataEnabled','true'); localStorage.removeItem('emailBuilder.module.testData');` then reload — toggle renders ON. (c) With NO key for either, reload — toggle defaults ON (matches prior `!== 'false'` default at index.html:1746)."
+  - criterion: "The module-scoped `testDataEnabled` variable read by `applyTestData` (index.html:2429) stays in sync with the toggle. Flipping the toggle changes the preview substitution and re-renders, identical to the prior `flipTestData` behavior."
     verification: "Manual: With valid test data entered, click the Test data toggle OFF. The live preview iframe immediately shows raw `{{Client.FirstName}}` tokens (a `scheduleRender()` fired). Click it ON — preview shows substituted values (e.g. 'James'). Repeat via keyboard: focus the toggle, press Space, confirm the same flip + re-render. Press Enter, confirm flip + re-render."
   - criterion: "The new toggle persists its state across reloads under the factory key `emailBuilder.module.testData`."
     verification: "Manual: Flip Test data OFF, reload. localStorage `emailBuilder.module.testData` === 'false' and the toggle is OFF on load. Flip ON, reload — value 'true', toggle ON."
-  - criterion: "The dead `flipTestData`, `syncTestDataSwitch` functions and the manual `testDataSwitch` click/keydown listeners (index.html:1893-1911) are removed. No orphaned references remain."
+  - criterion: "The dead `flipTestData`, `syncTestDataSwitch` functions and the manual `testDataSwitch` click/keydown listeners (index.html:2607-2625) are removed. No orphaned references remain."
     verification: "grep -n 'flipTestData\\|syncTestDataSwitch' index.html returns 0 matches. grep -n 'getElementById(.testDataSwitch.)' index.html returns 0 matches. App loads with no console errors (devtools Console is clean on initial render)."
   - criterion: "The HUMANIZE_FIXTURES test harness (Ctrl+Shift+T) still passes all fixtures unchanged."
     verification: "Press Ctrl+Shift+T in the running app. Every fixture row shows the PASS badge; row count is unchanged from before the edit."
@@ -34,7 +34,9 @@ test_strategy:
 
 ## Objective
 
-`index.html` currently contains two near-identical toggle implementations. `createModuleToggle()` (index.html:1916-1967, shipped in TASK-011) is a reusable factory handling `role="switch"` a11y, click + Space/Enter keyboard handling, and `emailBuilder.module.<id>` localStorage persistence. The older test-data switch (static markup at index.html:672-675 plus the hand-rolled `flipTestData`/`syncTestDataSwitch` handlers at index.html:1893-1911) is a copy of the same widget. TASK-011's code-reviewer flagged the factory as a "clean generalization" of this older pattern. This task migrates the test-data switch onto the factory and deletes the duplicate, so future a11y/persistence fixes apply in one place. The load-bearing risk is the localStorage key change (`emailBuilder.testDataEnabled` -> `emailBuilder.module.testData`), which must not silently reset existing users' saved preference.
+`index.html` currently contains two near-identical toggle implementations. `createModuleToggle()` (index.html:2630-2680, shipped in TASK-011) is a reusable factory handling `role="switch"` a11y, click + Space/Enter keyboard handling, and `emailBuilder.module.<id>` localStorage persistence. The older test-data switch (static markup at index.html:736-739 plus the hand-rolled `flipTestData`/`syncTestDataSwitch` handlers at index.html:2607-2625) is a copy of the same widget. TASK-011's code-reviewer flagged the factory as a "clean generalization" of this older pattern. This task migrates the test-data switch onto the factory and deletes the duplicate, so future a11y/persistence fixes apply in one place. The load-bearing risk is the localStorage key change (`emailBuilder.testDataEnabled` -> `emailBuilder.module.testData`), which must not silently reset existing users' saved preference.
+
+**Sequencing note (2026-08-11):** TASK-021 (dark-mode preview epic) declares `depends_on: [TASK-014]` and anchors its own header controls immediately after this task's `appendChild(testDataToggle.element)` line — run this task first. Line references in this plan were refreshed against the current file on 2026-08-11.
 
 ## Approach (chosen): factory-built element + one-time key migration
 
@@ -42,7 +44,7 @@ Replace the static `#testDataSwitch` span with a `createModuleToggle('testData',
 
 ## Implementation Steps
 
-1. **Remove the static markup.** Delete the `<span class="switch on" ... id="testDataSwitch" ...>...</span>` block at index.html:672-675. Leave the `<span class="divider" aria-hidden="true"></span>` at index.html:671 in place — the factory element will be appended after it.
+1. **Remove the static markup.** Delete the `<span class="switch on" ... id="testDataSwitch" ...>...</span>` block at index.html:736-739. Leave the `<span class="divider" aria-hidden="true"></span>` at index.html:735 in place — the factory element will be appended after it.
 
 2. **Add the one-time key migration shim.** Immediately before where the toggle is constructed (see step 4), add:
    ```js
@@ -53,9 +55,9 @@ Replace the static `#testDataSwitch` span with a `createModuleToggle('testData',
      if (legacy !== null) localStorage.setItem('emailBuilder.module.testData', legacy);
    }
    ```
-   This must run BEFORE `createModuleToggle('testData', ...)` so the factory's `localStorage.getItem(key)` (index.html:1918) reads the migrated value. The factory's null-handling (index.html:1922-1926) then yields: missing both keys -> `defaultOn`; legacy 'false' -> OFF; legacy 'true' -> ON.
+   This must run BEFORE `createModuleToggle('testData', ...)` so the factory's `localStorage.getItem(key)` (index.html:2632) reads the migrated value. The factory's null-handling (index.html:2636-2640) then yields: missing both keys -> `defaultOn`; legacy 'false' -> OFF; legacy 'true' -> ON.
 
-3. **Replace the handlers with an onChange callback.** Delete `syncTestDataSwitch` (index.html:1894-1897), `flipTestData` (index.html:1898-1903), and the two `testDataSwitch.addEventListener` calls plus the trailing `syncTestDataSwitch();` (index.html:1904-1911) and the `const testDataSwitch = document.getElementById('testDataSwitch');` line (index.html:1893). Replace them with:
+3. **Replace the handlers with an onChange callback.** Delete `syncTestDataSwitch` (index.html:2608-2611), `flipTestData` (index.html:2612-2617), and the two `testDataSwitch.addEventListener` calls plus the trailing `syncTestDataSwitch();` (index.html:2618-2625) and the `const testDataSwitch = document.getElementById('testDataSwitch');` line (index.html:2607). Replace them with:
    ```js
    function onTestDataToggle(isOn) {
      testDataEnabled = isOn;
@@ -66,16 +68,16 @@ Replace the static `#testDataSwitch` span with a `createModuleToggle('testData',
    document.querySelector('.preview-header-left').appendChild(testDataToggle.element);
    ```
    Notes:
-   - `defaultOn` is `true` to match the prior default at index.html:1571 (`!== 'false'` => default ON).
+   - `defaultOn` is `true` to match the prior default at index.html:1746 (`!== 'false'` => default ON).
    - The factory does NOT set a `title` attribute, so re-apply the original tooltip on `.element` after construction (preserves hover affordance).
-   - The factory calls `onChange(state)` synchronously during construction (index.html:1964), so `testDataEnabled` is assigned the resolved state at creation time and the first render reflects it.
-   - This call site mirrors the existing CTA toggle pattern at index.html:1988-1989.
+   - The factory calls `onChange(state)` synchronously during construction (index.html:2678), so `testDataEnabled` is assigned the resolved state at creation time and the first render reflects it.
+   - This call site mirrors the existing CTA toggle pattern at index.html:2702-2703.
 
-4. **Simplify the module-scoped declaration.** At index.html:1571, the line `let testDataEnabled = localStorage.getItem('emailBuilder.testDataEnabled') !== 'false';` may remain as a safe pre-construction default (the factory's synchronous `onChange` overwrites it). To avoid two sources of truth, change it to `let testDataEnabled = true;` — the authoritative value now comes from `onTestDataToggle` fired during `createModuleToggle` construction. Do NOT delete the variable; `applyTestData` (index.html:1759) reads it. Verify the construction at step 3 runs after line 1571 in execution order (it does — 1571 is top-level, the toggle is constructed lower in the module body).
+4. **Simplify the module-scoped declaration.** At index.html:1746, the line `let testDataEnabled = localStorage.getItem('emailBuilder.testDataEnabled') !== 'false';` may remain as a safe pre-construction default (the factory's synchronous `onChange` overwrites it). To avoid two sources of truth, change it to `let testDataEnabled = true;` — the authoritative value now comes from `onTestDataToggle` fired during `createModuleToggle` construction. Do NOT delete the variable; `applyTestData` (index.html:2429) reads it. Verify the construction at step 3 runs after line 1746 in execution order (it does — 1746 is top-level, the toggle is constructed lower in the module body).
 
-5. **Confirm no other readers of the legacy key.** Run `grep -n "emailBuilder.testDataEnabled" index.html`. After the edit the only remaining occurrence must be inside the migration shim (step 2). `TEST_DATA_STORAGE_KEY` at index.html:1548 is `emailBuilder.testData` (the test-data JSON payload, a different key) — do NOT touch it.
+5. **Confirm no other readers of the legacy key.** Run `grep -n "emailBuilder.testDataEnabled" index.html`. After the edit the only remaining occurrence must be inside the migration shim (step 2). `TEST_DATA_STORAGE_KEY` at index.html:1723 is `emailBuilder.testData` (the test-data JSON payload, a different key) — do NOT touch it.
 
-6. **Verify `.switch` CSS disposition.** After removing the only `.switch` element, the paired CSS selectors at index.html:356, 366, 372, 382, 394, 396, 398 still carry `.module-toggle` and remain live. Removing the now-unused `.switch` halves of those selector lists is OPTIONAL cleanup; if done, edit only the `.switch` portion of each comma-paired rule and leave `.module-toggle` intact. Do not remove a whole rule. Skipping this is acceptable — flag the dead selectors in the done report either way.
+6. **Verify `.switch` CSS disposition.** After removing the only `.switch` element, the paired CSS selectors at index.html:371, 381, 387, 397, 409, 411, 413 still carry `.module-toggle` and remain live. Removing the now-unused `.switch` halves of those selector lists is OPTIONAL cleanup; if done, edit only the `.switch` portion of each comma-paired rule and leave `.module-toggle` intact. Do not remove a whole rule. Skipping this is acceptable — flag the dead selectors in the done report either way. This cleanup stays safe with respect to the downstream dark-mode epic: TASK-021 builds its dark-mode switch with the `module-toggle` class, not `.switch`.
 
 7. **Manual verification pass.** Start the dev server (`python -m http.server 8080 --bind 127.0.0.1`), open the app, and run every scenario in the Acceptance Criteria above — especially the three localStorage migration sub-cases.
 
@@ -99,4 +101,4 @@ Preserving the user's saved test-data preference across the localStorage key cha
 
 ## Lowest Confidence Area
 
-Execution-order assumption in step 4: that the top-level `let testDataEnabled` at index.html:1571 is assigned its authoritative value by `onTestDataToggle` firing synchronously inside `createModuleToggle` (constructed lower in the same module body). If the toggle construction were ever moved above line 1571, or if `applyTestData` could run between line 1571 and the toggle construction, the variable could briefly hold the wrong default. Current code has no render before the toggle is built, so this holds — but the executor should confirm no `scheduleRender`/`applyTestData` call fires between index.html:1571 and the new construction site. The optional `.switch` CSS cleanup (step 6) is also a judgment call left to the executor.
+Execution-order assumption in step 4: that the top-level `let testDataEnabled` at index.html:1746 is assigned its authoritative value by `onTestDataToggle` firing synchronously inside `createModuleToggle` (constructed lower in the same module body). If the toggle construction were ever moved above line 1746, or if `applyTestData` could run between line 1746 and the toggle construction, the variable could briefly hold the wrong default. Current code has no render before the toggle is built, so this holds — but the executor should confirm no `scheduleRender`/`applyTestData` call fires between index.html:1571 and the new construction site. The optional `.switch` CSS cleanup (step 6) is also a judgment call left to the executor.
