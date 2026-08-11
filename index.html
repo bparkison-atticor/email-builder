@@ -2587,6 +2587,81 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
     body.appendChild(row);
   }
+
+  // --- Section 10: dark-mode preview transforms — Apple Mail + author-CSS drift guard (TASK-023) ---
+  // Same predicate-fixture shape and row renderer as Sections 8/9. Fixture
+  // 7 (the drift guard) is the highest-value regression lock in this
+  // section: it must stay in the harness for the life of the feature —
+  // it is the mechanism that turns a silent premise violation (the
+  // compiler starting to emit dark-mode CSS) into a loud, named failure.
+  const h10 = document.createElement('h3');
+  h10.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h10.textContent = 'Dark-mode preview transforms — Apple Mail + author-CSS drift guard';
+  body.appendChild(h10);
+
+  const APPLEMAIL_DARK_FIXTURES = [
+    {
+      label: 'Detector: authored beats meta (substring-ordering trap)',
+      check() {
+        return detectAuthorDarkScheme('<style>@media (prefers-color-scheme: dark){body{color:#fff}}</style>') === 'authored';
+      },
+      description: '"prefers-color-scheme" contains the substring "color-scheme", so a detector that checked meta-only first would misclassify this input as meta-only. It must return authored.',
+    },
+    {
+      label: 'Detector: color-scheme meta',
+      check() { return detectAuthorDarkScheme('<meta name="color-scheme" content="light dark">') === 'meta-only'; },
+      description: 'A bare color-scheme meta with no authored dark rules must classify as meta-only.',
+    },
+    {
+      label: 'Detector: legacy supported-color-schemes meta',
+      check() { return detectAuthorDarkScheme('<meta name="supported-color-schemes" content="light dark">') === 'meta-only'; },
+      description: 'The legacy supported-color-schemes meta name must also classify as meta-only.',
+    },
+    {
+      label: 'Detector: none',
+      check() {
+        return detectAuthorDarkScheme('<html><head><meta name="format-detection" content="telephone=no"></head><body>x</body></html>') === 'none';
+      },
+      description: 'An input with neither prefers-color-scheme nor a color-scheme signal must classify as none.',
+    },
+    {
+      label: 'Pass-through is exact identity when scheme is none',
+      check() {
+        const input = '<html><head><meta name="format-detection" content="telephone=no"></head><body>x</body></html>';
+        return appleMailDarkTransform(input) === input;
+      },
+      description: 'With no author dark-mode CSS present, appleMailDarkTransform must return its input by strict identity — not merely an equivalent string, and never with an injected marker.',
+    },
+    {
+      label: 'Meta-only applies the partial invert',
+      check() {
+        const input = '<html><head><meta name="color-scheme" content="light dark"></head><body><td style="background-color:#ffffff">x</td></body></html>';
+        return !appleMailDarkTransform(input).includes('#ffffff');
+      },
+      description: 'When only the color-scheme meta is present with no authored dark rules, Apple\'s documented fallback is a partial invert (remapInlineColors) — the white background must be gone from the output.',
+    },
+    {
+      label: 'Drift guard: live compiled output still authors no dark-mode CSS',
+      check() {
+        return typeof lastHtml === 'string' && lastHtml.length > 0 && detectAuthorDarkScheme(lastHtml) === 'none';
+      },
+      description: 'If this fails, buildMjml() now emits dark-mode CSS and the Apple Mail pass-through is no longer faithful — implement the authored branch of appleMailDarkTransform.',
+    },
+  ];
+
+  for (const fixture of APPLEMAIL_DARK_FIXTURES) {
+    const pass = (() => { try { return fixture.check(); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
+    body.appendChild(row);
+  }
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
