@@ -1,7 +1,7 @@
 ---
 sprint: SPRINT-007
-pending_count: 16
-last_updated: "2026-08-12T00:35:00.000Z"
+pending_count: 19
+last_updated: "2026-08-12T01:30:00.000Z"
 ---
 # Findings Queue
 
@@ -193,4 +193,34 @@ last_updated: "2026-08-12T00:35:00.000Z"
 - **location:** index.html:3428-3430 (dark-client picker buttons)
 - **description:** The dark-client picker's disclosures live entirely in `title` attributes on buttons that already have visible text content. Because accessible-name computation prefers element content over `title`, the tooltip text is not announced by screen readers, and native tooltips are not reachable by keyboard-only users at all — `title` is a hover-only affordance. For Gmail and Outlook that is tolerable, since the transform itself is the visible answer. For Apple Mail the tooltip *is* the feature's explanation ("respects author dark-mode CSS; this email has none, so it renders unchanged"), and the TASK-023 plan locked the scope decision on "the button tooltip plus the darkened stage chrome carry the disclosure." Combined with FIND-SPRINT-007-15 (the stage chrome is occluded at the desktop viewport), both halves of the intended disclosure are unavailable to a keyboard or screen-reader user in the default view: the option appears to do nothing and says nothing about why. The pattern predates this task (all three titles come from TASK-021/022) but TASK-023 is where a tooltip became load-bearing.
 - **suggested_action:** Consider treating this together with FIND-SPRINT-007-15 rather than separately — the muted caption the plan names as the cheapest escalation would fix the keyboard/SR gap and the occlusion gap at once, since visible text is announced and needs no hover. If the caption stays out of scope, the minimum is an `aria-describedby` pointing at a visually-hidden span carrying the same sentence, so the disclosure at least reaches assistive tech. Requires reopening the locked scope decision either way, so it is a human-review item rather than a straight TASK-024 fix.
+- **resolved_by:** 
+
+## FIND-SPRINT-007-20
+- **source:** TASK-024 (verifier)
+- **type:** improvement
+- **severity:** medium
+- **status:** open
+- **location:** CHANGELOG.md:13, index.html:247-250
+- **description:** The new CHANGELOG entry's `.preview-stage.dark` bullet states the rule "darkens the chrome around the iframe (`#1a1a1a`) so the Apple Mail no-op still reads as a deliberate result rather than a broken toggle." The second half of that sentence does not hold in the default desktop viewport, which is the view the marketer sees first. Confirmed by reading the shipped CSS rather than re-measuring: `.preview-stage` (index.html:226-233) has no padding and its only child is `.preview-iframe` (index.html:234-240) at `width:100%; height:100%; border:none`, so the stage background is fully occluded and no `#1a1a1a` is ever painted; the chrome becomes visible only under `.preview-stage.mobile .preview-iframe` (index.html:241-246), which narrows the iframe to 375px and adds a 16px vertical margin. This is the same defect already logged at high severity as FIND-SPRINT-007-15 against the CSS; the new finding is that the claim has now been copied out of the code comment (index.html:247-249, which asserts the same intent) into the project's permanent change record, where a future maintainer will read it as shipped behavior. Not an executor error and not a blocker for TASK-024: the plan's step 3 explicitly directed documenting "the darkened `.preview-stage` chrome," the wording faithfully mirrors the existing code comment, and the actual fix lives in `index.html`, which is `files_readonly` for this task — so rewording only the CHANGELOG would leave the code comment making the identical unsupported claim. Secondary, much smaller note in the same area: README.md:94 says the simulation "runs entirely inside the preview iframe," which is exactly true in the desktop viewport but slightly overstated in the mobile viewport, where the stage surround does repaint.
+- **suggested_action:** Fix in one coordinated change once `index.html` is writable, alongside FIND-SPRINT-007-15. If the occlusion is fixed (e.g. a `.preview-stage.dark` padding or a dark-mode iframe inset), both the CHANGELOG sentence and the code comment become true and need no edit. If the scope decision instead lands on leaving the desktop view unchanged, narrow both the code comment and the CHANGELOG bullet to state that the darkened chrome is visible in the mobile viewport only, so neither claims a desktop signal that is not there.
+- **resolved_by:** 
+
+## FIND-SPRINT-007-21
+- **source:** TASK-024 (verifier)
+- **type:** cleanup
+- **severity:** low
+- **status:** open
+- **location:** README.md:143
+- **description:** The README `## Scope` section's **In:** list enumerates the app's shipped capabilities — "live preview with desktop/mobile viewport toggle, raw HTML inspector modal, one-click copy with validation…, preview-only Handlebars test data…, humanized syntax-error banner, and `localStorage` persistence" — and was not extended with the dark-mode preview when TASK-024 documented the feature elsewhere in the same file. A reader scanning Scope to learn what the tool does now gets an incomplete answer, and the viewport toggle sitting in that list without its new sibling makes the omission look deliberate. Outside TASK-024's acceptance criteria, which only required the numbered-workflow step and the dedicated section, both of which are present and correct. The adjacent **Out:** line ("persistence of email content (only the test-data JSON and toggle state persist)") remains accurate, since dark-mode state is deliberately not persisted.
+- **suggested_action:** Add "dark-mode preview simulation (Gmail / Outlook / Apple Mail)" to the **In:** list next to the viewport toggle. One-line edit to README.md, no other file affected.
+- **resolved_by:** 
+
+## FIND-SPRINT-007-22
+- **source:** TASK-024 (code-reviewer)
+- **type:** claude-md
+- **severity:** medium
+- **status:** open
+- **location:** ARCHITECTURE.md:22-29 (Major Components / Layers), CODE-PATTERNS.md:13-64 (Shared Utilities)
+- **description:** The `dark-mode-preview` epic closes without touching either of the two agent-orientation documents that CLAUDE.md points every future agent at. ARCHITECTURE.md's "Major Components / Layers" list enumerates the script block's logical sections — template configs, Quill editors, the MJML build pipeline, test data substitution, copy/output flow, UI controls — and the epic added a whole new one that is not there: the preview transform layer (`applyDarkMode` dispatching to `gmailDarkTransform` / `outlookDarkTransform` / `appleMailDarkTransform`, plus `detectAuthorDarkScheme` and the WCAG contrast primitives, index.html:2823-3274). The same list's "MJML build pipeline" bullet still describes `render()` as writing "the compiled HTML" into the iframe, which no longer captures the two-branch reality the epic depends on — `lastHtml` pure for export, a transformed string for `srcdoc`. Separately, CODE-PATTERNS.md's Shared Utilities section has no entry for `injectPreviewStyle` (index.html:~2790-2821), even though it is now a genuine shared utility with a non-obvious safety property: it neutralizes a literal `</style>` inside its `css` argument (fixed in commit d931119), and any future preview-only style injector must go through it rather than string-concatenating a `<style>` block. Neither file was in any epic task's `files_owned`, so no executor could have updated them; TASK-024 owned only README.md and CHANGELOG.md. Marketer-facing docs are complete and accurate — this is the maintainer-facing half of the epic's documentation.
+- **suggested_action:** Add a "Dark-mode preview simulation" bullet to ARCHITECTURE.md's component list naming the four functions and the preview-only invariant, and amend the MJML build pipeline bullet to distinguish `lastHtml` (export source) from the `srcdoc` transform chain. Add a CODE-PATTERNS.md `injectPreviewStyle` entry documenting the `</style>` neutralization and the "all preview-only CSS goes through this" rule. Natural work for `/sf:compound` or a follow-up docs task; can be batched with FIND-SPRINT-007-2, which is the same class of drift in CODE-PATTERNS.md.
 - **resolved_by:** 
