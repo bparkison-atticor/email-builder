@@ -2693,7 +2693,280 @@ function gmailDarkTransform(html) {
   return injectPreviewStyle(html, css);
 }
 
-function outlookDarkTransform(html) { /* DARK_TRANSFORM_STUB — implemented in TASK-022 */ return html; }
+// ---------------------------------------------------------------------
+// Outlook.com / OWA contrast-repair color primitives (TASK-022).
+// relLuminance and contrastRatio implement the formulas published in
+// W3C WCAG 2.0 technique G18 (https://www.w3.org/TR/WCAG20-TECHS/G18.html).
+//
+// COLOR-SPACE SPLIT — the easiest thing here for a maintainer to get
+// wrong: classification (light vs. dark) and remapping (remapLightness)
+// operate on HSL LIGHTNESS. The 4.5:1 contrast guard (liftForContrast,
+// via contrastRatio/relLuminance) operates on WCAG RELATIVE LUMINANCE.
+// These are different quantities computed by different formulas over
+// the same {r,g,b} — do not conflate them when touching this block.
+// ---------------------------------------------------------------------
+
+// A small named-color map covering what this app and MJML actually
+// emit. Anything not listed here falls through to the hex/rgb parsers
+// in parseCssColor, and anything neither lists nor parses returns null.
+const NAMED_COLORS = {
+  white: { r: 255, g: 255, b: 255 },
+  black: { r: 0, g: 0, b: 0 },
+  red: { r: 255, g: 0, b: 0 },
+  blue: { r: 0, g: 0, b: 255 },
+  green: { r: 0, g: 128, b: 0 },
+  gray: { r: 128, g: 128, b: 128 },
+  grey: { r: 128, g: 128, b: 128 },
+  silver: { r: 192, g: 192, b: 192 },
+};
+
+// parseCssColor(str) — accepts #rgb, #rrggbb, rgb(r,g,b), rgba(r,g,b,a)
+// (alpha ignored), and the NAMED_COLORS map above. Returns null — "leave
+// this value alone" — for transparent/inherit/initial/currentcolor/none
+// and anything else it cannot parse. Conservative by construction: an
+// unrecognized value is never rewritten.
+function parseCssColor(str) {
+  if (typeof str !== 'string') return null;
+  const s = str.trim().toLowerCase();
+  if (!s) return null;
+  if (s === 'transparent' || s === 'inherit' || s === 'initial' || s === 'currentcolor' || s === 'none') return null;
+  if (Object.prototype.hasOwnProperty.call(NAMED_COLORS, s)) {
+    const c = NAMED_COLORS[s];
+    return { r: c.r, g: c.g, b: c.b };
+  }
+  let m = /^#([0-9a-f]{3})$/.exec(s);
+  if (m) {
+    const r = m[1][0], g = m[1][1], b = m[1][2];
+    return { r: parseInt(r + r, 16), g: parseInt(g + g, 16), b: parseInt(b + b, 16) };
+  }
+  m = /^#([0-9a-f]{6})$/.exec(s);
+  if (m) {
+    return {
+      r: parseInt(m[1].slice(0, 2), 16),
+      g: parseInt(m[1].slice(2, 4), 16),
+      b: parseInt(m[1].slice(4, 6), 16),
+    };
+  }
+  m = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*[\d.]+\s*)?\)$/.exec(s);
+  if (m) {
+    return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]) };
+  }
+  return null;
+}
+
+// relLuminance({r,g,b}) — WCAG 2.0 G18 relative luminance.
+function relLuminance(rgb) {
+  const chan = (c8) => {
+    const c = c8 / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * chan(rgb.r) + 0.7152 * chan(rgb.g) + 0.0722 * chan(rgb.b);
+}
+
+// contrastRatio(a, b) — WCAG 2.0 G18 contrast ratio. Accepts either a
+// parsed {r,g,b} object or a raw color string for each argument (both
+// are normalized via parseCssColor internally) so callers can compare
+// a working {r,g,b} value directly against a hex constant such as
+// OUTLOOK_DARK_SURFACE without an extra parse step at every call site.
+function contrastRatio(a, b) {
+  const rgbA = typeof a === 'string' ? parseCssColor(a) : a;
+  const rgbB = typeof b === 'string' ? parseCssColor(b) : b;
+  const la = relLuminance(rgbA);
+  const lb = relLuminance(rgbB);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+// rgbToHsl({r,g,b}) — standard conversion. h in [0,360), s and l in [0,1].
+function rgbToHsl({ r, g, b }) {
+  const rn = r / 255, gn = g / 255, bn = b / 255;
+  const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  const d = max - min;
+  let h = 0, s = 0;
+  if (d !== 0) {
+    s = d / (1 - Math.abs(2 * l - 1));
+    switch (max) {
+      case rn: h = ((gn - bn) / d) % 6; break;
+      case gn: h = (bn - rn) / d + 2; break;
+      default: h = (rn - gn) / d + 4; break;
+    }
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return { h, s, l };
+}
+
+// hslToRgb({h,s,l}) — standard conversion, inverse of rgbToHsl. Returns
+// unrounded channel values; callers that need a final hex string go
+// through toHex, which clamps and rounds.
+function hslToRgb({ h, s, l }) {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let rp = 0, gp = 0, bp = 0;
+  if (h < 60) { rp = c; gp = x; bp = 0; }
+  else if (h < 120) { rp = x; gp = c; bp = 0; }
+  else if (h < 180) { rp = 0; gp = c; bp = x; }
+  else if (h < 240) { rp = 0; gp = x; bp = c; }
+  else if (h < 300) { rp = x; gp = 0; bp = c; }
+  else { rp = c; gp = 0; bp = x; }
+  return { r: (rp + m) * 255, g: (gp + m) * 255, b: (bp + m) * 255 };
+}
+
+// toHex({r,g,b}) — lowercase '#rrggbb', each channel clamped to 0-255
+// and rounded.
+function toHex({ r, g, b }) {
+  const ch = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  return '#' + ch(r) + ch(g) + ch(b);
+}
+
+// remapLightness({r,g,b}) — preserves hue and saturation; remaps HSL
+// lightness with a clamped piecewise remap (Dark Reader's approach, not
+// an inversion). Used for BOTH directions: a light input (L>=0.5) is
+// pushed dark (background rule), a dark input (L<0.5) is pushed light
+// (foreground rule) — the branch that fires depends on the input alone.
+function remapLightness(rgb) {
+  const hsl = rgbToHsl(rgb);
+  const l2 = hsl.l >= 0.5
+    ? 0.10 + (1 - hsl.l) * 0.40   // white 1.0 -> 0.10; mid 0.5 -> 0.30
+    : 0.90 - hsl.l * 0.40;        // black 0.0 -> 0.90; 0.49 -> 0.70
+  return hslToRgb({ h: hsl.h, s: hsl.s, l: l2 });
+}
+
+// liftForContrast(rgb, bgHex, min) — while contrastRatio(rgb, bgHex) is
+// below `min` and HSL lightness is below 0.97, raises lightness by 0.02
+// and recomputes. Returns `rgb` unchanged if it already passes. The
+// iteration count is hard-capped as a defensive guard against a
+// non-terminating edge case (there should not be one at these step
+// sizes, but the cap costs nothing and removes the possibility).
+function liftForContrast(rgb, bgHex, min) {
+  const MAX_ITERATIONS = 50;
+  let current = rgb;
+  let iterations = 0;
+  while (contrastRatio(current, bgHex) < min) {
+    const hsl = rgbToHsl(current);
+    if (hsl.l >= 0.97 || iterations >= MAX_ITERATIONS) break;
+    current = hslToRgb({ h: hsl.h, s: hsl.s, l: Math.min(0.97, hsl.l + 0.02) });
+    iterations++;
+  }
+  return current;
+}
+
+// OWA's real fingerprint writes data-ogsc/data-ogsb attributes storing
+// the original colors alongside the repaired ones; that is deliberately
+// not reproduced here (see the plan's Rejected Alternatives) — it is
+// invisible to the marketer and requires tag-level parsing this string
+// pass does not do. 4.5:1 is the threshold community reverse-engineering
+// attributes to OWA's behavior; it approximates an unpublished,
+// unversioned algorithm and should be re-checked periodically against
+// caniemail.com and hteumeuleu's email-bugs repo.
+const OUTLOOK_DARK_SURFACE = '#1b1b1b';
+
+const BACKGROUND_COLOR_PROPS = ['background-color', 'bgcolor'];
+const FOREGROUND_COLOR_PROPS = ['color', 'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color'];
+
+// remapBackgroundValue(value, isShorthand) — shared by remapDeclarations
+// (background-color prop) and the bgcolor attribute replacer in
+// remapInlineColors. When `isShorthand` is true (the `background` prop),
+// any value that is not a single color token (e.g. `#fff url(...)
+// no-repeat`) is left verbatim rather than partially rewritten — cutting
+// just the color out of a multi-token shorthand would desync the
+// declaration. Already-dark backgrounds (HSL lightness < 0.5) survive
+// untouched: that is the whole point of this option.
+function remapBackgroundValue(value, isShorthand) {
+  const trimmed = value.trim();
+  if (isShorthand && /\s/.test(trimmed)) return value;
+  const rgb = parseCssColor(trimmed);
+  if (!rgb) return value;
+  if (rgbToHsl(rgb).l < 0.5) return value;
+  return toHex(remapLightness(rgb));
+}
+
+// remapForegroundValue(value) — already-light foreground colors (HSL
+// lightness >= 0.5) survive untouched; dark ones are lifted via
+// remapLightness and then contrast-checked against OUTLOOK_DARK_SURFACE.
+function remapForegroundValue(value) {
+  const trimmed = value.trim();
+  const rgb = parseCssColor(trimmed);
+  if (!rgb) return value;
+  if (rgbToHsl(rgb).l >= 0.5) return value;
+  return toHex(liftForContrast(remapLightness(rgb), OUTLOOK_DARK_SURFACE, 4.5));
+}
+
+// remapDeclarations(decl) — operates on the contents of one `style`
+// attribute (the part between the quotes). Splits on ';', dispatches
+// each `prop:value` pair to the background or foreground rule by
+// property name, and passes every other property through untouched.
+// Reassembling with the same separators means a declaration the
+// rewriter declines is byte-identical in the output — this is what
+// keeps values like `transparent`, `inherit`, and font-family stacks
+// containing apostrophes intact.
+function remapDeclarations(decl) {
+  return decl.split(';').map((piece) => {
+    const idx = piece.indexOf(':');
+    if (idx === -1) return piece;
+    const rawProp = piece.slice(0, idx);
+    const rawValue = piece.slice(idx + 1);
+    const prop = rawProp.trim().toLowerCase();
+    let newValue = rawValue;
+    if (prop === 'background') {
+      newValue = remapBackgroundValue(rawValue, true);
+    } else if (BACKGROUND_COLOR_PROPS.includes(prop)) {
+      newValue = remapBackgroundValue(rawValue, false);
+    } else if (FOREGROUND_COLOR_PROPS.includes(prop)) {
+      newValue = remapForegroundValue(rawValue);
+    }
+    return rawProp + ':' + newValue;
+  }).join(';');
+}
+
+// remapInlineColors(html) — the markup pass. Rewrites `style="..."`
+// attribute contents and `bgcolor="..."`/`bgcolor='...'` attribute
+// values; every other attribute (including href) is untouched because
+// neither regex can match outside those two attribute shapes.
+//
+// Color literals inside MSO conditional comments (<!--[if mso]> ...
+// <![endif]-->) are also rewritten by these regexes; this is inert
+// because the browser treats the whole block as an HTML comment and
+// never renders it.
+//
+// Colors declared in the compiled <style> block are NOT covered by this
+// pass — today that block holds only `color: inherit` (the Apple
+// data-detector override), so coverage is complete in practice. A
+// future `mj-style` block adding real color declarations would silently
+// escape this remap.
+function remapInlineColors(html) {
+  // style="..." — DOUBLE-QUOTE ONLY, deliberately. MJML emits
+  // font-family:'Helvetica Neue',... inside style attributes; a pattern
+  // that also stopped at ' would truncate mid-value and corrupt the
+  // markup. [^"]* cannot escape the attribute, the same boundary
+  // guarantee safeAttrHtml relies on. Function replacer throughout so a
+  // remapped value's `$` sequences are never treated as substitution
+  // patterns.
+  let out = html.replace(/style="([^"]*)"/gi, (match, decl) => 'style="' + remapDeclarations(decl) + '"');
+  // bgcolor="..." / bgcolor='...' — both quote styles are safe here
+  // since a color value never contains a quote.
+  out = out.replace(/bgcolor=(["'])([^"']*)\1/gi, (match, quote, value) => 'bgcolor=' + quote + remapBackgroundValue(value, false) + quote);
+  return out;
+}
+
+// outlookDarkTransform(html) — simulates Outlook.com / OWA's selective
+// inline-color contrast repair (chosen over Outlook Windows desktop's
+// full invert, which would render near-identical to the Gmail option
+// and make the picker uninformative — see the surface-behavior table
+// above). Light backgrounds darken, already-dark backgrounds (a navy
+// brand band, a brand-colored CTA) survive untouched, dark text is
+// lifted and contrast-checked against the simulated surface, and light
+// text is left alone. The injected canvas rule below darkens the area
+// outside the body box, which the inline remap cannot reach.
+function outlookDarkTransform(html) {
+  const css = [
+    '/* EB-DARKSIM outlook — preview only, never present in copied HTML */',
+    'html { background-color: #1b1b1b !important; }',
+  ].join('\n');
+  return injectPreviewStyle(remapInlineColors(html), css);
+}
+
 function appleMailDarkTransform(html) { /* DARK_TRANSFORM_STUB — implemented in TASK-023 */ return html; }
 const DARK_MODE_TRANSFORMS = { gmail: gmailDarkTransform, outlook: outlookDarkTransform, applemail: appleMailDarkTransform };
 
