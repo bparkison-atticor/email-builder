@@ -2463,6 +2463,130 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
     body.appendChild(row);
   }
+
+  // --- Section 9: dark-mode preview transforms — Outlook (TASK-022) ---
+  // Same predicate-fixture shape and row renderer as Section 8. All
+  // functions under test are pure, so fixtures are literal HTML strings
+  // or literal color values — no mocking needed.
+  const h9 = document.createElement('h3');
+  h9.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h9.textContent = 'Dark-mode preview transforms — Outlook (OWA contrast repair)';
+  body.appendChild(h9);
+
+  const OUTLOOK_DARK_FIXTURES = [
+    {
+      label: 'relLuminance: white rounds to 1',
+      check() { return Math.round(relLuminance(parseCssColor('#ffffff'))) === 1; },
+      description: 'W3C WCAG 2.0 G18 reference value: the relative luminance of white is 1.',
+    },
+    {
+      label: 'relLuminance: black is 0',
+      check() { return relLuminance(parseCssColor('#000000')) === 0; },
+      description: 'W3C WCAG 2.0 G18 reference value: the relative luminance of black is 0.',
+    },
+    {
+      label: 'contrastRatio: white vs. black rounds to 21.0',
+      check() { return Math.round(contrastRatio(parseCssColor('#ffffff'), parseCssColor('#000000')) * 10) / 10 === 21; },
+      description: 'W3C WCAG 2.0 G18 reference value: the contrast ratio of white against black is 21:1.',
+    },
+    {
+      label: 'Light background darkens (inline style)',
+      check() {
+        const out = outlookDarkTransform('<td style="background-color:#ffffff">x</td>');
+        if (out.includes('#ffffff')) return false;
+        const m = /background-color:(#[0-9a-f]{6})/i.exec(out);
+        return !!m && rgbToHsl(parseCssColor(m[1])).l <= 0.32;
+      },
+      description: 'A white inline background-color must be replaced by a color with HSL lightness <= 0.32.',
+    },
+    {
+      label: 'Light background darkens (bgcolor attribute, case-insensitive)',
+      check() {
+        const out = outlookDarkTransform('<td bgcolor="#F4F4F4">x</td>');
+        if (/#f4f4f4/i.test(out)) return false;
+        const m = /bgcolor="(#[0-9a-f]{6})"/i.exec(out);
+        return !!m && rgbToHsl(parseCssColor(m[1])).l <= 0.32;
+      },
+      description: 'A light bgcolor attribute value must be replaced by a color with HSL lightness <= 0.32, matched case-insensitively.',
+    },
+    {
+      label: 'Dark background survives byte-identical',
+      check() { return outlookDarkTransform('<td style="background-color:#00183e">x</td>').includes('#00183e'); },
+      description: 'An already-dark background (the navy brand color) must survive untouched — the whole point of this option.',
+    },
+    {
+      label: 'Dark text lifts and clears 4.5:1',
+      check() {
+        const out = outlookDarkTransform('<td style="color:#333333">x</td>');
+        const m = /color:(#[0-9a-f]{6})/i.exec(out);
+        return !!m && contrastRatio(parseCssColor(m[1]), OUTLOOK_DARK_SURFACE) >= 4.5;
+      },
+      description: 'Dark foreground text must be lifted to clear 4.5:1 contrast against the simulated dark surface.',
+    },
+    {
+      label: 'Light text survives byte-identical',
+      check() { return outlookDarkTransform('<td style="color:#ffffff">x</td>').includes('#ffffff'); },
+      description: 'Already-light foreground text must survive untouched.',
+    },
+    {
+      label: 'Contrast guard is exercised, not dead code',
+      check() {
+        const preLift = remapLightness(parseCssColor('#0000ee'));
+        const preCr = contrastRatio(preLift, OUTLOOK_DARK_SURFACE);
+        const lifted = liftForContrast(preLift, OUTLOOK_DARK_SURFACE, 4.5);
+        const postCr = contrastRatio(lifted, OUTLOOK_DARK_SURFACE);
+        return preCr < 4.5 && postCr >= 4.5;
+      },
+      description: 'For the classic link-blue #0000ee, the HSL-lightness remap alone fails 4.5:1 against the simulated surface; liftForContrast must raise it to clear the threshold. (A neutral gray such as #767676 cannot demonstrate this: remapLightness maps every dark achromatic input to lightness >= 0.70, which is always above the ~0.51 crossover lightness for this surface, so the guard never fires for grays — see FIND-SPRINT-007-10.)',
+    },
+    {
+      label: 'Non-color values pass through byte-identical',
+      check() {
+        const input = '<td style="background-color:transparent;color:inherit">x</td>';
+        return outlookDarkTransform(input).includes('style="background-color:transparent;color:inherit"');
+      },
+      description: 'transparent and inherit are unparseable by design and must be left exactly as written.',
+    },
+    {
+      label: 'Background shorthand with url() passes through byte-identical',
+      check() {
+        const input = '<td style="background:#ffffff url(https://x.test/a.png) no-repeat">x</td>';
+        return outlookDarkTransform(input).includes('background:#ffffff url(https://x.test/a.png) no-repeat');
+      },
+      description: 'A background shorthand with more than a single color token must not be rewritten — rewriting only the color half would desync the declaration.',
+    },
+    {
+      label: 'Apostrophe safety: font-family survives, only color changes',
+      check() {
+        const input = '<td style="font-family:\'Helvetica Neue\',Helvetica,sans-serif;color:#333333">x</td>';
+        const out = outlookDarkTransform(input);
+        return out.includes('font-family:\'Helvetica Neue\',Helvetica,sans-serif') && !out.includes('color:#333333');
+      },
+      description: 'MJML\'s font-family stacks (single-quoted font names) must survive the double-quote-only style regex intact.',
+    },
+    {
+      label: 'Attribute-boundary safety: href is untouched',
+      check() {
+        const input = '<a href="https://x.test/?c=%23ffffff" style="color:#333333">t</a>';
+        return outlookDarkTransform(input).includes('href="https://x.test/?c=%23ffffff"');
+      },
+      description: 'The transform must never cross an attribute boundary — an adjacent href containing a URL-encoded # must be untouched.',
+    },
+  ];
+
+  for (const fixture of OUTLOOK_DARK_FIXTURES) {
+    const pass = (() => { try { return fixture.check(); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
+    body.appendChild(row);
+  }
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
