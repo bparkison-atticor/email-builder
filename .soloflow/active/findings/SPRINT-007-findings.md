@@ -1,7 +1,7 @@
 ---
 sprint: SPRINT-007
-pending_count: 19
-last_updated: "2026-08-12T01:30:00.000Z"
+pending_count: 24
+last_updated: "2026-08-11T23:57:19.749Z"
 ---
 # Findings Queue
 
@@ -223,4 +223,76 @@ last_updated: "2026-08-12T01:30:00.000Z"
 - **location:** ARCHITECTURE.md:22-29 (Major Components / Layers), CODE-PATTERNS.md:13-64 (Shared Utilities)
 - **description:** The `dark-mode-preview` epic closes without touching either of the two agent-orientation documents that CLAUDE.md points every future agent at. ARCHITECTURE.md's "Major Components / Layers" list enumerates the script block's logical sections — template configs, Quill editors, the MJML build pipeline, test data substitution, copy/output flow, UI controls — and the epic added a whole new one that is not there: the preview transform layer (`applyDarkMode` dispatching to `gmailDarkTransform` / `outlookDarkTransform` / `appleMailDarkTransform`, plus `detectAuthorDarkScheme` and the WCAG contrast primitives, index.html:2823-3274). The same list's "MJML build pipeline" bullet still describes `render()` as writing "the compiled HTML" into the iframe, which no longer captures the two-branch reality the epic depends on — `lastHtml` pure for export, a transformed string for `srcdoc`. Separately, CODE-PATTERNS.md's Shared Utilities section has no entry for `injectPreviewStyle` (index.html:~2790-2821), even though it is now a genuine shared utility with a non-obvious safety property: it neutralizes a literal `</style>` inside its `css` argument (fixed in commit d931119), and any future preview-only style injector must go through it rather than string-concatenating a `<style>` block. Neither file was in any epic task's `files_owned`, so no executor could have updated them; TASK-024 owned only README.md and CHANGELOG.md. Marketer-facing docs are complete and accurate — this is the maintainer-facing half of the epic's documentation.
 - **suggested_action:** Add a "Dark-mode preview simulation" bullet to ARCHITECTURE.md's component list naming the four functions and the preview-only invariant, and amend the MJML build pipeline bullet to distinguish `lastHtml` (export source) from the `srcdoc` transform chain. Add a CODE-PATTERNS.md `injectPreviewStyle` entry documenting the `</style>` neutralization and the "all preview-only CSS goes through this" rule. Natural work for `/sf:compound` or a follow-up docs task; can be batched with FIND-SPRINT-007-2, which is the same class of drift in CODE-PATTERNS.md.
+- **resolved_by:** 
+
+## FIND-SPRINT-007-23
+- **source:** SPRINT-007 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** medium
+- **status:** open
+- **location:** index.html:3415-3454 (hand-rolled dark-mode switch) vs index.html:3462-3517 (createModuleToggle)
+- **description:** Sprint re-introduces the hand-rolled switch it just deleted — net switch-widget consolidation across the sprint is zero. TASK-014 existed to migrate the last hand-rolled `class="switch"` element onto `createModuleToggle()`: commit 514455f deleted `testDataSwitch`, `syncTestDataSwitch()`, `flipTestData()`, their click+keydown pair, and the `.switch` halves of the CSS at index.html:379-420. Four commits later TASK-021 (472be1c) built `darkModeSwitch` as a hand-rolled control with the identical `module-toggle`/`track` markup shape, an identical sync (`classList.toggle('on', …)` + `setAttribute('aria-checked', String(…))`, index.html:3437-3438), an identical flip (index.html:3442-3446), and a byte-identical keydown block (`if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip…(); }`, index.html:3448-3453) — into the same DOM container, `.preview-header-left`. Only per-task review ran, so no reviewer saw the deletion and the re-creation together. The stated justification (index.html:3417-3420) rests on a single fact: the factory unconditionally persists to `emailBuilder.module.<id>` (getItem index.html:3465, setItem index.html:3497) and dark-mode state must not persist. Secondary drift in the same pair: the factory builds DOM via createElement/createTextNode, the copy via a raw `insertAdjacentHTML` string.
+- **suggested_action:** Give `createModuleToggle` a persistence opt-out — a 5th `persist` parameter defaulting to true that gates the `localStorage.getItem` at index.html:3465 and the `localStorage.setItem` at index.html:3497 — then rebuild the dark-mode switch on the factory. The two extra side effects `syncDarkModeSwitch` performs beyond the factory sync (`darkClientControl.hidden = !darkModeEnabled` and `previewStage.classList.toggle('dark', …)`) both fit in the `onChange` callback, so index.html:3434-3454 collapses to one factory call. If persistence-only is instead a deliberate constraint on the factory, say so explicitly in the CODE-PATTERNS.md `createModuleToggle` entry (already queued as stale by FIND-SPRINT-007-3) so the next non-persistent toggle does not fork a third copy.
+- **resolved_by:** 
+
+
+
+
+
+Suspected tasks: TASK-014, TASK-021
+
+## FIND-SPRINT-007-24
+- **source:** SPRINT-007 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** medium
+- **status:** open
+- **location:** ARCHITECTURE.md:26 (vs index.html:761)
+- **description:** ARCHITECTURE.md tells every future agent the preview iframe is sandboxed; it is not, and this sprint's own new code reasons from the opposite premise. ARCHITECTURE.md:26 reads: "`render()` calls `mjml2html()` and writes the compiled HTML into a sandboxed `<iframe>`." The actual element is `<iframe class="preview-iframe" id="preview" title="Email preview"></iframe>` (index.html:761) — no `sandbox` attribute, and the string `sandbox` does not appear anywhere in index.html (verified by grep across index.html, README.md, CODE-PATTERNS.md; the only hit in the repo is the ARCHITECTURE.md claim itself). A `srcdoc` iframe without `sandbox` is same-origin with the host page and executes scripts. Meanwhile the comment this sprint added to `injectPreviewStyle` (index.html:2805-2808, commit d931119) states the correct premise — the preview iframe "is same-origin with the app and already hosts an injected <script> (PREVIEW_LINK_HANDLER)" — and that premise is the entire justification for the `</style` neutralization shipped as the fix for FIND-SPRINT-007-8. The repo now holds two contradictory statements about the same security property, and the false one is in the orientation doc CLAUDE.md points agents at, where it is most likely to be reasoned from. Sharpened by this sprint because three new string-transform layers (gmail/outlook/applemail) now write into that iframe. Deliberately not filed as Critical: the sprint introduces no exploitable path, the tool is local and single-user with no backend, and marketer rich text is filtered through `richTextToMjText` before compilation — so this is a false-documentation and posture problem, not a live vulnerability.
+- **suggested_action:** Pick one side and make code and docs agree. Either (a) add an explicit `sandbox` attribute to index.html:761 and verify the `PREVIEW_LINK_HANDLER` script and `srcdoc` still behave — note that `allow-scripts` without `allow-same-origin` is the meaningful hardening here, and dropping same-origin would also let the injectPreviewStyle comment's threat model relax; or (b) if same-origin script execution is a hard requirement, correct ARCHITECTURE.md:26 to state that the preview iframe is deliberately NOT sandboxed, say why, and cross-reference the injectPreviewStyle comment. FIND-SPRINT-007-22 already queues an edit to this same ARCHITECTURE.md bullet — do both in one pass.
+- **resolved_by:** 
+
+
+
+
+Suspected tasks: TASK-021, TASK-022, TASK-023 (surfaced by, not caused by)
+
+## FIND-SPRINT-007-25
+- **source:** SPRINT-007 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** medium
+- **status:** open
+- **location:** index.html:3370
+- **description:** The one binding convention in CLAUDE.md is violated ten lines below code this sprint edited, by the same function. CLAUDE.md's Conventions section states: "Library errors must be humanized before display. Never show raw exception messages from Handlebars, MJML, or other CDN libraries to the user … Line numbers that refer to compiled HTML the marketer never sees must be stripped." `render()`'s catch arm does exactly what that forbids: `els.preview.srcdoc = `<pre style="color:#dc2626;padding:20px;font-family:monospace;">MJML error:
+- **suggested_action:** Add a `humanizeMjmlError(e)` helper modeled on `humanizeTemplateError` (index.html ~1476, the pattern CLAUDE.md names as canonical): pattern-match the common `mjml2html` failure shapes, strip compiled-HTML line numbers, and return an action-oriented message naming the field the marketer should look at. Call it from the catch at index.html:3369-3372 and render its output (still `escapeHtml`-wrapped) instead of `e.message`. If the raw text is wanted for debugging, surface it in the Ctrl+Shift+T harness rather than the default preview pane.
+- **resolved_by:** 
+
+
+${escapeHtml(e.message)}</pre>`` (index.html:3370) paints the raw `mjml2html` exception straight into the preview pane — including the compiled-HTML line numbers the convention explicitly calls out. The adjacent `showWarn('MJML compilation failed. See preview.')` (index.html:3371) is properly humanized, so the leak is confined to the `<pre>` block, and `escapeHtml` makes it inert as markup — this is a convention/UX violation, not an injection bug. Pre-existing: the line is not in `553b6d2..HEAD`. It is filed anyway because the sprint is what makes it visible — TASK-021's new `applyDarkMode` catch sits in the same screen (index.html:3266-3272) and its comment cites the rule verbatim ("Do not interpolate e.message — per CLAUDE.md, nothing raw reaches the marketer") before honoring it. Two error paths in one function, one following the documented convention and one not, is the kind of split only an aggregate read surfaces.
+
+Suspected tasks: none (pre-existing; adjacent to TASK-021's render() edits)
+
+## FIND-SPRINT-007-26
+- **source:** SPRINT-007 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** low
+- **status:** open
+- **location:** index.html:739 (static markup), index.html:3413, index.html:3422
+- **description:** `.preview-header-left` is now assembled from three insertion sites across two tasks, with ordering that is implicit and undocumented at the markup. Its static block (index.html:721-740) ends with the viewport `.seg-control` followed by a bare `<span class="divider" aria-hidden="true"></span>` (index.html:739). That divider was written to separate the viewport control from `testDataSwitch` — the element TASK-014 deleted in the same commit (514455f). It still reads correctly only because TASK-014's `document.querySelector('.preview-header-left').appendChild(testDataToggle.element)` (index.html:3413) happens to land immediately after it. TASK-021 then appended its own divider + toggle + client picker through a second lookup, `insertAdjacentHTML('beforeend', …)` (index.html:3422), and its comment (index.html:3415-3417) records that it was pushed into runtime insertion purely because TASK-014 had gone that way: "static markup here would render before that toggle, since TASK-014 appends it at runtime." Net effect: the header's rendered order is a function of module-body execution order, nothing in the HTML says so, and a maintainer who adds a fourth header control as static markup will silently get it placed ahead of both runtime-appended toggles. This is also the mechanism behind the cumulative header crowding measured in FIND-SPRINT-007-6 (wrap at ~1280px) — two tasks each appended controls to a container neither of them owned declaratively. Supporting detail: two uncached `document.querySelector('.preview-header-left')` lookups nine lines apart.
+- **suggested_action:** Add a comment at index.html:739 marking the container as runtime-extended — e.g. "Test data toggle and dark-mode controls are appended here by the script (index.html:3413, 3422); add new header controls there, in order, not as static markup" — so the ordering contract is visible where someone would otherwise edit. While there, cache the container in a single `const previewHeaderLeft = document.getElementById(...)`/`querySelector(...)` and append both controls through it. If FIND-SPRINT-007-23 is actioned and the dark-mode switch moves onto `createModuleToggle`, do this in the same pass so all header toggles are inserted through one code path.
+- **resolved_by:** 
+
+
+Suspected tasks: TASK-014, TASK-021
+
+## FIND-SPRINT-007-27
+- **source:** SPRINT-007 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** low
+- **status:** open
+- **location:** index.html:2435-2436 (purity guard), index.html:3227-3234 (appleMailDarkTransform meta-only branch), index.html:3249 (DARK_MODE_TRANSFORMS)
+- **description:** The `EB-DARKSIM` marker is relied on as a cross-transform invariant but was never made a contract, and one of the three transforms does not emit it. Harness Section 8 fixture 8 — which TASK-021's plan calls "the highest-value regression lock in the whole epic" — detects preview-only leakage into `lastHtml` solely by marker absence: `lastHtml.indexOf('EB-DARKSIM') === -1` (index.html:2436). `gmailDarkTransform` and `outlookDarkTransform` both emit the marker, but only incidentally: it rides along inside the CSS comment each passes to `injectPreviewStyle`, not because any contract requires it. `appleMailDarkTransform` (TASK-023) emits no marker on either branch. Its `'none'` branch is strict identity, which is correct and separately pinned. Its `'meta-only'` branch, though, returns `remapInlineColors(html)` (index.html:3234) — a real color mutation of the document with nothing injected to mark it. So a regression of `render()` to `lastHtml = applyDarkMode(result.html)` with Apple Mail selected and that branch live would push rewritten colors into Copy HTML / View HTML source while the guard still reported PASS. Latent today: the meta-only branch is unreachable while `buildMjml()` authors no `color-scheme` meta, which Section 10 fixture 7 pins. Distinct from its two neighbors and only visible when all three transforms are read side by side: FIND-SPRINT-007-7 is about the guard being vacuous because dark mode is off at harness-open; FIND-SPRINT-007-18 is about the meta-only branch missing the canvas rule; this one is about the marker's own coverage across the transform set.
+
+Suspected tasks: TASK-021, TASK-023
+- **suggested_action:** State the invariant and close the gap in one edit. Add a comment above `DARK_MODE_TRANSFORMS` (index.html:3249) requiring that every transform which mutates its input inject the `EB-DARKSIM` marker, so the Section 8 purity guard can see it; then change the meta-only branch to `return injectPreviewStyle(remapInlineColors(html), '/* EB-DARKSIM applemail — preview only, never present in copied HTML */
+html { background-color: ' + OUTLOOK_DARK_SURFACE + ' !important; }');`. That marks the branch and supplies the missing canvas rule FIND-SPRINT-007-18 asks for, and interpolating the constant also addresses FIND-SPRINT-007-12's two-sources-of-truth note while giving `injectPreviewStyle`'s `</style` neutralization its first genuinely interpolated caller. Leave the `'none'` branch as strict identity.
 - **resolved_by:** 
