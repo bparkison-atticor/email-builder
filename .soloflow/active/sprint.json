@@ -13,12 +13,6 @@
     "created_at": "2026-08-11T20:54:47.000Z"
   },
   "tasks": {
-    "TASK-014": {
-      "status": "pending",
-      "depends_on": [],
-      "epic": null,
-      "idea": "IDEA-003"
-    },
     "TASK-021": {
       "status": "pending",
       "depends_on": [
