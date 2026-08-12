@@ -170,6 +170,8 @@
     left: 12px;
     right: 12px;
   }
+  /* Compact variant — microcopy is one or two sentences, not body copy. */
+  .rich-editor-wrap.compact .ql-editor { min-height: 64px; }
   .preview-panel {
     display: flex;
     flex-direction: column;
@@ -691,6 +693,13 @@
         <div class="cta-preview" aria-hidden="true">
           <span class="btn" id="ctaPreviewBtn">Click Here</span>
         </div>
+        <div class="field">
+          <label id="ctaMicrocopyLabel">Microcopy <span class="seg-tag">optional</span></label>
+          <div class="rich-editor-wrap compact">
+            <div id="ctaMicrocopy"></div>
+          </div>
+          <div class="hint"><span id="ctaMicrocopyCount">0</span> chars · aim for under 140 — two short sentences. Renders as small, muted text directly under the button.</div>
+        </div>
       </div>
     </div>
 
@@ -1166,6 +1175,7 @@ const els = {
   promoBody: document.getElementById('promoBody'),
   ctaDestinationLabel: document.getElementById('ctaDestinationLabel'),
   ctaDestinationHint: document.getElementById('ctaDestinationHint'),
+  ctaMicrocopyCount: document.getElementById('ctaMicrocopyCount'),
   preview: document.getElementById('preview'),
   copyBtn: document.getElementById('copyBtn'),
   warn: document.getElementById('warn'),
@@ -1205,6 +1215,20 @@ const bodyBelowQuill = new Quill('#bodyBelow', {
   theme: 'snow',
   placeholder: 'Optional.'
 });
+
+// Microcopy toolbar deliberately omits lists: this is one or two sentences
+// under the button, and the compiled output suppresses the typed-bullet
+// converter so fine-print starting with '*' or '—' stays a sentence.
+const microcopyToolbar = [['bold', 'italic', 'link']];
+const microcopyFormats = ['bold', 'italic', 'link'];
+
+const ctaMicrocopyQuill = new Quill('#ctaMicrocopy', {
+  modules: { toolbar: [...microcopyToolbar] },
+  formats: [...microcopyFormats],
+  theme: 'snow',
+  placeholder: 'Optional. One or two supporting sentences.'
+});
+ctaMicrocopyQuill.root.setAttribute('aria-labelledby', 'ctaMicrocopyLabel');
 
 // --- Link insert modal state (TASK-001) ---
 let ownerEditor = null;
@@ -1305,7 +1329,7 @@ function closeLinkModal() {
 }
 
 // Toolbar override — must happen after both Quill instances are created
-[bodyAboveQuill, bodyBelowQuill].forEach(q => {
+[bodyAboveQuill, bodyBelowQuill, ctaMicrocopyQuill].forEach(q => {
   q.getModule('toolbar').addHandler('link', () => openLinkModal(q));
 });
 
@@ -1641,6 +1665,36 @@ function richTextToMjText(html, tpl, opts = {}) {
   return `        <mj-text ${attrs}>\n          ${div.innerHTML}\n        </mj-text>`;
 }
 
+// Pure. Length of the visible microcopy text, ignoring Quill's trailing
+// newline(s). Interior newlines (paragraph breaks) count as one char each.
+function plainTextLength(text) {
+  return String(text || '').replace(/\n+$/, '').length;
+}
+
+// Pure. '' for an empty editor; otherwise a muted, smaller mj-text block
+// styled from the active brand's microcopy keys. Links are muted rather than
+// brand-accent, and the typed-bullet converter is off (see microcopyToolbar).
+function buildMicrocopyBlock(html, tpl) {
+  if (!hasRichHtml(html)) return '';
+  const color = tpl.ctaMicrocopyColor || DEFAULT_CTA_MICROCOPY_COLOR;
+  return richTextToMjText(html, tpl, {
+    fontSize: tpl.ctaMicrocopyFontSize || DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    color,
+    linkColor: color,
+    padding: '0 0 18px 0',
+    blockMargin: 8,
+    convertTypedBullets: false,
+  });
+}
+
+// Pure. The mj-button's padding depends on whether microcopy follows it:
+// with a caption below, the button's own 18px bottom gap would read as a
+// detached sentence, so it tightens to 6px. With no microcopy the value is
+// byte-identical to what shipped before microcopy existed.
+function ctaButtonPadding(microcopyHtml) {
+  return hasRichHtml(microcopyHtml) ? '14px 0 6px 0' : '14px 0 18px 0';
+}
+
 function buildCtaHref() {
   const type = getCtaType();
   const value = (els.ctaDestination.value || '').trim();
@@ -1660,6 +1714,9 @@ function buildMjml() {
   const isPhone = getCtaType() === 'phone';
   const ctaTarget = isPhone ? '_self' : '_blank';
   const ctaRelAttr = isPhone ? '' : ' rel="noopener noreferrer"';
+  const microcopyHtml = ctaToggle.isOn() ? ctaMicrocopyQuill.root.innerHTML : '';
+  const microcopyBlock = buildMicrocopyBlock(microcopyHtml, tpl);
+  const ctaPadding = ctaButtonPadding(microcopyHtml);
   const preheader = (els.preheader.value || '').trim();
   const previewTag = preheader
     ? `<mj-preview>${escapeHtml(preheader)}</mj-preview>\n    `
@@ -1705,10 +1762,10 @@ function buildMjml() {
     <mj-section padding="28px 24px 8px 24px" background-color="#ffffff">
       <mj-column>
 ${richTextToMjText(bodyAboveQuill.root.innerHTML, tpl)}
-${ctaToggle.isOn() ? `        <mj-button href="${escapeHtml(ctaHref)}" target="${ctaTarget}"${ctaRelAttr} background-color="${tpl.ctaBackgroundColor}" color="${tpl.ctaTextColor}" padding="14px 0 18px 0">
+${ctaToggle.isOn() ? `        <mj-button href="${escapeHtml(ctaHref)}" target="${ctaTarget}"${ctaRelAttr} background-color="${tpl.ctaBackgroundColor}" color="${tpl.ctaTextColor}" padding="${ctaPadding}">
           ${escapeHtml(ctaText)}
         </mj-button>
-` : ''}${richTextToMjText(bodyBelowQuill.root.innerHTML, tpl)}
+${microcopyBlock ? microcopyBlock + '\n' : ''}` : ''}${richTextToMjText(bodyBelowQuill.root.innerHTML, tpl)}
       </mj-column>
     </mj-section>
     <mj-section padding="16px 24px 4px 24px" background-color="#f1f1f1">
@@ -3660,6 +3717,14 @@ function scheduleRender() {
 bodyAboveQuill.on('text-change', scheduleRender);
 bodyBelowQuill.on('text-change', scheduleRender);
 
+function updateMicrocopyCount() {
+  els.ctaMicrocopyCount.textContent = plainTextLength(ctaMicrocopyQuill.getText());
+}
+ctaMicrocopyQuill.on('text-change', () => {
+  updateMicrocopyCount();
+  scheduleRender();
+});
+
 // Viewport toggle (segmented control in the preview top bar)
 const viewportButtons = document.querySelectorAll('.seg-control button[data-vp]');
 const previewStage = document.getElementById('previewStage');
@@ -4098,6 +4163,7 @@ copyFromModal.addEventListener('click', async () => {
 loadTestData();
 autoSizeTestData();
 updateCtaPreview();
+updateMicrocopyCount();
 clearPromoFields();
 render();
 </script>
