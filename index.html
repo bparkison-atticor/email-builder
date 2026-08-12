@@ -3045,6 +3045,12 @@ function renderTestHarness() {
       check: out => !out.includes('<ul') && out.includes('* Restrictions apply.'),
       description: 'Microcopy passes convertTypedBullets:false — fine print starting with * or — is a sentence, not a list, even though its own toolbar forbids list buttons.',
     },
+    {
+      label: 'Toolbar/whitelist config has no list — microcopy stays sentence-only (FIND-SPRINT-008-15)',
+      html: null,
+      check: () => !microcopyFormats.includes('list') && !JSON.stringify(microcopyToolbar).includes('list'),
+      description: 'microcopyToolbar/microcopyFormats are ctaMicrocopyQuill\'s own consts, not aliases of the shared richToolbar/allowedFormats the body editors use. This must go red if a future change points ctaMicrocopyQuill at the shared config — the typed-bullet fixture above would keep passing (convertTypedBullets is a separate switch) while the marketer silently gained list buttons over a 13px muted caption.',
+    },
   ];
 
   for (const fixture of MICROCOPY_BLOCK_FIXTURES) {
@@ -3120,6 +3126,23 @@ function renderTestHarness() {
       label: '#ctaBody.scrollHeight stays under the .seg-body collapse-animation ceiling',
       check() { return els.ctaBody.scrollHeight < 1000; },
       description: 'The .seg-body { max-height: 1000px } rule must still exceed the fully-expanded content height, or the collapse/expand animation clips the field.',
+    },
+    {
+      label: 'Compact wrap toolbar renders no list buttons (FIND-SPRINT-008-15)',
+      check() { return document.querySelectorAll('.rich-editor-wrap.compact .ql-list').length === 0; },
+      description: 'Criterion 2\'s own DOM assertion: even if the config-assertion fixture above were bypassed, the rendered toolbar inside the compact wrap must never contain a .ql-list button.',
+    },
+    {
+      label: 'Toolbar-handler loop wires the link button to ctaMicrocopyQuill, not just the body editors (FIND-SPRINT-008-15)',
+      check() {
+        const handler = ctaMicrocopyQuill.getModule('toolbar').handlers.link;
+        if (typeof handler !== 'function') return false;
+        handler();
+        const wired = ownerEditor === ctaMicrocopyQuill && linkModal.classList.contains('visible');
+        closeLinkModal();
+        return wired;
+      },
+      description: 'Invokes the toolbar module\'s own "link" handler — the same function Quill calls on a real click — to prove the "Toolbar override" forEach loop includes ctaMicrocopyQuill and routes it through openLinkModal(ctaMicrocopyQuill), not just bodyAboveQuill/bodyBelowQuill or Quill\'s unwired default link behaviour.',
     },
   ];
 
