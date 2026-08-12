@@ -1,7 +1,7 @@
 ---
 sprint: SPRINT-008
-pending_count: 22
-last_updated: "2026-08-12T23:35:00.000Z"
+pending_count: 29
+last_updated: "2026-08-12T22:42:56.307Z"
 ---
 # Findings Queue
 
@@ -203,7 +203,7 @@ last_updated: "2026-08-12T23:35:00.000Z"
 - **location:** README.md — Workflow numbered list (grep "## Workflow")
 - **description:** TASK-028-plan.md acceptance criterion 2 asserts the workflow list currently runs to 12 and will run to 13 after inserting the microcopy step. At execution time the README already had 13 numbered steps (TASK-024 landed a Dark mode toggle step after the plan was drafted), so inserting the microcopy step correctly renumbers the list to 1..14, not 1..13. Same drift pattern as FIND-SPRINT-008-6 (occurrence-count assertions over a file that keeps moving under intervening tasks), just in README.md instead of index.html. Implemented the substantive intent — one new step immediately after the CTA destination step, contiguous 1..14 numbering, no dupes/skips — rather than the literal count in the AC prose.
 - **suggested_action:** No action needed on this task; noting for planners writing numbered-list ACs over docs that other in-flight tasks also touch. Consider the same guidance FIND-SPRINT-008-6 suggests: state the expected renumbering as a delta (insert-after-step-N) rather than an absolute final count.
-- **resolved_by:**
+- **resolved_by:** 
 
 ## FIND-SPRINT-008-21
 - **source:** TASK-028 (verifier)
@@ -213,7 +213,7 @@ last_updated: "2026-08-12T23:35:00.000Z"
 - **location:** index.html — `BULLET_PREFIX` inside `richTextToMjText` (grep `const BULLET_PREFIX`), its preceding comment, and the Section 12 fixture description (grep `Fine print starting with`)
 - **description:** `BULLET_PREFIX` contains `–` (EN DASH) but not `—` (EM DASH), so a body-copy paragraph beginning `— text` is never converted to a bullet while `– text` and `- text` both are. The comment directly above the regex says the trailing `\s+` "keeps prose that merely starts with a dash/em-dash (`— when, where...`) from being mistaken for a list" — but `\s+` does not achieve that (the example has a space after the dash and would match if U+2014 were in the class); the exclusion of U+2014 from the character class does. The same conflation appears in the Section 12 fixture description "Fine print starting with * or — is a sentence, not a list". Pre-existing from TASK-026, unchanged by TASK-028, and not a behaviour defect on its own — but it is the source of the em-dash claims TASK-028's docs inherited, and the en-dash/em-dash asymmetry is almost certainly unintentional.
 - **suggested_action:** Decide whether U+2014 should join the class (making the two dashes behave alike) or stay out, then correct the comment and the fixture description to name the characters that actually convert (`*`, `-`, `–`, bullet glyphs). Whichever way it lands, the docs corrected under TASK-028 must match.
-- **resolved_by:**
+- **resolved_by:** 
 
 ## FIND-SPRINT-008-22
 - **source:** TASK-028 (verifier)
@@ -223,7 +223,7 @@ last_updated: "2026-08-12T23:35:00.000Z"
 - **location:** .soloflow/active/plans/cta-microcopy/TASK-028-plan.md — acceptance criterion 8 (CHANGELOG)
 - **description:** Second instance of the drift pattern FIND-SPRINT-008-20 and FIND-SPRINT-008-6 already record, in the same plan. AC8 states the new entry must sit "above `## 2026-08-11 — Keller Postman lead outreach wordmark size`" and that this entry "is unmodified and now second". By execution time the topmost entry was `## 2026-08-11 — Dark mode preview simulation (Gmail / Outlook / Apple Mail)` (landed by TASK-024 after the plan was drafted). The substantive requirement — new dated entry at the very top, insertions only, no existing entry edited — is satisfied and independently verifiable via `git diff --numstat` (17 insertions, 0 deletions), so the literal miss is harmless here.
 - **suggested_action:** Same guidance as FIND-SPRINT-008-6/20: express doc-ordering ACs as invariants ("the new entry is first; `git diff --numstat` shows 0 deletions") rather than quoting the current neighbouring content, which any concurrent task can invalidate.
-- **resolved_by:**
+- **resolved_by:** 
 
 ## FIND-SPRINT-008-23
 - **source:** TASK-028 (verifier)
@@ -243,4 +243,110 @@ last_updated: "2026-08-12T23:35:00.000Z"
 - **location:** .soloflow/active/plans/TASK-032-plan.md — acceptance criteria 1, 2, 3 and (partly) 4
 - **description:** TASK-028's commit 9e8fbe9 (the count-free README repair prompted by the code-reviewer) lands work that TASK-032's plan still assumes is outstanding. TASK-032 AC1 (workflow step 1 enumerates no brand names), AC2 (Templates section states no brand count or list and names the `templates` map) and AC3 (the `TEMPLATE CONFIGS` pointer uses the grep-anchor convention and appears on exactly one README line) are all satisfied on the current branch: step 1 reads "the dropdown lists every brand that ships…", README.md:126 reads "Brands are configured in the `templates` map in `index.html` — grep `const templates`. The map's keys are the authoritative brand list…", and `grep -c 'TEMPLATE CONFIGS' README.md` is 1 in anchor form. AC4 is partly advanced too — `name` now has a hit inside the Templates section, leaving `bannerHtml` and `bannerBackgroundColor` as the undocumented keys rather than three. TASK-032's pre-flight notes are correspondingly stale: "README.md:114 is the only match outside `.soloflow/`" for `Three brands` is now zero matches, and its per-file anchor counts / `ANCHOR_FLOORS` baseline must be recomputed at execution time because README gained two anchors. Both files are owned by both tasks, but they run serially, so this is a stale-plan hazard, not a conflict.
 - **suggested_action:** When TASK-032 runs, re-derive AC1-AC4 state from the working tree first and record "already satisfied by TASK-028 (9e8fbe9)" rather than re-editing the same sentences; recompute the anchor floors from the live files instead of the plan's plan-time numbers. Same drift family as FIND-SPRINT-008-6, -20 and -22 — a fourth data point that plans quoting current file contents/line numbers go stale whenever another task touches the file first.
-- **resolved_by:**
+- **resolved_by:** 
+
+## FIND-SPRINT-008-25
+- **source:** SPRINT-008 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** medium
+- **status:** open
+- **location:** index.html:2797-3161 — harness Sections 11/12/13, the eight new fixture loops
+- **description:** Harness row-render loops measurably diverged inside a single sprint — the drift FIND-SPRINT-008-4 predicted has already happened. Extends FIND-SPRINT-008-4 with the cross-task evidence a per-task reviewer could not see; triage the two together, do not resolve independently.
+- **suggested_action:** Land FIND-SPRINT-008-4's `renderHarnessSection(body, title, fixtures, run)` helper as a standalone cleanup task BEFORE Section 14 is written, and fold FIND-SPRINT-008-1's guarded function-under-test call into it so the try/catch exists once. Pick one label vocabulary and one escaping rule while migrating (suggest: always escapeHtml, always JSON-stringify inputs/outputs, always render an Expected row when the fixture has one). Confirm section-by-section that row counts and PASS states are unchanged. Separately, record an explicit decision on whether ~1,030 lines of fixtures should keep shipping inside the production single-file app, or move behind a `?harness=1` fetch of a sibling file — the answer changes how much the duplication is worth paying down.
+
+
+
+
+
+
+
+Aggregate shape: 372 of index.html's 519 new lines (72%) landed inside renderTestHarness(), which is now lines 2133-3162 — 1,030 lines, 24% of a 4,342-line single-file app that ships whole to every marketer over HTTP with no build step to strip it. Three tasks added eight more copies of the same ~12-line row-render block, and the copies are no longer near-identical: (a) the Section 12 parity loop and the hasRichHtml loop have no try/catch at all while the Section 11, Section 12-override, Section 13 and DOM-guard loops each carry their own inline `(() => { try { … } catch { return false; } })()`; (b) the input label is 'Input HTML' in three loops, 'Input HTML (JSON)' in two, 'Input text (JSON)' in one; (c) the result label is 'Actual output' in three loops, 'Actual (JSON)' in one, 'Actual' in two; (d) three loops escapeHtml() the actual value while two pass it through String(); (e) two loops emit an 'Expected' row and four do not; (f) Section 11 renders its null-input config row as `fixture.html || '(none — config assertion)'` while Section 13, which copied that fixture shape one task later, renders `escapeHtml(fixture.html)` and shows a blank box. None of this changes a PASS/FAIL result today — the cost is that the harness is now the largest and least uniform region of the file, and the next section will copy whichever variant its author happens to scroll past.
+
+Suspected tasks: TASK-025, TASK-026, TASK-027
+
+## FIND-SPRINT-008-26
+- **source:** SPRINT-008 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** medium
+- **status:** open
+- **location:** index.html:3136-3146 — MICROCOPY_DOM_GUARDS, 4th entry ('Toolbar-handler loop wires the link button to ctaMicrocopyQuill…')
+- **description:** Opening the test harness now steals keyboard focus into the CTA microcopy editor and leaves it there, behind the overlay. The FIND-SPRINT-008-15 guard proves the wiring by invoking the real production handler: `handler()` → `openLinkModal(ctaMicrocopyQuill)` → `quill.getSelection(true)`, whose `true` argument focuses the editor; the guard then calls `closeLinkModal()`, which ends with `if (ownerEditor) ownerEditor.focus();` — focusing ctaMicrocopyQuill a second time and scrolling it into view. `#testHarness` is a `.modal-overlay` (position:fixed; inset:0; z-index:100) with no focus trap, so after Ctrl+Shift+T the marketer's own microcopy field holds focus underneath it: every subsequent keystroke that is not Escape is typed into the compiled email, fires text-change and schedules a render, and is invisible behind the overlay. This runs on every harness open, since renderTestHarness() rebuilds all rows each time.
+- **suggested_action:** Wrap the invocation in a save/restore, following Section 3's precedent: capture `document.activeElement`, `linkDestination.value` and the active link-type button before `handler()`, restore all three after `closeLinkModal()`, and finish with `document.getElementById('testHarnessClose').focus()` so focus stays inside the overlay. If a pending timer is unacceptable, assert the wiring without side effects instead — e.g. temporarily swap `openLinkModal` for a recording stub, or assert `handlers.link.toString()` mentions `openLinkModal`. Re-run the harness and confirm the guard still goes red when ctaMicrocopyQuill is removed from the toolbar-override loop at index.html:1332, which is the property it exists to protect.
+
+
+
+
+
+
+The guard also mutates and does not restore three pieces of production UI state — `linkDestination.value` (set to ''), the `linkTypeButtons` active/aria-pressed pair (forced to 'phone'), and a `setTimeout(() => linkDestination.focus(), 50)` that fires 50ms after the modal was hidden. The pending focus() is inert today only because `.modal-overlay` is `display:none` when not `.visible` (index.html:458-468); if that rule ever becomes opacity/visibility-based, focus lands in an invisible text input. Contrast Section 3 (TASK-016), the harness's only other side-effecting row, which explicitly snapshots and restores the localStorage key it touches. Invisible to the per-task reviewers: the guard landed in d645cb0 as a post-review fix for FIND-SPRINT-008-15, after TASK-027's code review had already run.
+
+Suspected tasks: TASK-027
+
+## FIND-SPRINT-008-27
+- **source:** SPRINT-008 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** medium
+- **status:** open
+- **location:** CODE-PATTERNS.md:24 ('strips unsafe tags') vs index.html:1509-1670 — `richTextToMjText`
+- **description:** The sprint's own docs task re-affirmed a sanitisation claim the function has never satisfied, on the same line it rewrote. CODE-PATTERNS.md:24 reads 'Converting a Quill editor's inner HTML into a safe `<mj-text>` content block — strips unsafe tags, preserves bold/italics/links/lists, applies the brand's link color.' `richTextToMjText` strips exactly two things: `<p><br></p>` (via `hasRichHtml`'s cleaner) and `.ql-ui` nodes. Everything after that only ADDS attributes — list restructuring, typed-bullet conversion, autoLinkPhones, and setAttribute passes on a/em/i/p/ul/ol/li — and the return value is `div.innerHTML` verbatim. There is no tag allowlist, no attribute scrub, and no `on*` handler filter anywhere in the function or between it and `lastHtml`.
+- **suggested_action:** Correct CODE-PATTERNS.md:24 to state where sanitisation actually happens — e.g. 'Assumes its input is already sanitised: the only sanitisation boundary is the Quill `formats` whitelist on the owning editor (`allowedFormats` / `microcopyFormats`). This function normalises styling for email clients; it does not strip tags or attributes. Do not pass HTML from any source that has not been through a Quill instance.' Mirror that sentence as a comment above `function richTextToMjText`. If a non-Quill caller is ever wanted, add an explicit tag/attribute allowlist pass at the top of the function and pin it with a harness fixture feeding `<script>` and `<img onerror>` — do not rely on the current doc wording.
+
+
+
+
+
+The real sanitisation boundary is Quill's per-instance `formats` whitelist (`allowedFormats` at index.html:1203, `microcopyFormats` at 1222), one hop upstream and in a different construct. That misattribution matters more after this sprint than before it: TASK-025 widened the whitelist, TASK-026 turned the function into a documented three-argument `(html, tpl, opts)` API with a 'Signature' bullet inviting reuse, TASK-027 added the third caller, and TASK-028 edited this exact sentence (commit 20a73ff, 'preserves bold and links' → 'preserves bold/italics/links/lists') while leaving 'strips unsafe tags' intact. The harness already calls it with hand-written HTML that never passed through Quill — the exact pattern a fourth caller (imported template, restored draft, pasted MJML) would follow while trusting the doc. `div.innerHTML = cleaned` fires `onerror`/`onload` on any injected element in the app's own origin at parse time, and the surviving tags land in `lastHtml`, the copied HTML, and a preview iframe ARCHITECTURE.md describes as deliberately not sandboxed and same-origin. No live vulnerability today — every current caller's input is Quill-whitelisted or developer-authored — so this is a contract/hardening fix, distinct from FIND-SPRINT-008-2, which covers link SCHEMES only.
+
+Suspected tasks: TASK-025, TASK-026, TASK-028
+
+## FIND-SPRINT-008-28
+- **source:** SPRINT-008 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** low
+- **status:** open
+- **location:** index.html:3048-3053 and 3066 — Section 13's config-assertion fixture and its render line
+- **description:** The `html: null` config-assertion shape that FIND-SPRINT-008-3 asked TASK-025 to abandon was copied into Section 13 one task later, while that finding was still open. The new row (index.html:3049, added by d645cb0 as the FIND-SPRINT-008-15 fix) sets `html: null` purely so the shared loop has an argument, which calls `buildMicrocopyBlock(null, MICROCOPY_TPL)` for no reason — surviving only because `hasRichHtml` opens with `if (!html) return false;`. That is the same null-guard dependence FIND-SPRINT-008-1 flags for `richTextToMjText`, now in a second function, and it is the second live instance of the shape FIND-SPRINT-008-3 wanted retired. The copy is also incomplete: Section 11 renders the null row as `escapeHtml(fixture.html || '(none — config assertion)')` while Section 13's line 3066 is a bare `escapeHtml(fixture.html)`, so the row shows an empty 'Input HTML' box with no explanation of why.
+- **suggested_action:** Fix both instances together when FIND-SPRINT-008-3 is triaged: move the two config assertions to the no-arg `check()` shape Sections 8-10 already use (or a tiny dedicated loop) so nothing is passed to `richTextToMjText`/`buildMicrocopyBlock`, which also removes the need for the `|| '(none…)'` fallback in the render line. If the shared-loop shape is kept instead, at least mirror Section 11's fallback string into Section 13 so the row is self-explanatory.
+
+
+
+
+Suspected tasks: TASK-025, TASK-027
+
+## FIND-SPRINT-008-29
+- **source:** SPRINT-008 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** low
+- **status:** open
+- **location:** index.html:1221, 1563, 1569, 2931, 3046 — every in-code statement of the em-dash typed-bullet claim
+- **description:** The em-dash claim was corrected in the three docs files but survives at five sites in index.html, so docs and code now contradict each other. TASK-028's fb200b1 rewrote README.md:56, CODE-PATTERNS.md's buildMicrocopyBlock gotcha and the CHANGELOG entry to say a leading asterisk or hyphen stays literal — the accurate wording, since U+2014 is absent from `BULLET_PREFIX`. The code still names an em dash in five places: index.html:1221 (microcopyToolbar comment, added by TASK-027), 1563 (the convertTypedBullets gate comment, TASK-026), 1569 (the BULLET_PREFIX comment, pre-existing), 2931 (Section 12 fixture description, TASK-026) and 3046 (Section 13 fixture description, TASK-027).
+- **suggested_action:** Resolve FIND-SPRINT-008-21 first (decide whether U+2014 joins `BULLET_PREFIX`), then sweep all five index.html sites in the same commit so they name exactly the characters in the class and match the already-corrected README/CODE-PATTERNS/CHANGELOG wording. Ripgrep for the literal em dash U+2014 inside index.html comments and fixture descriptions to confirm the sweep is complete — the five line numbers above are the full set as of commit c8e0b9b.
+
+
+
+Completes FIND-SPRINT-008-21's site list rather than restating it: that finding names only two of the five (1569 and 2931), because the other three were written by later tasks while it sat open. Triage them as one edit. The cross-task datum for the compounder is that an in-flight finding did not stop two subsequent tasks from copying the same false sentence into three new locations — in-sprint findings are invisible to later executors.
+
+Suspected tasks: TASK-026, TASK-027, TASK-028
+
+## FIND-SPRINT-008-30
+- **source:** SPRINT-008 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** low
+- **status:** open
+- **location:** index.html:998-999 (repeated in all eight brand entries through :1138), `buildMicrocopyBlock` :1679-1681, and Section 13's `MICROCOPY_TPL` :2998
+- **description:** Brand defaults for microcopy are implemented twice, and the second mechanism has no test coverage. TASK-026 added `ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE` / `ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR` to all eight brand entries (16 identical lines), matching the file's existing convention — `unsubscribeHtml: DEFAULT_UNSUBSCRIBE` is spelled out the same way in all eight, and `buildMjml` consumes `${tpl.unsubscribeHtml}` with no fallback. It then ALSO added `|| DEFAULT_…` fallbacks inside `buildMicrocopyBlock`. Either mechanism alone is sufficient: delete the 16 config lines and output is unchanged; delete the fallbacks and output is unchanged. So the codebase now has two competing patterns for the same concept, and microcopy is the only key that uses both.
+- **suggested_action:** Pick one mechanism. Preferred: keep the `|| DEFAULT_…` fallbacks in `buildMicrocopyBlock`, delete the two keys from all eight brand entries, and update README.md's Templates list to say the keys are optional per-brand overrides rather than fields every brand ships. Then add one Section 13 fixture with a tpl that omits both keys, asserting the emitted block still carries `font-size="13px"` and `color="#6b6b6b"`, so the fallback path is pinned. If instead the spell-it-in-every-entry convention wins, drop the fallbacks so a missing key fails loudly, and note the convention in CODE-PATTERNS.md so the next brand-scoped key does not fork the pattern a third time.
+
+
+The testing consequence is concrete: Section 13's `MICROCOPY_TPL` always supplies both keys, so the `||` branch is never exercised by any fixture. A typo in either key name, or deletion of either DEFAULT_ const, leaves every harness row green while silently changing what a brand emits. README.md:134-137 already documents these as 'per-brand override slots' that no brand currently overrides, which is the argument for keeping the fallback and dropping the sixteen no-op lines.
+
+Suspected tasks: TASK-026
+
+## FIND-SPRINT-008-31
+- **source:** SPRINT-008 (integration-tester, end-of-sprint)
+- **type:** bug
+- **severity:** medium
+- **status:** open
+- **location:** index.html — grep `function hasRichHtml` (fix site); reproduces in all three Quill editors
+- **description:** Armed-but-unused format leaks Quill internals into shipped HTML. Click into an empty editor, click Bold/Italic, type nothing: Quill leaves <p><em><span class="ql-cursor">U+FEFF</span></em></p> in root.innerHTML. hasRichHtml only strips <p><br></p> and <p></p>, so the editor reports content and the ql-cursor span plus a zero-width no-break space reach lastHtml — the string Copy HTML hands to SendGrid. Persists after blur; does not self-heal. Proven pre-existing at base c3159f1 (byte-identical artifact in #bodyBelow). New symptom surface via TASK-027: in #ctaMicrocopy the same state flips the CTA button padding to 14px 0 6px 0 and emits a spurious muted mj-text block while #ctaMicrocopyCount reads 0 — UI says empty, output disagrees. Repro artifacts: scratchpad it8/ws8_emptyitalic.js and ws9_classify.js.
+- **suggested_action:** Strip <span class="ql-cursor"> nodes and U+FEFF before the emptiness test inside hasRichHtml (single fix covers all three editors and both the emission gate and ctaButtonPadding, since both consume hasRichHtml). Pin with harness fixtures: hasRichHtml armed-cursor shape === false, and buildMicrocopyBlock on the same shape === empty string.
