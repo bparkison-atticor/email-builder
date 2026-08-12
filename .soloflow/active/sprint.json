@@ -1,11 +1,46 @@
 {
   "version": 2,
   "sprint": {
-    "id": "SPRINT-007",
-    "status": "complete",
-    "started": "2026-08-11T20:54:22.000Z",
+    "id": "SPRINT-008",
+    "status": "active",
+    "started": "2026-08-12T17:58:06.000Z",
     "execution_mode": "serial"
   },
-  "run": null,
-  "tasks": {}
+  "run": {
+    "branch": "soloflow/run-20260812-135829-SPRINT-008",
+    "base_branch": "main",
+    "base_sha": "c3159f19f170df4ea2fcb797f6d574fd361ceb2b",
+    "created_at": "2026-08-12T17:58:32.000Z"
+  },
+  "tasks": {
+    "TASK-025": {
+      "status": "pending",
+      "depends_on": [],
+      "idea": "IDEA-006"
+    },
+    "TASK-026": {
+      "status": "pending",
+      "depends_on": [
+        "TASK-025"
+      ],
+      "idea": "IDEA-006"
+    },
+    "TASK-027": {
+      "status": "pending",
+      "depends_on": [
+        "TASK-025",
+        "TASK-026"
+      ],
+      "idea": "IDEA-006"
+    },
+    "TASK-028": {
+      "status": "pending",
+      "depends_on": [
+        "TASK-025",
+        "TASK-026",
+        "TASK-027"
+      ],
+      "idea": "IDEA-006"
+    }
+  }
 }
