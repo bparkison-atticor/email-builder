@@ -29,6 +29,25 @@
         "TASK-027"
       ],
       "idea": "IDEA-006"
+    },
+    "TASK-029": {
+      "status": "ready",
+      "depends_on": [],
+      "idea": "SPRINT-006-007-compound"
+    },
+    "TASK-030": {
+      "status": "ready",
+      "depends_on": [
+        "TASK-029"
+      ],
+      "idea": "SPRINT-006-007-compound"
+    },
+    "TASK-031": {
+      "status": "ready",
+      "depends_on": [
+        "TASK-030"
+      ],
+      "idea": "SPRINT-006-007-compound"
     }
   }
 }
