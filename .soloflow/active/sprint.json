@@ -6,11 +6,6 @@
     "started": "2026-08-11T20:54:22.000Z",
     "execution_mode": "serial"
   },
-  "run": {
-    "branch": "soloflow/run-20260811-165445-SPRINT-007",
-    "base_branch": "main",
-    "base_sha": "553b6d2b1301fba1c6c4b29220d46fdd965be97f",
-    "created_at": "2026-08-11T20:54:47.000Z"
-  },
+  "run": null,
   "tasks": {}
 }
