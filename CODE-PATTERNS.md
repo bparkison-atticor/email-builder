@@ -14,59 +14,59 @@ to a canonical example — read those for the actual implementation.
 
 ### `wireSegControl`
 
-- **Location:** `index.html` ~line 821
-- **Use it for:** Registering a group of `.seg-control button` elements as a mutually exclusive toggle that fires a callback on change. Used for CTA type (Phone / URL variable) and viewport (Desktop / Mobile).
-- **Canonical example:** CTA type wiring ~line 830; viewport wiring ~line 835.
+- **Location:** `index.html` — grep `function wireSegControl`.
+- **Use it for:** Registering a group of `.seg-control button` elements as a mutually exclusive toggle that fires a callback on change. Used for CTA type, link type, viewport, and the dark-mode client picker.
+- **Canonical example:** grep `wireSegControl(` for all call sites — CTA type (`ctaTypeButtons`) and viewport (`viewportButtons`) are the simplest two.
 
 ### `richTextToMjText`
 
-- **Location:** `index.html` ~line 894
+- **Location:** `index.html` — grep `function richTextToMjText`.
 - **Use it for:** Converting a Quill editor's inner HTML into a safe `<mj-text>` content block — strips unsafe tags, preserves bold and links, applies the brand's link color.
 - **Canonical example:** called inside `buildMjml()` for both body-above and body-below editors.
 
 ### `autoLinkPhones`
 
-- **Location:** `index.html` ~line 852
+- **Location:** `index.html` — grep `function autoLinkPhones`.
 - **Use it for:** Walking a DOM subtree and wrapping plain-text US phone numbers in `<a href="tel:...">` anchors.
 - **Canonical example:** called inside `richTextToMjText()` before serializing body copy.
 - **Gotcha:** `PHONE_REGEX` has the `/g` flag; always reset `lastIndex = 0` before each `.test()` call — the regex is stateful and will silently skip matches otherwise.
 
 ### `applyTestData`
 
-- **Location:** `index.html` ~line 1504
+- **Location:** `index.html` — grep `function applyTestData`.
 - **Use it for:** Preview-only Handlebars substitution — compiles the rendered HTML with `Handlebars.compile()` and invokes the template against a Proxy-wrapped context built by `buildTestDataContext()`. Resolves `{{dot.path}}` / `{{{triple}}}` tokens, registered helpers (`#equals`, `#notEquals`, `#greaterThan`, `#lessThan`, `insert`, `formatDate`, `#and`, `#or`), and native Handlebars block helpers. Never applied to the copied / exported HTML.
 - **Canonical example:** called inside `render()` after `mjml2html()`; result is the iframe `srcdoc`.
 
 ### `buildTestDataContext`
 
-- **Location:** `index.html` ~line 1404
+- **Location:** `index.html` — grep `function buildTestDataContext`.
 - **Use it for:** Wrapping a parsed test-data object in a Proxy so that any key lookup that resolves to `undefined` emits a visible yellow chip in the preview rather than silently rendering as an empty string. Used exclusively by `applyTestData()` — never applied to the copied / exported HTML.
 - **Critical Handlebars 4.7+ trap requirement:** the Proxy MUST include `has(target, prop)` and `getOwnPropertyDescriptor(target, prop)` traps in addition to the `get` trap. Handlebars' `lookupProperty` (`proto-access.js`) calls `Object.prototype.hasOwnProperty.call(obj, key)` to guard against prototype-pollution. `hasOwnProperty` does NOT go through the `get` trap — without `has` and `getOwnPropertyDescriptor`, every chip emitted from a nested path is silently stripped back to `undefined` before reaching rendered output. Fix landed in commit a16e93d. Any extension of `buildTestDataContext` must preserve all three traps.
 - **Internal-key allowlist:** `INTERNAL_KEYS` (a `Set`) + Symbol passthrough + `__`-prefix guard prevent chip leakage into Handlebars' own property probes. Extend `INTERNAL_KEYS` if new template patterns cause stray chips in non-preview output.
 
 ### `humanizeTemplateError`
 
-- **Location:** `index.html` ~line 1476
+- **Location:** `index.html` — grep `function humanizeTemplateError`.
 - **Use it for:** Translating raw Handlebars compile/render exception messages into plain-English user-facing strings. Pattern-matches known error shapes (unclosed block, mismatched tags, unbalanced mustache) and emits "Body copy: …" messages with concrete fix suggestions.
 - **Canonical example:** called from both catch arms inside `applyTestData()` before assigning `templateError`.
 
 ### `createModuleToggle`
 
-- **Location:** `index.html` — `createModuleToggle()` (~line 3463).
+- **Location:** `index.html` — grep `function createModuleToggle`.
 - **Use it for:** Building an enable/disable toggle for an optional module. `createModuleToggle(id, label, defaultOn, onChange)` returns `{ element, isOn }`; caller appends `element` to the DOM. `onChange(state)` fires once on init and on every flip.
-- **Canonical example:** CTA toggle ~line 3535; test-data toggle ~line 3411 (grep `createModuleToggle('` for all callers).
-- **Gotcha:** the factory always persists to `emailBuilder.module.<id>` — there is no opt-out. That is why the dark-mode switch (~line 3422), whose state must not persist, is hand-rolled against the same markup/CSS instead of calling this factory; migrate it here if an opt-out ever lands. The test-data toggle carries a one-time copy shim (~line 3403) preserving its pre-TASK-014 `emailBuilder.testDataEnabled` value.
+- **Canonical example:** grep `createModuleToggle('` for all callers — CTA (`'cta'`), Promo (`'promo'`), Test data (`'testData'`).
+- **Gotcha:** the factory always persists to `emailBuilder.module.<id>` — there is no opt-out. That is why the dark-mode switch (grep `darkModeSwitch`), whose state must not persist, is hand-rolled against the same markup/CSS instead of calling this factory; migrate it here if an opt-out ever lands. The test-data toggle carries a one-time copy shim (grep `emailBuilder.testDataEnabled`) preserving its pre-TASK-014 preference.
 
 ### `injectPreviewStyle`
 
-- **Location:** `index.html` — `injectPreviewStyle()` (~line 2802).
+- **Location:** `index.html` — grep `function injectPreviewStyle`.
 - **Use it for:** Injecting a preview-only `<style>` block into a compiled HTML string (before `</head>`, else after the opening `<body>`, else prepended). Every dark-mode transform routes its generated CSS through this helper.
-- **Canonical example:** `outlookDarkTransform` ~line 3166.
+- **Canonical example:** `outlookDarkTransform` (grep `function outlookDarkTransform`).
 - **Gotcha:** the helper neutralizes a literal `</style` inside `css` so an interpolated value (e.g. a brand color) cannot close the style element early and have its remainder parsed as HTML — the preview iframe is same-origin and already runs an injected `<script>` (see ARCHITECTURE.md). Never hand-concatenate `<style>…</style>` into preview HTML, even for a literal that looks safe today.
 
 ### `.seg-body` collapse primitive
 
-- **Location:** CSS ~line 122 (`.seg-body` / `.seg-body.collapsed`); first used by `#ctaBody` ~line 598.
+- **Location:** `index.html` CSS — grep `.seg-body` for the rule pair (`.seg-body` / `.seg-body.collapsed`); first used by `#ctaBody` (grep `id="ctaBody"`).
 - **Use it for:** Animated max-height collapse of a module's field group when its toggle is OFF. Wrap collapsible fields in `<div class="seg-body" id="{module}Body">`; keep the `.seg-head` (which holds the toggle) outside the wrapper so the header stays visible. Toggle the `.collapsed` class from the module's `onChange`.
 - **Gotcha:** the expanded ceiling is `max-height: 1000px` — revisit only if a module body exceeds it.
 
@@ -74,12 +74,12 @@ to a canonical example — read those for the actual implementation.
 
 - **Single-file constraint.** All features are implemented inside `index.html` as inline CSS and vanilla JS. Do not introduce a build step, npm dependencies, React, or separate module files. CDN imports via `esm.sh` are acceptable for new libraries.
 - **CDN-first dependencies.** New libraries must be loaded via `<script src="...">` or `import ... from 'https://esm.sh/...'` — no `npm install`.
-- **Template config schema.** Each brand is one object in `TEMPLATE_CONFIGS` (~line 664). Adding a brand means copying an existing entry and updating its keys; the render pipeline reads these at runtime.
+- **Template config schema.** Each brand is one object in the `templates` map (grep `const templates`). Adding a brand means copying an existing entry and updating its keys; the render pipeline reads these at runtime.
 - **MJML as the output format.** All email layout is expressed as MJML, compiled to HTML via `mjml-browser` in the browser. Do not write raw `<table>` email HTML by hand.
 - **Validation before copy.** Any new required field should participate in the validation pass inside `runCopyAction()` — call `markInvalid()` on missing values and return early before copying.
 - **Error surface routing.** Two distinct error displays — pick the right one or marketers won't see the error:
-  - `#testDataHint` (`.hint` element below the JSON textarea, ~line 599) — JSON parse errors only, set via `setTestDataHint()`. Do NOT use for Handlebars compile or render errors.
-  - `#warn` (`.warn` banner above the preview iframe, ~line 648) — template compile errors, MJML warnings, and placeholder image notices. Set via `showWarn()`. Template errors are staged in the module-scope `templateError` variable (set inside `applyTestData()`) and folded in by `render()` at the `warnings.unshift(templateError)` call (~line 1607). Any new error that requires marketer attention during preview must go through `#warn`.
+  - `#testDataHint` (`.hint` element below the JSON textarea — grep `id="testDataHint"`) — JSON parse errors only, set via `setTestDataHint()`. Do NOT use for Handlebars compile or render errors.
+  - `#warn` (`.warn` banner above the preview iframe — grep `id="warn"`) — template compile errors, MJML warnings, and placeholder image notices. Set via `showWarn()`. Template errors are staged in the module-scope `templateError` variable (set inside `applyTestData()`) and folded in by `render()` at the `warnings.unshift(templateError)` call. Any new error that requires marketer attention during preview must go through `#warn`.
 
 `/sf:compound` will append patterns extracted from completed sprints to
 this file over time.

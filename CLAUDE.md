@@ -30,7 +30,7 @@ Email Builder is a single-file browser app (`index.html`) that compiles MJML tem
 
 ## Conventions
 
-- **Library errors must be humanized before display.** Never show raw exception messages from Handlebars, MJML, or other CDN libraries to the user. Use a named function (following the `humanizeTemplateError` pattern at `index.html` ~line 1476) that pattern-matches known error shapes and returns plain-English action-oriented messages. Line numbers that refer to compiled HTML the marketer never sees must be stripped. Compiler tokens (`CLOSE_BLOCK`, `EOF`, `ID`) must be translated to concrete instructions.
+- **Library errors must be humanized before display.** Never show raw exception messages from Handlebars, MJML, or other CDN libraries to the user. Use a named function (following the `humanizeTemplateError` pattern in `index.html` — grep `function humanizeTemplateError`) that pattern-matches known error shapes and returns plain-English action-oriented messages. Line numbers that refer to compiled HTML the marketer never sees must be stripped. Compiler tokens (`CLOSE_BLOCK`, `EOF`, `ID`) must be translated to concrete instructions.
 
 _`/sf:compound` will append sprint-derived learnings to this section over
 time. Keep entries terse — detailed implementation patterns belong in
