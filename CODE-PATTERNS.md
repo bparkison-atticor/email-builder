@@ -21,8 +21,17 @@ to a canonical example — read those for the actual implementation.
 ### `richTextToMjText`
 
 - **Location:** `index.html` — grep `function richTextToMjText`.
-- **Use it for:** Converting a Quill editor's inner HTML into a safe `<mj-text>` content block — strips unsafe tags, preserves bold and links, applies the brand's link color.
-- **Canonical example:** called inside `buildMjml()` for both body-above and body-below editors.
+- **Use it for:** Converting a Quill editor's inner HTML into a safe `<mj-text>` content block — strips unsafe tags, preserves bold/italics/links/lists, applies the brand's link color.
+- **Signature:** `richTextToMjText(html, tpl, opts = {})`. `opts` has six fields, all optional: `fontSize` (mj-text font-size attribute; `null` inherits the 16px `mj-attributes` default), `color` (mj-text color attribute; `null` inherits `#333333`), `linkColor` (when set, overrides both the brand-accent link pass and the phone-link pass for every anchor, auto-linked phones included), `padding` (mj-text padding attribute, default `'0 0 14px 0'`), `blockMargin` (p/ul/ol bottom margin in px, default `14`), and `convertTypedBullets` (default `true` — converts a leading `*`/`—`/bullet-glyph paragraph into a real `<ul><li>`; pass `false` to keep such text literal).
+- **Byte-parity guarantee:** omitting `opts` reproduces body-copy output byte-for-byte — the two body call sites (`bodyAboveQuill`, `bodyBelowQuill`) both pass only `(html, tpl)`. The harness section "richTextToMjText — default parity + style overrides" is the gate protecting that property; any change to the defaults above must keep those parity fixtures green.
+- **Canonical example:** called inside `buildMjml()` for both body-above and body-below editors (no `opts`), and inside `buildMicrocopyBlock` for the CTA microcopy field (styled `opts`).
+
+### `buildMicrocopyBlock`
+
+- **Location:** `index.html` — grep `function buildMicrocopyBlock`.
+- **Use it for:** The canonical override caller for `richTextToMjText` — builds the CTA microcopy `<mj-text>` block. Pure: returns `''` for an empty editor (via the shared `hasRichHtml` predicate), otherwise calls `richTextToMjText` with `fontSize`/`color` from the active brand's `ctaMicrocopyFontSize`/`ctaMicrocopyColor` (falling back to `DEFAULT_CTA_MICROCOPY_FONT_SIZE` / `DEFAULT_CTA_MICROCOPY_COLOR`), `linkColor` set to that same muted color so links don't take the brand accent, tighter `padding`/`blockMargin`, and `convertTypedBullets: false`.
+- **Canonical example:** called once inside `buildMjml()`, immediately before the CTA `mj-button` block.
+- **Gotcha:** it passes `convertTypedBullets: false` so a fine-print sentence starting with `*` or `—` is emitted literally instead of being converted into a one-item bulleted list — the opposite default from the two body-copy call sites.
 
 ### `autoLinkPhones`
 
