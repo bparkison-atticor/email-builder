@@ -23,10 +23,13 @@ All logic lives in `index.html`. Logical sections within the `<script type="modu
 
 - **Template configs** (`TEMPLATE_CONFIGS` object, ~line 664) — per-brand assets: banner image URL, CTA colors, unsubscribe HTML, disclosure HTML. Three brands ship: Postman Law, National Disability Center, Wettermark Keith.
 - **Quill editors** — two `Quill` instances (`bodyAboveQuill`, `bodyBelowQuill`) for rich-text body copy above and below the CTA. Quill's link sanitizer is patched (`PassthroughLink`) to allow `tel:` URLs and Handlebars tokens.
-- **MJML build pipeline** — `buildMjml()` assembles an MJML string from form state; `render()` calls `mjml2html()` and writes the compiled HTML into a sandboxed `<iframe>`.
+- **MJML build pipeline** — `buildMjml()` assembles an MJML string from form state; `render()` calls `mjml2html()` and forks the result: `lastHtml` keeps the untransformed HTML (the only source for Copy HTML / View HTML), while the preview `srcdoc` is that same HTML run through `withPreviewLinkHandler(applyDarkMode(applyTestData(...)))`. Export and preview are deliberately different strings from one compile.
+- **Dark-mode preview simulation** — `applyDarkMode()` dispatches through the `DARK_MODE_TRANSFORMS` registry to `gmailDarkTransform` / `outlookDarkTransform` / `appleMailDarkTransform`; `detectAuthorDarkScheme()` classifies the compiled HTML for the Apple Mail branch. Shared HSL/WCAG primitives (`parseCssColor`, `contrastRatio`, `remapLightness`, `liftForContrast`) back the Outlook and Apple Mail transforms. Preview only — never touches `lastHtml`.
 - **Test data substitution** — `applyTestData()` / `parseTestData()` handle preview-only Handlebars token resolution (`{{dot.path}}` / `{{{triple}}}`) against a user-editable JSON object persisted in `localStorage`.
 - **Copy / output flow** — `runCopyAction()` validates required fields, compiles MJML, and copies to clipboard. `openHtmlModal()` / `closeHtmlModal()` manage the raw HTML inspection modal.
 - **UI controls** — `wireSegControl()` registers groups of `.seg-control button` elements as mutually exclusive toggles. `updateCtaPreview()` mirrors the active CTA button style live in the form panel.
+
+The preview `<iframe>` (`index.html` ~line 761) is deliberately **not** sandboxed: it is same-origin with the host page and executes the link-click `<script>` that `withPreviewLinkHandler` injects. Any code writing into its HTML must assume that threat model — see `injectPreviewStyle` in CODE-PATTERNS.md.
 
 ## Frameworks & External Dependencies
 
