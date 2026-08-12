@@ -1551,6 +1551,15 @@ function richTextToMjText(html, tpl) {
     a.removeAttribute('data-link-type');
   });
 
+  // Italics: email clients almost universally honour <em>, but an explicit
+  // inline style removes the dependency on their default stylesheet and
+  // survives clients that normalise unrecognised inline tags. Deliberately
+  // NOT mirrored for <strong> — bold already works with no inline style, and
+  // adding one would change existing output for every email that uses bold.
+  div.querySelectorAll('em, i').forEach(el => {
+    el.setAttribute('style', 'font-style:italic;');
+  });
+
   // Paragraphs: consistent 14px bottom margin, zero top.
   div.querySelectorAll('p').forEach(p => {
     p.setAttribute('style', 'margin:0 0 14px 0;');
