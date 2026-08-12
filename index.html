@@ -2988,6 +2988,154 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — actual !== expected') + '</code></div>';
     body.appendChild(row);
   }
+
+  // --- Section 13: CTA microcopy — emission gating and muted styling (TASK-027) ---
+  const h13 = document.createElement('h3');
+  h13.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h13.textContent = 'CTA microcopy — emission gating and muted styling';
+  body.appendChild(h13);
+
+  const MICROCOPY_TPL = { ctaBackgroundColor: '#ED1C24', ctaMicrocopyFontSize: '13px', ctaMicrocopyColor: '#6b6b6b' };
+  const MICROCOPY_BLOCK_FIXTURES = [
+    {
+      label: 'Emptiness gate: empty string emits nothing',
+      html: '',
+      check: out => out === '',
+      description: 'An untouched microcopy editor must contribute nothing to the compiled MJML.',
+    },
+    {
+      label: 'Emptiness gate: Quill double-Enter empty paragraph emits nothing',
+      html: '<p><br></p>',
+      check: out => out === '',
+      description: 'Quill inserts <p><br></p> when the marketer hits Enter twice with no text — still empty.',
+    },
+    {
+      label: 'Emptiness gate: empty paragraph emits nothing',
+      html: '<p></p>',
+      check: out => out === '',
+      description: 'A bare empty paragraph must also gate to nothing.',
+    },
+    {
+      label: 'Styled emission: font-size, color, and padding read from brand config',
+      html: '<p>No obligation.</p>',
+      check: out => out.includes('font-size="13px"') && out.includes('color="#6b6b6b"') && out.includes('padding="0 0 18px 0"'),
+      description: 'A populated field emits an mj-text styled from tpl.ctaMicrocopyFontSize/ctaMicrocopyColor, with the 18px bottom padding that replaces the button\'s own gap.',
+    },
+    {
+      label: 'Muted URL link: brand-accent colour is overridden',
+      html: '<p><a href="https://x.test">terms</a></p>',
+      check: out => out.includes('color:#6b6b6b') && !out.includes('#ED1C24'),
+      description: 'Links inside microcopy must render muted, not in the brand accent colour used for the CTA button.',
+    },
+    {
+      label: 'Muted manual phone link: phone-blue is overridden',
+      html: '<p><a href="tel:5551234567" data-link-type="phone">call</a></p>',
+      check: out => out.includes('color:#6b6b6b') && !out.includes('#0000ee'),
+      description: 'A manually-inserted phone link (from the link dialog) must also mute to the microcopy colour, not the standard phone-blue.',
+    },
+    {
+      label: 'Muted auto-linked phone: creation-time blue is overridden',
+      html: '<p>Call 555-123-4567.</p>',
+      check: out => out.includes('color:#6b6b6b') && !out.includes('#0000ee'),
+      description: 'autoLinkPhones() hard-codes #0000ee on anchors it creates; buildMicrocopyBlock\'s linkColor pass must override that for a phone number typed as plain text.',
+    },
+    {
+      label: 'Typed-bullet suppression: asterisk-prefixed sentence stays a sentence',
+      html: '<p>* Restrictions apply.</p>',
+      check: out => !out.includes('<ul') && out.includes('* Restrictions apply.'),
+      description: 'Microcopy passes convertTypedBullets:false — fine print starting with * or — is a sentence, not a list, even though its own toolbar forbids list buttons.',
+    },
+  ];
+
+  for (const fixture of MICROCOPY_BLOCK_FIXTURES) {
+    const actual = buildMicrocopyBlock(fixture.html, MICROCOPY_TPL);
+    const pass = (() => { try { return fixture.check(actual); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input HTML:</strong><pre>' + escapeHtml(fixture.html) + '</pre></div>' +
+      '<div class="harness-field"><strong>Check:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual output:</strong> <code>' + escapeHtml(actual) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  const CTA_BUTTON_PADDING_FIXTURES = [
+    { label: 'ctaButtonPadding(\'\') === \'14px 0 18px 0\'', html: '', expected: '14px 0 18px 0' },
+    { label: 'ctaButtonPadding(\'<p>x</p>\') === \'14px 0 6px 0\'', html: '<p>x</p>', expected: '14px 0 6px 0' },
+  ];
+
+  for (const fixture of CTA_BUTTON_PADDING_FIXTURES) {
+    const actual = ctaButtonPadding(fixture.html);
+    const pass = actual === fixture.expected;
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input HTML (JSON):</strong><pre>' + escapeHtml(JSON.stringify(fixture.html)) + '</pre></div>' +
+      '<div class="harness-field"><strong>Expected:</strong> <code>' + escapeHtml(fixture.expected) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual:</strong> <code>' + escapeHtml(actual) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — actual !== expected') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  const PLAIN_TEXT_LENGTH_FIXTURES = [
+    { label: 'plainTextLength(\'abc\\n\') === 3', text: 'abc\n', expected: 3 },
+    { label: 'plainTextLength(\'\\n\') === 0', text: '\n', expected: 0 },
+    { label: 'plainTextLength(\'a\\nb\\n\') === 3', text: 'a\nb\n', expected: 3 },
+    { label: 'plainTextLength(\'\') === 0', text: '', expected: 0 },
+  ];
+
+  for (const fixture of PLAIN_TEXT_LENGTH_FIXTURES) {
+    const actual = plainTextLength(fixture.text);
+    const pass = actual === fixture.expected;
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input text (JSON):</strong><pre>' + escapeHtml(JSON.stringify(fixture.text)) + '</pre></div>' +
+      '<div class="harness-field"><strong>Expected:</strong> <code>' + String(fixture.expected) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual:</strong> <code>' + String(actual) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — actual !== expected') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  const MICROCOPY_DOM_GUARDS = [
+    {
+      label: '#ctaMicrocopy lives inside #ctaBody — the CTA collapse hides it for free',
+      check() { return els.ctaBody.contains(document.getElementById('ctaMicrocopy')); },
+      description: 'Microcopy must be a descendant of #ctaBody so onCtaToggle\'s existing .collapsed class hides it without any toggle-factory change.',
+    },
+    {
+      label: '#ctaBody.scrollHeight stays under the .seg-body collapse-animation ceiling',
+      check() { return els.ctaBody.scrollHeight < 1000; },
+      description: 'The .seg-body { max-height: 1000px } rule must still exceed the fully-expanded content height, or the collapse/expand animation clips the field.',
+    },
+  ];
+
+  for (const guard of MICROCOPY_DOM_GUARDS) {
+    const pass = (() => { try { return guard.check(); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(guard.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(guard.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — guard returned false') + '</code></div>';
+    body.appendChild(row);
+  }
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
