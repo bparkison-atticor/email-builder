@@ -21,7 +21,7 @@ The server binds to `127.0.0.1` (localhost only) so nothing on your Wi-Fi can re
 
 ## Workflow
 
-1. Pick template — eight brand configs ship today; see [Templates](#templates) below for the full list
+1. Pick template — the dropdown lists every brand that ships; see [Templates](#templates) below for what each entry holds
 2. Write the preheader — the preview text that shows up next to the subject in the inbox (under 90 chars recommended)
 3. Paste body copy above CTA — rich text editor supports **bold**, *italics*, bullet/numbered lists, and hyperlinks
 4. Enter CTA button text — the dashed CTA preview chip below mirrors the brand's button color in real time
@@ -52,9 +52,9 @@ An optional sentence or two rendered under the CTA button — a reassurance line
 
 - **It's part of the CTA module.** Switching the **Call to action** toggle off hides the field and drops the microcopy from the output along with the button; what you typed comes back when the toggle goes back on.
 - **Toolbar is bold, italics, and link — no lists, on purpose.** This field is fine print, not a list.
-- **Links inside microcopy stay muted grey**, not the brand accent color body-copy links use. Auto-linked phone numbers are muted here too.
+- **Links inside microcopy stay muted gray**, not the brand accent color body-copy links use. Auto-linked phone numbers are muted here too.
 - **A leading `*` or `-` stays literal.** In body copy that pattern becomes a bullet; here it's deliberately left alone so `* Restrictions apply.` reads as fine print, not a one-item list.
-- The character count under the field is guidance only — there's no limit, and nothing is blocked or truncated.
+- The character count under the field targets 140 as guidance only — there's no limit, and nothing is blocked or truncated.
 - Content doesn't survive a reload, same as every other copy field.
 
 ### Test data panel
@@ -123,7 +123,7 @@ The switch and the selected client **reset on reload**, unlike the Test data tog
 
 ## Templates
 
-Eight brands are configured in `index.html`: Postman Law, National Disability Center, Keller Postman (Attorney-Client and Lead Outreach variants), Wettermark Keith, National Justice Center, Parrish DeVaughn, and Keches Law Group (Lead Outreach). Scroll to the `TEMPLATE CONFIGS` block in the `<script>` to edit them. Each brand has:
+Brands are configured in the `templates` map in `index.html` — grep `const templates`. The map's keys are the authoritative brand list; each entry's `name` is the label shown in the template dropdown. Scroll to the `TEMPLATE CONFIGS` block (grep `TEMPLATE CONFIGS`) in the `<script>` to edit them. Each brand has:
 
 - `bannerImageUrl` — publicly hosted banner image
 - `bannerAlt` — alt text (should match brand name for accessibility)
