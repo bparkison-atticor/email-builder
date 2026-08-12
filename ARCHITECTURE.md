@@ -35,7 +35,7 @@ The preview `<iframe>` (`index.html` — grep `id="preview"`) is deliberately **
 
 All loaded from CDN at runtime — no lockfile, no install step:
 
-- **Quill 2** (jsDelivr CDN) — rich text editor for the two body copy fields and the CTA microcopy field.
+- **Quill 2** (jsDelivr CDN) — rich text editor for `bodyAboveQuill`/`bodyBelowQuill` and the CTA microcopy field (`ctaMicrocopyQuill`).
 - **mjml-browser 4.15.3** (esm.sh CDN) — MJML-to-HTML compilation in the browser.
 
 ## Data Model
@@ -43,7 +43,7 @@ All loaded from CDN at runtime — no lockfile, no install step:
 No persistent data layer. State is held in:
 
 - DOM form values (template select, preheader, CTA text / type / destination)
-- Three Quill editor instances (body above / below CTA, CTA microcopy)
+- Three Quill editor instances: `bodyAboveQuill` / `bodyBelowQuill` (body above / below CTA) and `ctaMicrocopyQuill` (CTA microcopy)
 - `localStorage` (test data JSON and toggle state)
 
 ## Build & Run
