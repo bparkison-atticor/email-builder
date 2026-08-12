@@ -22,7 +22,7 @@ Email Builder is a local, single-file browser tool that lets marketers assemble 
 All logic lives in `index.html`. Logical sections within the `<script type="module">` block:
 
 - **Template configs** (the `templates` map — grep `const templates`) — per-brand assets: banner image URL, CTA colors, unsubscribe HTML, disclosure HTML. One top-level key per brand; the map's keys are the authoritative brand list.
-- **Quill editors** — two `Quill` instances (`bodyAboveQuill`, `bodyBelowQuill`) for rich-text body copy above and below the CTA. Quill's link sanitizer is patched (`PassthroughLink`) to allow `tel:` URLs and Handlebars tokens.
+- **Quill editors** — three `Quill` instances: `bodyAboveQuill` and `bodyBelowQuill` for rich-text body copy above and below the CTA, plus `ctaMicrocopyQuill` for the CTA module's optional supporting sentence (bold/italics/link only — no lists). Quill's link sanitizer is patched (`PassthroughLink`) to allow `tel:` URLs and Handlebars tokens.
 - **MJML build pipeline** — `buildMjml()` assembles an MJML string from form state; `render()` calls `mjml2html()` and forks the result: `lastHtml` keeps the untransformed HTML (the only source for Copy HTML / View HTML), while the preview `srcdoc` is that same HTML run through `withPreviewLinkHandler(applyDarkMode(applyTestData(...)))`. Export and preview are deliberately different strings from one compile.
 - **Dark-mode preview simulation** — `applyDarkMode()` dispatches through the `DARK_MODE_TRANSFORMS` registry to `gmailDarkTransform` / `outlookDarkTransform` / `appleMailDarkTransform`; `detectAuthorDarkScheme()` classifies the compiled HTML for the Apple Mail branch. Shared HSL/WCAG primitives (`parseCssColor`, `contrastRatio`, `remapLightness`, `liftForContrast`) back the Outlook and Apple Mail transforms. Preview only — never touches `lastHtml`.
 - **Test data substitution** — `applyTestData()` / `parseTestData()` handle preview-only Handlebars token resolution (`{{dot.path}}` / `{{{triple}}}`) against a user-editable JSON object persisted in `localStorage`.
@@ -35,7 +35,7 @@ The preview `<iframe>` (`index.html` — grep `id="preview"`) is deliberately **
 
 All loaded from CDN at runtime — no lockfile, no install step:
 
-- **Quill 2** (jsDelivr CDN) — rich text editor for both body copy fields.
+- **Quill 2** (jsDelivr CDN) — rich text editor for the two body copy fields and the CTA microcopy field.
 - **mjml-browser 4.15.3** (esm.sh CDN) — MJML-to-HTML compilation in the browser.
 
 ## Data Model
@@ -43,7 +43,7 @@ All loaded from CDN at runtime — no lockfile, no install step:
 No persistent data layer. State is held in:
 
 - DOM form values (template select, preheader, CTA text / type / destination)
-- Two Quill editor instances (body above / below CTA)
+- Three Quill editor instances (body above / below CTA, CTA microcopy)
 - `localStorage` (test data JSON and toggle state)
 
 ## Build & Run
