@@ -2831,6 +2831,106 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — actual !== expected') + '</code></div>';
     body.appendChild(row);
   }
+
+  // Note: richTextToMjText only ever reads tpl.ctaBackgroundColor — the
+  // ctaMicrocopyFontSize/ctaMicrocopyColor brand-config keys are read by the
+  // (future) caller and passed in as opts.fontSize/opts.color, not by this
+  // function directly, so this fixture tpl omits them.
+  const RICHTEXT_MICROCOPY_TPL = { ctaBackgroundColor: '#ED1C24' };
+  const RICHTEXT_OVERRIDE_FIXTURES = [
+    {
+      label: 'Style overrides: attribute emission + order (padding, font-size, color)',
+      html: '<p>x</p>',
+      opts: { fontSize: '13px', color: '#6b6b6b', padding: '0 0 18px 0' },
+      check: out => out.includes('<mj-text padding="0 0 18px 0" font-size="13px" color="#6b6b6b">'),
+      description: 'With fontSize/color/padding set, the mj-text tag must open with exactly padding, then font-size, then color, in that order.',
+    },
+    {
+      label: 'linkColor overrides the brand-accent pass on a URL link',
+      html: '<p><a href="https://x.test">c</a></p>',
+      opts: { linkColor: '#6b6b6b' },
+      check: out => out.includes('color:#6b6b6b') && !out.includes('#ED1C24'),
+      description: 'opts.linkColor must override tpl.ctaBackgroundColor for ordinary links, not merely supplement it.',
+    },
+    {
+      label: 'linkColor overrides the phone-blue pass on a manually-inserted phone link',
+      html: '<p><a href="tel:5551234567" data-link-type="phone">c</a></p>',
+      opts: { linkColor: '#6b6b6b' },
+      check: out => out.includes('color:#6b6b6b') && !out.includes('#0000ee'),
+      description: 'opts.linkColor must override the hard-coded #0000ee phone-blue for manually-inserted phone links.',
+    },
+    {
+      label: 'linkColor colours auto-linked phone numbers too (opt-in only)',
+      html: '<p>Call 555-123-4567.</p>',
+      opts: { linkColor: '#6b6b6b' },
+      check: out => out.includes('color:#6b6b6b'),
+      description: 'The auto-linked-phone anchor pass only runs when linkColor is supplied — when it is, every anchor class is muted, including auto-linked phones.',
+    },
+    {
+      label: 'convertTypedBullets:false leaves a typed asterisk paragraph as a paragraph',
+      html: '<p>* Restrictions apply.</p>',
+      opts: { convertTypedBullets: false },
+      check: out => !out.includes('<ul') && out.includes('* Restrictions apply.'),
+      description: 'Fine print starting with * or — is a sentence, not a list — convertTypedBullets:false must skip the typed-bullet-to-<ul> conversion entirely.',
+    },
+    {
+      label: 'convertTypedBullets omitted (default true) still converts the typed bullet',
+      html: '<p>* Restrictions apply.</p>',
+      opts: {},
+      check: out => out.includes('<ul'),
+      description: 'Paired with the fixture above: with the flag omitted, default behaviour (convert) is unchanged.',
+    },
+    {
+      label: 'blockMargin:8 sets the paragraph bottom margin; last-block zeroing still applies',
+      html: '<p>one</p><p>two</p>',
+      opts: { blockMargin: 8 },
+      check: out => out.includes('margin:0 0 8px 0;') && /margin:0;">two/.test(out),
+      description: 'blockMargin threads through the p/ul/ol margin passes; the last block is still zeroed regardless of blockMargin.',
+    },
+  ];
+
+  for (const fixture of RICHTEXT_OVERRIDE_FIXTURES) {
+    const actual = richTextToMjText(fixture.html, RICHTEXT_MICROCOPY_TPL, fixture.opts);
+    const pass = (() => { try { return fixture.check(actual); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input HTML:</strong><pre>' + escapeHtml(fixture.html) + '</pre></div>' +
+      '<div class="harness-field"><strong>opts:</strong> <code>' + escapeHtml(JSON.stringify(fixture.opts)) + '</code></div>' +
+      '<div class="harness-field"><strong>Check:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual output:</strong> <code>' + escapeHtml(actual) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  const HAS_RICH_HTML_FIXTURES = [
+    { label: 'hasRichHtml(\'\') === false', html: '', expected: false },
+    { label: 'hasRichHtml(\'<p><br></p>\') === false', html: '<p><br></p>', expected: false },
+    { label: 'hasRichHtml(\'<p></p>\') === false', html: '<p></p>', expected: false },
+    { label: 'hasRichHtml(\'  \') === false', html: '  ', expected: false },
+    { label: 'hasRichHtml(\'<p>x</p>\') === true', html: '<p>x</p>', expected: true },
+  ];
+
+  for (const fixture of HAS_RICH_HTML_FIXTURES) {
+    const actual = hasRichHtml(fixture.html);
+    const pass = actual === fixture.expected;
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input HTML (JSON):</strong><pre>' + escapeHtml(JSON.stringify(fixture.html)) + '</pre></div>' +
+      '<div class="harness-field"><strong>Expected:</strong> <code>' + String(fixture.expected) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual:</strong> <code>' + String(actual) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — actual !== expected') + '</code></div>';
+    body.appendChild(row);
+  }
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
