@@ -1,7 +1,7 @@
 ---
 sprint: SPRINT-008
-pending_count: 18
-last_updated: "2026-08-12T23:55:00.000Z"
+pending_count: 22
+last_updated: "2026-08-12T23:35:00.000Z"
 ---
 # Findings Queue
 
@@ -194,3 +194,53 @@ last_updated: "2026-08-12T23:55:00.000Z"
 - **description:** Two small placement/naming residues. (1) `plainTextLength` is defined between `richTextToMjText` and `buildCtaHref`, i.e. inside the MJML-emission helper cluster, but it has nothing to do with emission — its only caller is the UI character counter roughly 2,200 lines further down, and no compile-path function references it. A reader auditing the emission pipeline meets a function that is not part of it. (2) The name is generic while the behaviour is Quill-specific: it strips trailing newlines (because `quill.getText()` always appends one) and counts interior newlines as one character each. Anyone reusing it for a plain `<input>` — for instance to unify it with the preheader counter, which is the app's other character counter and is implemented inline as `els.preheaderCount.textContent = els.preheader.value.length` with no named helper and no startup call — would silently get different semantics. The app now has two character counters built two different ways.
 - **suggested_action:** Move `plainTextLength` next to `updateMicrocopyCount` (or into a small UI-helpers cluster) and rename it to something that carries the Quill contract, e.g. `quillTextLength` or `visibleTextLength`. If the preheader counter is ever revisited, unify both behind one `wireCharCount(el, countEl, read)` helper. Section 13's four `plainTextLength` fixtures move with the function; the label strings need updating if it is renamed.
 - **resolved_by:** 
+
+## FIND-SPRINT-008-20
+- **source:** TASK-028 (executor)
+- **type:** improvement
+- **severity:** low
+- **status:** open
+- **location:** README.md — Workflow numbered list (grep "## Workflow")
+- **description:** TASK-028-plan.md acceptance criterion 2 asserts the workflow list currently runs to 12 and will run to 13 after inserting the microcopy step. At execution time the README already had 13 numbered steps (TASK-024 landed a Dark mode toggle step after the plan was drafted), so inserting the microcopy step correctly renumbers the list to 1..14, not 1..13. Same drift pattern as FIND-SPRINT-008-6 (occurrence-count assertions over a file that keeps moving under intervening tasks), just in README.md instead of index.html. Implemented the substantive intent — one new step immediately after the CTA destination step, contiguous 1..14 numbering, no dupes/skips — rather than the literal count in the AC prose.
+- **suggested_action:** No action needed on this task; noting for planners writing numbered-list ACs over docs that other in-flight tasks also touch. Consider the same guidance FIND-SPRINT-008-6 suggests: state the expected renumbering as a delta (insert-after-step-N) rather than an absolute final count.
+- **resolved_by:**
+
+## FIND-SPRINT-008-21
+- **source:** TASK-028 (verifier)
+- **type:** bug
+- **severity:** low
+- **status:** open
+- **location:** index.html — `BULLET_PREFIX` inside `richTextToMjText` (grep `const BULLET_PREFIX`), its preceding comment, and the Section 12 fixture description (grep `Fine print starting with`)
+- **description:** `BULLET_PREFIX` contains `–` (EN DASH) but not `—` (EM DASH), so a body-copy paragraph beginning `— text` is never converted to a bullet while `– text` and `- text` both are. The comment directly above the regex says the trailing `\s+` "keeps prose that merely starts with a dash/em-dash (`— when, where...`) from being mistaken for a list" — but `\s+` does not achieve that (the example has a space after the dash and would match if U+2014 were in the class); the exclusion of U+2014 from the character class does. The same conflation appears in the Section 12 fixture description "Fine print starting with * or — is a sentence, not a list". Pre-existing from TASK-026, unchanged by TASK-028, and not a behaviour defect on its own — but it is the source of the em-dash claims TASK-028's docs inherited, and the en-dash/em-dash asymmetry is almost certainly unintentional.
+- **suggested_action:** Decide whether U+2014 should join the class (making the two dashes behave alike) or stay out, then correct the comment and the fixture description to name the characters that actually convert (`*`, `-`, `–`, bullet glyphs). Whichever way it lands, the docs corrected under TASK-028 must match.
+- **resolved_by:**
+
+## FIND-SPRINT-008-22
+- **source:** TASK-028 (verifier)
+- **type:** improvement
+- **severity:** low
+- **status:** open
+- **location:** .soloflow/active/plans/cta-microcopy/TASK-028-plan.md — acceptance criterion 8 (CHANGELOG)
+- **description:** Second instance of the drift pattern FIND-SPRINT-008-20 and FIND-SPRINT-008-6 already record, in the same plan. AC8 states the new entry must sit "above `## 2026-08-11 — Keller Postman lead outreach wordmark size`" and that this entry "is unmodified and now second". By execution time the topmost entry was `## 2026-08-11 — Dark mode preview simulation (Gmail / Outlook / Apple Mail)` (landed by TASK-024 after the plan was drafted). The substantive requirement — new dated entry at the very top, insertions only, no existing entry edited — is satisfied and independently verifiable via `git diff --numstat` (17 insertions, 0 deletions), so the literal miss is harmless here.
+- **suggested_action:** Same guidance as FIND-SPRINT-008-6/20: express doc-ordering ACs as invariants ("the new entry is first; `git diff --numstat` shows 0 deletions") rather than quoting the current neighbouring content, which any concurrent task can invalidate.
+- **resolved_by:**
+
+## FIND-SPRINT-008-23
+- **source:** TASK-028 (verifier)
+- **type:** claude-md
+- **severity:** medium
+- **status:** open
+- **location:** .soloflow/active/plans/cta-microcopy/TASK-028-plan.md — implementation step 3 and acceptance criterion 3(d)
+- **description:** The plan asserted a runtime behaviour it never checked against the implementing code: "a leading `*` or `—` stays literal here, unlike body copy where it becomes a bullet". The em dash in that sentence is U+2014, which is absent from `BULLET_PREFIX`, so the second half is false for that character. Because the claim was baked into both the implementation step and the acceptance criterion, the executor transcribed it verbatim and it shipped into README.md, CODE-PATTERNS.md, and CHANGELOG.md — three new false statements in a task whose entire purpose was correcting false statements. The AC's own verification recipe (a grep for the sentence) could not catch it: grepping for prose you dictated only proves the prose was copied. This is the failure mode to guard against in docs-accuracy tasks — prose ACs must be verifiable against the code, not against themselves.
+- **suggested_action:** For plans that put behavioural claims into prose, cite the code construct that decides the behaviour (e.g. "the characters listed must be exactly those in `BULLET_PREFIX` — grep `const BULLET_PREFIX`") and make the AC's verification a comparison against that construct rather than a grep for the sentence. Worth a short line in CLAUDE.md's Conventions alongside the existing humanized-error rule: documentation claims about behaviour name the deciding code construct so a verifier can diff prose against source.
+- **resolved_by:** 
+
+## FIND-SPRINT-008-24
+- **source:** TASK-028 (verifier)
+- **type:** improvement
+- **severity:** medium
+- **status:** open
+- **location:** .soloflow/active/plans/TASK-032-plan.md — acceptance criteria 1, 2, 3 and (partly) 4
+- **description:** TASK-028's commit 9e8fbe9 (the count-free README repair prompted by the code-reviewer) lands work that TASK-032's plan still assumes is outstanding. TASK-032 AC1 (workflow step 1 enumerates no brand names), AC2 (Templates section states no brand count or list and names the `templates` map) and AC3 (the `TEMPLATE CONFIGS` pointer uses the grep-anchor convention and appears on exactly one README line) are all satisfied on the current branch: step 1 reads "the dropdown lists every brand that ships…", README.md:126 reads "Brands are configured in the `templates` map in `index.html` — grep `const templates`. The map's keys are the authoritative brand list…", and `grep -c 'TEMPLATE CONFIGS' README.md` is 1 in anchor form. AC4 is partly advanced too — `name` now has a hit inside the Templates section, leaving `bannerHtml` and `bannerBackgroundColor` as the undocumented keys rather than three. TASK-032's pre-flight notes are correspondingly stale: "README.md:114 is the only match outside `.soloflow/`" for `Three brands` is now zero matches, and its per-file anchor counts / `ANCHOR_FLOORS` baseline must be recomputed at execution time because README gained two anchors. Both files are owned by both tasks, but they run serially, so this is a stale-plan hazard, not a conflict.
+- **suggested_action:** When TASK-032 runs, re-derive AC1-AC4 state from the working tree first and record "already satisfied by TASK-028 (9e8fbe9)" rather than re-editing the same sentences; recompute the anchor floors from the live files instead of the plan's plan-time numbers. Same drift family as FIND-SPRINT-008-6, -20 and -22 — a fourth data point that plans quoting current file contents/line numbers go stale whenever another task touches the file first.
+- **resolved_by:**
