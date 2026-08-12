@@ -2842,7 +2842,7 @@ function renderTestHarness() {
       label: 'Style overrides: attribute emission + order (padding, font-size, color)',
       html: '<p>x</p>',
       opts: { fontSize: '13px', color: '#6b6b6b', padding: '0 0 18px 0' },
-      check: out => out.includes('<mj-text padding="0 0 18px 0" font-size="13px" color="#6b6b6b">'),
+      check: out => out.startsWith('        <mj-text padding="0 0 18px 0" font-size="13px" color="#6b6b6b">'),
       description: 'With fontSize/color/padding set, the mj-text tag must open with exactly padding, then font-size, then color, in that order.',
     },
     {
@@ -2863,8 +2863,8 @@ function renderTestHarness() {
       label: 'linkColor colours auto-linked phone numbers too (opt-in only)',
       html: '<p>Call 555-123-4567.</p>',
       opts: { linkColor: '#6b6b6b' },
-      check: out => out.includes('color:#6b6b6b'),
-      description: 'The auto-linked-phone anchor pass only runs when linkColor is supplied — when it is, every anchor class is muted, including auto-linked phones.',
+      check: out => out.includes('color:#6b6b6b') && !out.includes('#0000ee'),
+      description: 'The auto-linked-phone anchor pass only runs when linkColor is supplied — when it is, every anchor class is muted, including auto-linked phones. A regression that left the creation-time #0000ee in place alongside the new colour must fail.',
     },
     {
       label: 'convertTypedBullets:false leaves a typed asterisk paragraph as a paragraph',
