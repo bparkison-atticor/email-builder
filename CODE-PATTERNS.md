@@ -57,6 +57,13 @@ to a canonical example — read those for the actual implementation.
 - **Canonical example:** CTA toggle ~line 3535; test-data toggle ~line 3411 (grep `createModuleToggle('` for all callers).
 - **Gotcha:** the factory always persists to `emailBuilder.module.<id>` — there is no opt-out. That is why the dark-mode switch (~line 3422), whose state must not persist, is hand-rolled against the same markup/CSS instead of calling this factory; migrate it here if an opt-out ever lands. The test-data toggle carries a one-time copy shim (~line 3403) preserving its pre-TASK-014 `emailBuilder.testDataEnabled` value.
 
+### `injectPreviewStyle`
+
+- **Location:** `index.html` — `injectPreviewStyle()` (~line 2802).
+- **Use it for:** Injecting a preview-only `<style>` block into a compiled HTML string (before `</head>`, else after the opening `<body>`, else prepended). Every dark-mode transform routes its generated CSS through this helper.
+- **Canonical example:** `outlookDarkTransform` ~line 3166.
+- **Gotcha:** the helper neutralizes a literal `</style` inside `css` so an interpolated value (e.g. a brand color) cannot close the style element early and have its remainder parsed as HTML — the preview iframe is same-origin and already runs an injected `<script>` (see ARCHITECTURE.md). Never hand-concatenate `<style>…</style>` into preview HTML, even for a literal that looks safe today.
+
 ### `.seg-body` collapse primitive
 
 - **Location:** CSS ~line 122 (`.seg-body` / `.seg-body.collapsed`); first used by `#ctaBody` ~line 598.
