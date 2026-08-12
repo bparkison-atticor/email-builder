@@ -30,9 +30,10 @@ The server binds to `127.0.0.1` (localhost only) so nothing on your Wi-Fi can re
 7. Optional: body copy below CTA (also rich text)
 8. Optional: edit the **Test data** JSON to substitute `{{tokens}}` in the live preview (does not affect copied HTML)
 9. Toggle viewport between **Desktop** and **Mobile** in the preview header to spot-check responsive layout
-10. Hit **Copy HTML** (or open **View HTML** to inspect / copy from the raw HTML modal)
-11. Paste into SendGrid → Design → Code Editor
-12. **Don't forget:** set the subject line directly in SendGrid (it's not in the HTML)
+10. Toggle **Dark mode** and pick a client (Gmail, Outlook, or Apple Mail) in the preview header to preview how each renders the email in dark mode
+11. Hit **Copy HTML** (or open **View HTML** to inspect / copy from the raw HTML modal)
+12. Paste into SendGrid → Design → Code Editor
+13. **Don't forget:** set the subject line directly in SendGrid (it's not in the HTML)
 
 ### Body copy editor notes
 
@@ -87,6 +88,18 @@ Missing paths inside a block-helper comparand are treated as falsy and route to 
 #### Template syntax errors
 
 If the body copy has a syntax issue (unclosed `{{#…}}` block, mismatched tags, unbalanced `{{`), the preview shows a yellow warning banner directly above the iframe with a plain-English message (e.g. `Body copy: unclosed {{#equals}} block — add a matching {{/equals}}.`). The preview still renders the underlying email structure so you can keep editing; the banner clears as soon as the syntax is valid again.
+
+### Dark mode preview
+
+The **Dark mode** switch in the preview header simulates how three email clients transform the email when the recipient's device is set to dark mode — the simulation runs entirely inside the preview iframe.
+
+- **Gmail** — the Gmail mobile app (iOS), not Gmail on the web (which leaves the email body alone). Inverts the whole email, then re-inverts images so photos still look right.
+- **Outlook** — Outlook.com / OWA on the web. Repairs contrast selectively instead of inverting everything: light backgrounds go dark, colors that are already dark are left alone. Watch for a dark brand color (a navy banner, a dark CTA button) surviving against the newly-darkened background — that's the classic Outlook dark-mode failure.
+- **Apple Mail** — macOS 12.4+ / iOS 13+. Only goes dark if the email carries its own dark-mode CSS; this builder emits none, so the email renders **unchanged**. If that white slab against the dark app chrome is the problem, the fix is authoring dark-mode CSS, not changing brand colors.
+
+The transforms are **approximations** of undocumented, vendor-changeable behavior — good enough to catch vanishing logos, low-contrast text, and harshly inverted brand colors, not pixel-exact rendering. They're also preview-only: the copied HTML (from **Copy HTML** or **View HTML**) is byte-identical whether dark mode is on or off.
+
+The switch and the selected client **reset on reload**, unlike the Test data toggle and JSON, which persist.
 
 ### Validation and invalid-field highlighting
 

@@ -220,6 +220,8 @@
     display: flex;
     align-items: center;
     gap: 14px;
+    flex-wrap: wrap;
+    row-gap: 8px;
   }
   .preview-stage {
     flex: 1;
@@ -242,6 +244,15 @@
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     margin: 16px 0;
   }
+  /* Chrome around the iframe (not the email itself) so a no-op client
+     transform (Apple Mail, TASK-023) is still legibly different from
+     "the toggle is broken" (IDEA-005 / TASK-021). */
+  .preview-stage.dark { background: #1a1a1a; }
+  /* Required: the author rule `.seg-control { display: inline-flex; }`
+     beats the UA stylesheet's `[hidden] { display: none }`, so without
+     this the `hidden` attribute on #darkClientControl silently does
+     nothing (TASK-021). */
+  .seg-control[hidden] { display: none; }
   .hint {
     font-size: 12px;
     color: var(--muted);
@@ -368,7 +379,6 @@
     background: var(--border);
     flex-shrink: 0;
   }
-  .switch,
   .module-toggle {
     display: inline-flex;
     align-items: center;
@@ -378,13 +388,11 @@
     cursor: pointer;
     user-select: none;
   }
-  .switch:focus-visible,
   .module-toggle:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
     border-radius: 4px;
   }
-  .switch .track,
   .module-toggle .track {
     width: 28px;
     height: 16px;
@@ -394,7 +402,6 @@
     transition: background 0.15s;
     flex-shrink: 0;
   }
-  .switch .track::after,
   .module-toggle .track::after {
     content: '';
     position: absolute;
@@ -406,11 +413,8 @@
     border-radius: 50%;
     transition: transform 0.15s;
   }
-  .switch.on .track,
   .module-toggle.on .track { background: var(--accent); }
-  .switch.on .track::after,
   .module-toggle.on .track::after { transform: translateX(12px); }
-  .switch.on,
   .module-toggle.on { color: var(--text); }
 
   .btn-toolbar {
@@ -733,10 +737,6 @@
           </button>
         </div>
         <span class="divider" aria-hidden="true"></span>
-        <span class="switch on" role="switch" aria-checked="true" tabindex="0" id="testDataSwitch" title="Substitute {{tokens}} in preview">
-          <span class="track"></span>
-          Test data
-        </span>
       </div>
       <div class="copy-group">
         <div class="copy-error" id="copyError"></div>
@@ -1743,12 +1743,21 @@ const SAMPLE_TEST_DATA = {
 
 let testData = {};
 let testDataValid = true;
-let testDataEnabled = localStorage.getItem('emailBuilder.testDataEnabled') !== 'false';
+let testDataEnabled = true;
 // Module-scope flag set by applyTestData when Handlebars compile/render throws.
 // render() picks it up and folds it into the #warn banner alongside MJML warnings,
 // so the error appears above the preview where the marketer is already looking
 // (the body copy is where the syntax error came from — #testDataHint is the wrong place).
 let templateError = '';
+
+// Dark-mode preview state. Deliberately NOT persisted to localStorage —
+// this is a review-time lens like the desktop/mobile viewport switcher,
+// not a content decision like testDataEnabled. Locked by IDEA-005.
+let darkModeEnabled = false;
+let darkModeClient = 'gmail';
+// Set by applyDarkMode when a transform throws; folded into #warn by render().
+// Same staging pattern as templateError.
+let darkModeError = '';
 
 // buildTestDataContext(data) — wraps the parsed test-data object in a Proxy so
 // that any key lookup that resolves to undefined emits a visible yellow chip
@@ -2355,6 +2364,304 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — script was truncated or wiring did not run') + '</code></div>';
     body.appendChild(row);
   }
+
+  // --- Section 8: dark-mode preview transforms — Gmail (TASK-021) ---
+  // Every function under test is pure string-in/string-out, so fixtures
+  // are literal HTML strings — no mocking needed. Fixture 8 is the
+  // highest-value regression lock in the whole epic: it must stay in the
+  // harness for the life of the feature.
+  const h8 = document.createElement('h3');
+  h8.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h8.textContent = 'Dark-mode preview transforms — Gmail';
+  body.appendChild(h8);
+
+  const DARK_MODE_FIXTURES = [
+    {
+      label: 'applyDarkMode is identity when off',
+      check() {
+        const saved = darkModeEnabled;
+        darkModeEnabled = false;
+        try {
+          return applyDarkMode('<body>x</body>') === '<body>x</body>';
+        } finally {
+          darkModeEnabled = saved;
+        }
+      },
+      description: 'applyDarkMode must return its input unchanged when darkModeEnabled is false.',
+    },
+    {
+      label: 'Gmail transform: EB-DARKSIM marker present',
+      check() { return gmailDarkTransform('<html><head></head><body>x</body></html>').includes('EB-DARKSIM'); },
+      description: 'The injected stylesheet must carry the EB-DARKSIM marker.',
+    },
+    {
+      label: 'Gmail transform: body double-invert filter present',
+      check() {
+        const out = gmailDarkTransform('<html><head></head><body>x</body></html>');
+        return /body\s*\{[^}]*filter:\s*invert\(100%\)\s*hue-rotate\(180deg\)/.test(out);
+      },
+      description: 'The body selector must carry filter: invert(100%) hue-rotate(180deg).',
+    },
+    {
+      label: 'Gmail transform: media counter-filter present',
+      check() {
+        const out = gmailDarkTransform('<html><head></head><body>x</body></html>');
+        return /img,\s*video,\s*svg\s*\{[^}]*filter:\s*invert\(100%\)\s*hue-rotate\(180deg\)/.test(out);
+      },
+      description: 'img, video, svg must carry the same filter declaration to cancel the parent inversion.',
+    },
+    {
+      label: 'Gmail transform: html background-color present',
+      check() { return gmailDarkTransform('<html><head></head><body>x</body></html>').includes('html { background-color: #0b0b0b'); },
+      description: 'html background-color must be set explicitly so no white canvas seam shows through the body filter.',
+    },
+    {
+      label: 'Gmail transform: injected before </head>',
+      check() {
+        const out = gmailDarkTransform('<html><head></head><body>x</body></html>');
+        return out.indexOf('EB-DARKSIM') < out.indexOf('</head>');
+      },
+      description: 'The injected <style> block must appear before </head> when a head exists.',
+    },
+    {
+      label: 'Gmail transform: falls back to post-<body> insertion with no </head>',
+      check() {
+        const out = gmailDarkTransform('<body>x</body>');
+        return out.includes('EB-DARKSIM') && out.indexOf('EB-DARKSIM') > out.indexOf('<body>');
+      },
+      description: 'With no </head> in the compiled HTML, the style block must be inserted immediately after the opening <body> tag.',
+    },
+    {
+      label: 'Preview-only purity guard: lastHtml never carries EB-DARKSIM',
+      check() { return typeof lastHtml === 'string' && lastHtml.indexOf('EB-DARKSIM') === -1; },
+      description: 'lastHtml (Copy HTML / View HTML source) must never carry a preview-only dark-mode stylesheet, regardless of toggle state.',
+    },
+    {
+      label: 'injectPreviewStyle: literal </style> inside css is neutralized',
+      check() {
+        const out = injectPreviewStyle(
+          '<html><head></head><body>x</body></html>',
+          '/* EB-DARKSIM test */ body { color: red; } </style><img src=x onerror=1>'
+        );
+        const first = out.indexOf('</style>');
+        return first !== -1 && out.indexOf('</style>', first + 1) === -1;
+      },
+      description: 'A literal </style> sequence inside the css argument must not terminate the injected <style> element early — exactly one real </style> may appear in the output.',
+    },
+  ];
+
+  for (const fixture of DARK_MODE_FIXTURES) {
+    const pass = (() => { try { return fixture.check(); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  // --- Section 9: dark-mode preview transforms — Outlook (TASK-022) ---
+  // Same predicate-fixture shape and row renderer as Section 8. All
+  // functions under test are pure, so fixtures are literal HTML strings
+  // or literal color values — no mocking needed.
+  const h9 = document.createElement('h3');
+  h9.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h9.textContent = 'Dark-mode preview transforms — Outlook (OWA contrast repair)';
+  body.appendChild(h9);
+
+  const OUTLOOK_DARK_FIXTURES = [
+    {
+      label: 'relLuminance: white rounds to 1',
+      check() { return Math.round(relLuminance(parseCssColor('#ffffff'))) === 1; },
+      description: 'W3C WCAG 2.0 G18 reference value: the relative luminance of white is 1.',
+    },
+    {
+      label: 'relLuminance: black is 0',
+      check() { return relLuminance(parseCssColor('#000000')) === 0; },
+      description: 'W3C WCAG 2.0 G18 reference value: the relative luminance of black is 0.',
+    },
+    {
+      label: 'contrastRatio: white vs. black rounds to 21.0',
+      check() { return Math.round(contrastRatio(parseCssColor('#ffffff'), parseCssColor('#000000')) * 10) / 10 === 21; },
+      description: 'W3C WCAG 2.0 G18 reference value: the contrast ratio of white against black is 21:1.',
+    },
+    {
+      label: 'Light background darkens (inline style)',
+      check() {
+        const out = outlookDarkTransform('<td style="background-color:#ffffff">x</td>');
+        if (out.includes('#ffffff')) return false;
+        const m = /background-color:(#[0-9a-f]{6})/i.exec(out);
+        return !!m && rgbToHsl(parseCssColor(m[1])).l <= 0.32;
+      },
+      description: 'A white inline background-color must be replaced by a color with HSL lightness <= 0.32.',
+    },
+    {
+      label: 'Light background darkens (bgcolor attribute, case-insensitive)',
+      check() {
+        const out = outlookDarkTransform('<td bgcolor="#F4F4F4">x</td>');
+        if (/#f4f4f4/i.test(out)) return false;
+        const m = /bgcolor="(#[0-9a-f]{6})"/i.exec(out);
+        return !!m && rgbToHsl(parseCssColor(m[1])).l <= 0.32;
+      },
+      description: 'A light bgcolor attribute value must be replaced by a color with HSL lightness <= 0.32, matched case-insensitively.',
+    },
+    {
+      label: 'Dark background survives byte-identical',
+      check() { return outlookDarkTransform('<td style="background-color:#00183e">x</td>').includes('#00183e'); },
+      description: 'An already-dark background (the navy brand color) must survive untouched — the whole point of this option.',
+    },
+    {
+      label: 'Dark text lifts and clears 4.5:1',
+      check() {
+        const out = outlookDarkTransform('<td style="color:#333333">x</td>');
+        const m = /color:(#[0-9a-f]{6})/i.exec(out);
+        return !!m && contrastRatio(parseCssColor(m[1]), OUTLOOK_DARK_SURFACE) >= 4.5;
+      },
+      description: 'Dark foreground text must be lifted to clear 4.5:1 contrast against the simulated dark surface.',
+    },
+    {
+      label: 'Light text survives byte-identical',
+      check() { return outlookDarkTransform('<td style="color:#ffffff">x</td>').includes('#ffffff'); },
+      description: 'Already-light foreground text must survive untouched.',
+    },
+    {
+      label: 'Contrast guard is exercised, not dead code',
+      check() {
+        const preLift = remapLightness(parseCssColor('#0000ee'));
+        const preCr = contrastRatio(preLift, OUTLOOK_DARK_SURFACE);
+        const lifted = liftForContrast(preLift, OUTLOOK_DARK_SURFACE, 4.5);
+        const postCr = contrastRatio(lifted, OUTLOOK_DARK_SURFACE);
+        return preCr < 4.5 && postCr >= 4.5;
+      },
+      description: 'For the classic link-blue #0000ee, the HSL-lightness remap alone fails 4.5:1 against the simulated surface; liftForContrast must raise it to clear the threshold. (A neutral gray such as #767676 cannot demonstrate this: remapLightness maps every dark achromatic input to lightness >= 0.70, which is always above the ~0.51 crossover lightness for this surface, so the guard never fires for grays — see FIND-SPRINT-007-10.)',
+    },
+    {
+      label: 'Non-color values pass through byte-identical',
+      check() {
+        const input = '<td style="background-color:transparent;color:inherit">x</td>';
+        return outlookDarkTransform(input).includes('style="background-color:transparent;color:inherit"');
+      },
+      description: 'transparent and inherit are unparseable by design and must be left exactly as written.',
+    },
+    {
+      label: 'Background shorthand with url() passes through byte-identical',
+      check() {
+        const input = '<td style="background:#ffffff url(https://x.test/a.png) no-repeat">x</td>';
+        return outlookDarkTransform(input).includes('background:#ffffff url(https://x.test/a.png) no-repeat');
+      },
+      description: 'A background shorthand with more than a single color token must not be rewritten — rewriting only the color half would desync the declaration.',
+    },
+    {
+      label: 'Apostrophe safety: font-family survives, only color changes',
+      check() {
+        const input = '<td style="font-family:\'Helvetica Neue\',Helvetica,sans-serif;color:#333333">x</td>';
+        const out = outlookDarkTransform(input);
+        return out.includes('font-family:\'Helvetica Neue\',Helvetica,sans-serif') && !out.includes('color:#333333');
+      },
+      description: 'MJML\'s font-family stacks (single-quoted font names) must survive the double-quote-only style regex intact.',
+    },
+    {
+      label: 'Attribute-boundary safety: href is untouched',
+      check() {
+        const input = '<a href="https://x.test/?c=%23ffffff" style="color:#333333">t</a>';
+        return outlookDarkTransform(input).includes('href="https://x.test/?c=%23ffffff"');
+      },
+      description: 'The transform must never cross an attribute boundary — an adjacent href containing a URL-encoded # must be untouched.',
+    },
+  ];
+
+  for (const fixture of OUTLOOK_DARK_FIXTURES) {
+    const pass = (() => { try { return fixture.check(); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  // --- Section 10: dark-mode preview transforms — Apple Mail + author-CSS drift guard (TASK-023) ---
+  // Same predicate-fixture shape and row renderer as Sections 8/9. Fixture
+  // 7 (the drift guard) is the highest-value regression lock in this
+  // section: it must stay in the harness for the life of the feature —
+  // it is the mechanism that turns a silent premise violation (the
+  // compiler starting to emit dark-mode CSS) into a loud, named failure.
+  const h10 = document.createElement('h3');
+  h10.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h10.textContent = 'Dark-mode preview transforms — Apple Mail + author-CSS drift guard';
+  body.appendChild(h10);
+
+  const APPLEMAIL_DARK_FIXTURES = [
+    {
+      label: 'Detector: authored beats meta (substring-ordering trap)',
+      check() {
+        return detectAuthorDarkScheme('<style>@media (prefers-color-scheme: dark){body{color:#fff}}</style>') === 'authored';
+      },
+      description: '"prefers-color-scheme" contains the substring "color-scheme", so a detector that checked meta-only first would misclassify this input as meta-only. It must return authored.',
+    },
+    {
+      label: 'Detector: color-scheme meta',
+      check() { return detectAuthorDarkScheme('<meta name="color-scheme" content="light dark">') === 'meta-only'; },
+      description: 'A bare color-scheme meta with no authored dark rules must classify as meta-only.',
+    },
+    {
+      label: 'Detector: legacy supported-color-schemes meta',
+      check() { return detectAuthorDarkScheme('<meta name="supported-color-schemes" content="light dark">') === 'meta-only'; },
+      description: 'The legacy supported-color-schemes meta name must also classify as meta-only.',
+    },
+    {
+      label: 'Detector: none',
+      check() {
+        return detectAuthorDarkScheme('<html><head><meta name="format-detection" content="telephone=no"></head><body>x</body></html>') === 'none';
+      },
+      description: 'An input with neither prefers-color-scheme nor a color-scheme signal must classify as none.',
+    },
+    {
+      label: 'Pass-through is exact identity when scheme is none',
+      check() {
+        const input = '<html><head><meta name="format-detection" content="telephone=no"></head><body>x</body></html>';
+        return appleMailDarkTransform(input) === input;
+      },
+      description: 'With no author dark-mode CSS present, appleMailDarkTransform must return its input by strict identity — not merely an equivalent string, and never with an injected marker.',
+    },
+    {
+      label: 'Meta-only applies the partial invert',
+      check() {
+        const input = '<html><head><meta name="color-scheme" content="light dark"></head><body><td style="background-color:#ffffff">x</td></body></html>';
+        return !appleMailDarkTransform(input).includes('#ffffff');
+      },
+      description: 'When only the color-scheme meta is present with no authored dark rules, Apple\'s documented fallback is a partial invert (remapInlineColors) — the white background must be gone from the output.',
+    },
+    {
+      label: 'Drift guard: live compiled output still authors no dark-mode CSS',
+      check() {
+        return typeof lastHtml === 'string' && lastHtml.length > 0 && detectAuthorDarkScheme(lastHtml) === 'none';
+      },
+      description: 'If this fails, buildMjml() now emits dark-mode CSS and the Apple Mail pass-through is no longer faithful — implement the authored branch of appleMailDarkTransform.',
+    },
+  ];
+
+  for (const fixture of APPLEMAIL_DARK_FIXTURES) {
+    const pass = (() => { try { return fixture.check(); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
+    body.appendChild(row);
+  }
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
@@ -2486,6 +2793,486 @@ function withPreviewLinkHandler(html) {
     : html + PREVIEW_LINK_HANDLER;
 }
 
+// injectPreviewStyle(html, css) — inserts a <style> block carrying `css`
+// into `html`: immediately before </head> when present, else immediately
+// after the opening <body ...> tag when present, else prepended to `html`.
+// Every .replace() call here uses a function replacer (not a string
+// replacement) so that a literal $&, $', $` etc. inside `css` can never be
+// interpreted by the JS engine as a substitution pattern.
+function injectPreviewStyle(html, css) {
+  // Neutralize a literal </style (case-insensitively) inside `css` before
+  // concatenating: without this, an interpolated value carrying that
+  // sequence would terminate the injected <style> element early and have
+  // its remainder parsed as HTML in the preview iframe, which is
+  // same-origin with the app and already hosts an injected <script>
+  // (PREVIEW_LINK_HANDLER). Unexploitable while every caller used a
+  // compile-time literal; TASK-022's outlookDarkTransform is the first
+  // transform whose css could plausibly carry interpolated color values.
+  const safeCss = String(css).replace(/<\/style/gi, '<\\/style');
+  const styleBlock = '<style type="text/css">' + safeCss + '</style>';
+  if (html.indexOf('</head>') !== -1) {
+    return html.replace('</head>', () => styleBlock + '</head>');
+  }
+  const bodyMatch = html.match(/<body[^>]*>/i);
+  if (bodyMatch) {
+    return html.replace(bodyMatch[0], () => bodyMatch[0] + styleBlock);
+  }
+  return styleBlock + html;
+}
+
+// ---------------------------------------------------------------------
+// Dark-mode preview transforms (IDEA-005 / TASK-021, extended by
+// TASK-022, TASK-023). Each picker option simulates ONE NAMED SURFACE,
+// not "the brand's dark mode" — dark-mode behavior splits by platform,
+// not by brand. The surface is disclosed to the marketer via each
+// picker button's `title` tooltip.
+//
+//   Picker option | Simulated surface                 | Why this surface
+//   --------------|------------------------------------|----------------------------
+//   Gmail         | Gmail mobile app, iOS              | Gmail web leaves the email
+//                 |                                    | body untouched (chrome-only
+//                 |                                    | dark mode) — simulating it
+//                 |                                    | would be a no-op that
+//                 |                                    | teaches the marketer
+//                 |                                    | nothing. iOS's full CSS
+//                 |                                    | filter inversion is both
+//                 |                                    | the documented mechanism
+//                 |                                    | and the worst case in the
+//                 |                                    | Gmail family, matching a
+//                 |                                    | risk-spotting preview.
+//   Outlook       | Outlook.com / OWA (web)            | Outlook Windows desktop is
+//                 |                                    | a full invert, which would
+//                 |                                    | render near-identical to
+//                 |                                    | Gmail's — uninformative.
+//                 |                                    | OWA's selective contrast
+//                 |                                    | repair surfaces a different
+//                 |                                    | failure class (dark brand
+//                 |                                    | colors surviving un-inverted
+//                 |                                    | next to newly-darkened
+//                 |                                    | surroundings). Implemented
+//                 |                                    | in TASK-022.
+//   Apple Mail    | Apple Mail macOS 12.4+ / iOS 13+   | The only one of the three
+//                 |                                    | that is opt-in rather than
+//                 |                                    | forced; its honest behavior
+//                 |                                    | against today's compiler
+//                 |                                    | output is "renders
+//                 |                                    | unchanged". Implemented in
+//                 |                                    | TASK-023.
+//
+// These behaviors are community-reverse-engineered, unversioned by the
+// vendors, and should be re-checked against caniemail.com / hteumeuleu's
+// email-bugs repo periodically.
+// ---------------------------------------------------------------------
+
+// gmailDarkTransform(html) — simulates Gmail's iOS app dark mode: a CSS
+// filter double-invert. The whole body is inverted, then media is
+// re-inverted so photos/video/svg render right-side-up and correctly
+// colored — exactly the mechanism Gmail iOS itself uses.
+function gmailDarkTransform(html) {
+  const css = [
+    '/* EB-DARKSIM gmail — preview only, never present in copied HTML */',
+    // (b) The html background is set explicitly: when <html> has no
+    // background of its own, the body's background propagates to the
+    // canvas and escapes the body filter — Firefox in particular then
+    // paints a white canvas behind the inverted body. #0b0b0b is the
+    // inverted equivalent of MJML's default #f4f4f4 body background, so
+    // the seam is invisible.
+    'html { background-color: #0b0b0b !important; }',
+    // (a) hue-rotate(180deg) after invert(100%) restores hue so blues
+    // stay blue instead of flipping to orange.
+    'body { filter: invert(100%) hue-rotate(180deg) !important; }',
+    // (c) Re-applying the identical filter to media cancels the parent
+    // inversion — exactly what Gmail iOS does so photos aren't inverted.
+    'img, video, svg { filter: invert(100%) hue-rotate(180deg) !important; }',
+  ].join('\n');
+  // Not simulated: CSS background-image values cannot be counter-filtered
+  // by this technique (there is no element to target them with), and
+  // Gmail Android is reported to additionally invert small images
+  // (<100px) — a divergence deliberately left out of this simulation.
+  return injectPreviewStyle(html, css);
+}
+
+// ---------------------------------------------------------------------
+// Outlook.com / OWA contrast-repair color primitives (TASK-022).
+// relLuminance and contrastRatio implement the formulas published in
+// W3C WCAG 2.0 technique G18 (https://www.w3.org/TR/WCAG20-TECHS/G18.html).
+//
+// COLOR-SPACE SPLIT — the easiest thing here for a maintainer to get
+// wrong: classification (light vs. dark) and remapping (remapLightness)
+// operate on HSL LIGHTNESS. The 4.5:1 contrast guard (liftForContrast,
+// via contrastRatio/relLuminance) operates on WCAG RELATIVE LUMINANCE.
+// These are different quantities computed by different formulas over
+// the same {r,g,b} — do not conflate them when touching this block.
+// ---------------------------------------------------------------------
+
+// A small named-color map covering what this app and MJML actually
+// emit. Anything not listed here falls through to the hex/rgb parsers
+// in parseCssColor, and anything neither lists nor parses returns null.
+const NAMED_COLORS = {
+  white: { r: 255, g: 255, b: 255 },
+  black: { r: 0, g: 0, b: 0 },
+  red: { r: 255, g: 0, b: 0 },
+  blue: { r: 0, g: 0, b: 255 },
+  green: { r: 0, g: 128, b: 0 },
+  gray: { r: 128, g: 128, b: 128 },
+  grey: { r: 128, g: 128, b: 128 },
+  silver: { r: 192, g: 192, b: 192 },
+};
+
+// parseCssColor(str) — accepts #rgb, #rrggbb, rgb(r,g,b), rgba(r,g,b,a)
+// (alpha ignored), and the NAMED_COLORS map above. Returns null — "leave
+// this value alone" — for transparent/inherit/initial/currentcolor/none
+// and anything else it cannot parse. Conservative by construction: an
+// unrecognized value is never rewritten.
+function parseCssColor(str) {
+  if (typeof str !== 'string') return null;
+  const s = str.trim().toLowerCase();
+  if (!s) return null;
+  if (s === 'transparent' || s === 'inherit' || s === 'initial' || s === 'currentcolor' || s === 'none') return null;
+  if (Object.prototype.hasOwnProperty.call(NAMED_COLORS, s)) {
+    const c = NAMED_COLORS[s];
+    return { r: c.r, g: c.g, b: c.b };
+  }
+  let m = /^#([0-9a-f]{3})$/.exec(s);
+  if (m) {
+    const r = m[1][0], g = m[1][1], b = m[1][2];
+    return { r: parseInt(r + r, 16), g: parseInt(g + g, 16), b: parseInt(b + b, 16) };
+  }
+  m = /^#([0-9a-f]{6})$/.exec(s);
+  if (m) {
+    return {
+      r: parseInt(m[1].slice(0, 2), 16),
+      g: parseInt(m[1].slice(2, 4), 16),
+      b: parseInt(m[1].slice(4, 6), 16),
+    };
+  }
+  m = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*[\d.]+\s*)?\)$/.exec(s);
+  if (m) {
+    return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]) };
+  }
+  return null;
+}
+
+// relLuminance({r,g,b}) — WCAG 2.0 G18 relative luminance.
+function relLuminance(rgb) {
+  const chan = (c8) => {
+    const c = c8 / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * chan(rgb.r) + 0.7152 * chan(rgb.g) + 0.0722 * chan(rgb.b);
+}
+
+// contrastRatio(a, b) — WCAG 2.0 G18 contrast ratio. Accepts either a
+// parsed {r,g,b} object or a raw color string for each argument (both
+// are normalized via parseCssColor internally) so callers can compare
+// a working {r,g,b} value directly against a hex constant such as
+// OUTLOOK_DARK_SURFACE without an extra parse step at every call site.
+function contrastRatio(a, b) {
+  const rgbA = typeof a === 'string' ? parseCssColor(a) : a;
+  const rgbB = typeof b === 'string' ? parseCssColor(b) : b;
+  const la = relLuminance(rgbA);
+  const lb = relLuminance(rgbB);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+// rgbToHsl({r,g,b}) — standard conversion. h in [0,360), s and l in [0,1].
+function rgbToHsl({ r, g, b }) {
+  const rn = r / 255, gn = g / 255, bn = b / 255;
+  const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  const d = max - min;
+  let h = 0, s = 0;
+  if (d !== 0) {
+    s = d / (1 - Math.abs(2 * l - 1));
+    switch (max) {
+      case rn: h = ((gn - bn) / d) % 6; break;
+      case gn: h = (bn - rn) / d + 2; break;
+      default: h = (rn - gn) / d + 4; break;
+    }
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return { h, s, l };
+}
+
+// hslToRgb({h,s,l}) — standard conversion, inverse of rgbToHsl. Returns
+// unrounded channel values; callers that need a final hex string go
+// through toHex, which clamps and rounds.
+function hslToRgb({ h, s, l }) {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let rp = 0, gp = 0, bp = 0;
+  if (h < 60) { rp = c; gp = x; bp = 0; }
+  else if (h < 120) { rp = x; gp = c; bp = 0; }
+  else if (h < 180) { rp = 0; gp = c; bp = x; }
+  else if (h < 240) { rp = 0; gp = x; bp = c; }
+  else if (h < 300) { rp = x; gp = 0; bp = c; }
+  else { rp = c; gp = 0; bp = x; }
+  return { r: (rp + m) * 255, g: (gp + m) * 255, b: (bp + m) * 255 };
+}
+
+// toHex({r,g,b}) — lowercase '#rrggbb', each channel clamped to 0-255
+// and rounded.
+function toHex({ r, g, b }) {
+  const ch = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  return '#' + ch(r) + ch(g) + ch(b);
+}
+
+// remapLightness({r,g,b}) — preserves hue and saturation; remaps HSL
+// lightness with a clamped piecewise remap (Dark Reader's approach, not
+// an inversion). Used for BOTH directions: a light input (L>=0.5) is
+// pushed dark (background rule), a dark input (L<0.5) is pushed light
+// (foreground rule) — the branch that fires depends on the input alone.
+function remapLightness(rgb) {
+  const hsl = rgbToHsl(rgb);
+  const l2 = hsl.l >= 0.5
+    ? 0.10 + (1 - hsl.l) * 0.40   // white 1.0 -> 0.10; mid 0.5 -> 0.30
+    : 0.90 - hsl.l * 0.40;        // black 0.0 -> 0.90; 0.49 -> 0.70
+  return hslToRgb({ h: hsl.h, s: hsl.s, l: l2 });
+}
+
+// liftForContrast(rgb, bgHex, min) — while contrastRatio(rgb, bgHex) is
+// below `min` and HSL lightness is below 0.97, raises lightness by 0.02
+// and recomputes. Returns `rgb` unchanged if it already passes. The
+// iteration count is hard-capped as a defensive guard against a
+// non-terminating edge case (there should not be one at these step
+// sizes, but the cap costs nothing and removes the possibility).
+function liftForContrast(rgb, bgHex, min) {
+  const MAX_ITERATIONS = 50;
+  let current = rgb;
+  let iterations = 0;
+  while (contrastRatio(current, bgHex) < min) {
+    const hsl = rgbToHsl(current);
+    if (hsl.l >= 0.97 || iterations >= MAX_ITERATIONS) break;
+    current = hslToRgb({ h: hsl.h, s: hsl.s, l: Math.min(0.97, hsl.l + 0.02) });
+    iterations++;
+  }
+  return current;
+}
+
+// OWA's real fingerprint writes data-ogsc/data-ogsb attributes storing
+// the original colors alongside the repaired ones; that is deliberately
+// not reproduced here (see the plan's Rejected Alternatives) — it is
+// invisible to the marketer and requires tag-level parsing this string
+// pass does not do. 4.5:1 is the threshold community reverse-engineering
+// attributes to OWA's behavior; it approximates an unpublished,
+// unversioned algorithm and should be re-checked periodically against
+// caniemail.com and hteumeuleu's email-bugs repo.
+const OUTLOOK_DARK_SURFACE = '#1b1b1b';
+
+const BACKGROUND_COLOR_PROPS = ['background-color', 'bgcolor'];
+const FOREGROUND_COLOR_PROPS = ['color', 'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color'];
+
+// remapBackgroundValue(value, isShorthand) — shared by remapDeclarations
+// (background-color prop) and the bgcolor attribute replacer in
+// remapInlineColors. When `isShorthand` is true (the `background` prop),
+// any value that is not a single color token (e.g. `#fff url(...)
+// no-repeat`) is left verbatim rather than partially rewritten — cutting
+// just the color out of a multi-token shorthand would desync the
+// declaration. Already-dark backgrounds (HSL lightness < 0.5) survive
+// untouched: that is the whole point of this option.
+function remapBackgroundValue(value, isShorthand) {
+  const trimmed = value.trim();
+  if (isShorthand && /\s/.test(trimmed)) return value;
+  const rgb = parseCssColor(trimmed);
+  if (!rgb) return value;
+  if (rgbToHsl(rgb).l < 0.5) return value;
+  return toHex(remapLightness(rgb));
+}
+
+// remapForegroundValue(value) — already-light foreground colors (HSL
+// lightness >= 0.5) survive untouched; dark ones are lifted via
+// remapLightness and then contrast-checked against OUTLOOK_DARK_SURFACE.
+function remapForegroundValue(value) {
+  const trimmed = value.trim();
+  const rgb = parseCssColor(trimmed);
+  if (!rgb) return value;
+  if (rgbToHsl(rgb).l >= 0.5) return value;
+  return toHex(liftForContrast(remapLightness(rgb), OUTLOOK_DARK_SURFACE, 4.5));
+}
+
+// remapDeclarations(decl) — operates on the contents of one `style`
+// attribute (the part between the quotes). Splits on ';', dispatches
+// each `prop:value` pair to the background or foreground rule by
+// property name, and passes every other property through untouched.
+// Reassembling with the same separators means a declaration the
+// rewriter declines is byte-identical in the output — this is what
+// keeps values like `transparent`, `inherit`, and font-family stacks
+// containing apostrophes intact.
+function remapDeclarations(decl) {
+  return decl.split(';').map((piece) => {
+    const idx = piece.indexOf(':');
+    if (idx === -1) return piece;
+    const rawProp = piece.slice(0, idx);
+    const rawValue = piece.slice(idx + 1);
+    const prop = rawProp.trim().toLowerCase();
+    let newValue = rawValue;
+    if (prop === 'background') {
+      newValue = remapBackgroundValue(rawValue, true);
+    } else if (BACKGROUND_COLOR_PROPS.includes(prop)) {
+      newValue = remapBackgroundValue(rawValue, false);
+    } else if (FOREGROUND_COLOR_PROPS.includes(prop)) {
+      newValue = remapForegroundValue(rawValue);
+    }
+    return rawProp + ':' + newValue;
+  }).join(';');
+}
+
+// remapInlineColors(html) — the markup pass. Rewrites `style="..."`
+// attribute contents and `bgcolor="..."`/`bgcolor='...'` attribute
+// values; every other attribute (including href) is untouched because
+// neither regex can match outside those two attribute shapes.
+//
+// Color literals inside MSO conditional comments (<!--[if mso]> ...
+// <![endif]-->) are also rewritten by these regexes; this is inert
+// because the browser treats the whole block as an HTML comment and
+// never renders it.
+//
+// Colors declared in the compiled <style> block are NOT covered by this
+// pass — today that block holds only `color: inherit` (the Apple
+// data-detector override), so coverage is complete in practice. A
+// future `mj-style` block adding real color declarations would silently
+// escape this remap.
+function remapInlineColors(html) {
+  // style="..." — DOUBLE-QUOTE ONLY, deliberately. MJML emits
+  // font-family:'Helvetica Neue',... inside style attributes; a pattern
+  // that also stopped at ' would truncate mid-value and corrupt the
+  // markup. [^"]* cannot escape the attribute, the same boundary
+  // guarantee safeAttrHtml relies on. Function replacer throughout so a
+  // remapped value's `$` sequences are never treated as substitution
+  // patterns.
+  let out = html.replace(/style="([^"]*)"/gi, (match, decl) => 'style="' + remapDeclarations(decl) + '"');
+  // bgcolor="..." / bgcolor='...' — both quote styles are safe here
+  // since a color value never contains a quote.
+  out = out.replace(/bgcolor=(["'])([^"']*)\1/gi, (match, quote, value) => 'bgcolor=' + quote + remapBackgroundValue(value, false) + quote);
+  return out;
+}
+
+// outlookDarkTransform(html) — simulates Outlook.com / OWA's selective
+// inline-color contrast repair (chosen over Outlook Windows desktop's
+// full invert, which would render near-identical to the Gmail option
+// and make the picker uninformative — see the surface-behavior table
+// above). Light backgrounds darken, already-dark backgrounds (a navy
+// brand band, a brand-colored CTA) survive untouched, dark text is
+// lifted and contrast-checked against the simulated surface, and light
+// text is left alone. The injected canvas rule below darkens the area
+// outside the body box, which the inline remap cannot reach.
+function outlookDarkTransform(html) {
+  const css = [
+    '/* EB-DARKSIM outlook — preview only, never present in copied HTML */',
+    'html { background-color: #1b1b1b !important; }',
+  ].join('\n');
+  return injectPreviewStyle(remapInlineColors(html), css);
+}
+
+// ---------------------------------------------------------------------
+// Apple Mail CSS-respecting simulation (TASK-023).
+//
+// Apple Mail (macOS 12.4+ / iOS 13+, per caniemail's primary data file)
+// is the ONLY one of the three simulated surfaces that is OPT-IN rather
+// than forced: it honors the `prefers-color-scheme` media query and the
+// `color-scheme` / `supported-color-schemes` meta, and does nothing on
+// its own when neither is present. Mail 12 and earlier used a
+// meta-tag-only mechanism and is out of scope for this simulation.
+//
+// Gmail and Outlook (TASK-021/022) are both "forced" clients: they
+// repaint every email regardless of what the email itself declares.
+// Apple Mail is the "optional dark mode" case in that taxonomy, which is
+// precisely why its faithful simulation can be a no-op.
+//
+// This whole design rests on a premise about THIS APP's compiler:
+// buildMjml() emits no dark-mode CSS today (verified: no
+// prefers-color-scheme / color-scheme in the compiled output), so the
+// honest simulation of "opt-in, nothing to opt into" is identity.
+// Harness Section 10's drift-guard fixture asserts that premise against
+// the live compiled output on every harness run — see its description
+// for the remediation if it ever fails.
+// ---------------------------------------------------------------------
+
+// detectAuthorDarkScheme(html) — classifies an HTML string into one of
+// three author-dark-CSS states: 'authored' (a real
+// @media (prefers-color-scheme: dark) block, or the CSS property form
+// used outside a media query), 'meta-only' (a bare color-scheme /
+// supported-color-schemes signal with no actual dark rules behind it),
+// or 'none' (neither).
+//
+// BRANCH ORDER IS LOAD-BEARING: the string `prefers-color-scheme`
+// contains `color-scheme` as a substring, so the 'authored' check MUST
+// run before the 'meta-only' check — swapping these two branches would
+// silently misclassify every authored-dark-CSS input as meta-only. Do
+// not reorder.
+function detectAuthorDarkScheme(html) {
+  if (/prefers-color-scheme/i.test(html)) return 'authored';
+  if (/name=["']?(?:color-scheme|supported-color-schemes)/i.test(html)) return 'meta-only';
+  // The [;{"'\s] prefix requires a preceding delimiter so this cannot
+  // match inside the substring "prefers-color-scheme:" — belt-and-braces
+  // given the authored check above already short-circuits that case.
+  if (/[;{"'\s]color-scheme\s*:/i.test(html)) return 'meta-only';
+  return 'none';
+}
+
+// appleMailDarkTransform(html) — see the surface-behavior comment above.
+function appleMailDarkTransform(html) {
+  const scheme = detectAuthorDarkScheme(html);
+  if (scheme === 'none') {
+    // Identity, by design: no marker, no injected stylesheet, nothing.
+    // Apple Mail does not force a transform, and this app's compiler
+    // authors no dark-mode CSS to opt into, so the faithful simulation
+    // is the untouched input. Injecting even the EB-DARKSIM marker here
+    // would make the "renders unchanged" claim false and would break
+    // the strict-identity fixture (Section 10) that pins it.
+    return html;
+  }
+  if (scheme === 'meta-only') {
+    // Apple's documented fallback when color-scheme / supported-color-schemes
+    // is present but no dark rules are authored: a partial invert (light
+    // backgrounds go dark, dark text goes light). remapInlineColors
+    // (TASK-022) already implements exactly that transform, so it is
+    // reused as-is rather than duplicated.
+    return remapInlineColors(html);
+  }
+  // scheme === 'authored' — unreachable today (see the Section 10 drift
+  // guard). Routed to the same partial-invert fallback as a conservative
+  // placeholder so nothing throws if this branch is ever hit ahead of a
+  // real fix.
+  // TODO: the correct behavior is to honor the author's own rules by
+  // unwrapping @media (prefers-color-scheme: dark) blocks into
+  // unconditional CSS, rather than approximating with remapInlineColors.
+  // Not implemented now — brace-balanced CSS parsing here would be
+  // speculative code against a compiler that emits nothing to unwrap
+  // (see the plan's Hardest Decision). The Section 10 drift guard will
+  // fail loudly the moment this branch becomes reachable, which is the
+  // signal to do the real implementation then.
+  return remapInlineColors(html);
+}
+const DARK_MODE_TRANSFORMS = { gmail: gmailDarkTransform, outlook: outlookDarkTransform, applemail: appleMailDarkTransform };
+
+// applyDarkMode(html) — preview-only step in the srcdoc transform chain.
+// Returns `html` unchanged when dark mode is off or the selected client
+// has no registered transform. Never applied to lastHtml (Copy HTML /
+// View HTML source) — see render()'s wiring.
+function applyDarkMode(html) {
+  // Both early returns below also clear darkModeError: without this, a
+  // stale "could not be applied" warning from a previous transform throw
+  // stayed pinned in #warn after the marketer switched dark mode back OFF
+  // or picked a client with no registered transform, even though the
+  // preview is the ordinary untransformed email and nothing is wrong.
+  if (!darkModeEnabled) { darkModeError = ''; return html; }
+  const transform = DARK_MODE_TRANSFORMS[darkModeClient];
+  if (!transform) { darkModeError = ''; return html; }
+  try {
+    const result = transform(html);
+    darkModeError = '';
+    return result;
+  } catch (e) {
+    // Do not interpolate e.message — per CLAUDE.md, nothing raw reaches
+    // the marketer, and this string is already action-neutral/complete.
+    darkModeError = 'Dark-mode preview could not be applied — showing the untransformed email.';
+    return html;
+  }
+}
+
 function setTestDataHint(text, kind) {
   els.testDataHint.textContent = text;
   els.testDataHint.classList.remove('error', 'success');
@@ -2551,7 +3338,11 @@ function render() {
     const result = mjml2html(mjml, { validationLevel: 'soft' });
     lastHtml = result.html;
     // Preview gets test-data substitution; lastHtml stays pure for Copy HTML / modal.
-    els.preview.srcdoc = withPreviewLinkHandler(applyTestData(result.html));
+    // Order: applyDarkMode runs after applyTestData so the marketer sees the
+    // dark-mode result of the actual substituted copy, and before
+    // withPreviewLinkHandler so the injected click-handler <script> is never
+    // a target of any dark-mode transform.
+    els.preview.srcdoc = withPreviewLinkHandler(applyDarkMode(applyTestData(result.html)));
 
     // Aggregate non-fatal warnings from template state + MJML compiler output.
     const warnings = [];
@@ -2566,6 +3357,7 @@ function render() {
       warnings.push(`MJML warning: ${msgs.join('; ')}${suffix}`);
     }
     if (templateError) warnings.unshift(templateError);
+    if (darkModeError) warnings.push(darkModeError);
     if (promoToggle.isOn()) {
       const promoUrlVal = els.promoUrl.value.trim();
       if (promoUrlVal && isHttpsUrl(promoUrlVal) && !promoUrlVal.includes('utm_')) {
@@ -2603,26 +3395,67 @@ wireSegControl(viewportButtons, (btn) => {
 });
 
 // Test-data substitution toggle (preview only — never affects copied HTML).
-// Single switch element replaces the previous two-button toggle.
-const testDataSwitch = document.getElementById('testDataSwitch');
-function syncTestDataSwitch() {
-  testDataSwitch.classList.toggle('on', testDataEnabled);
-  testDataSwitch.setAttribute('aria-checked', String(testDataEnabled));
+// Built via the shared createModuleToggle() factory (below) rather than a
+// hand-rolled switch (TASK-014 consolidation).
+//
+// One-time migration: preserve the pre-TASK-014 saved preference.
+// Old key: emailBuilder.testDataEnabled ; new factory key: emailBuilder.module.testData
+if (localStorage.getItem('emailBuilder.module.testData') === null) {
+  const legacy = localStorage.getItem('emailBuilder.testDataEnabled');
+  if (legacy !== null) localStorage.setItem('emailBuilder.module.testData', legacy);
 }
-function flipTestData() {
-  testDataEnabled = !testDataEnabled;
-  localStorage.setItem('emailBuilder.testDataEnabled', String(testDataEnabled));
-  syncTestDataSwitch();
+function onTestDataToggle(isOn) {
+  testDataEnabled = isOn;
   scheduleRender();
 }
-testDataSwitch.addEventListener('click', flipTestData);
-testDataSwitch.addEventListener('keydown', (e) => {
+const testDataToggle = createModuleToggle('testData', 'Test data', true, onTestDataToggle);
+testDataToggle.element.title = 'Substitute {{tokens}} in preview';
+document.querySelector('.preview-header-left').appendChild(testDataToggle.element);
+
+// Dark-mode preview controls (IDEA-005 / TASK-021). Runtime-inserted, same
+// as the Test data toggle above: static markup here would render before
+// that toggle, since TASK-014 appends it at runtime. Deliberately hand-rolled
+// rather than createModuleToggle() — that factory persists to localStorage
+// under emailBuilder.module.<id>, and dark-mode state must NOT be persisted
+// (locked at the idea checkpoint). Reuses the factory's module-toggle /
+// track markup shape so it shares the same CSS.
+document.querySelector('.preview-header-left').insertAdjacentHTML('beforeend',
+  '<span class="divider" aria-hidden="true"></span>' +
+  '<span class="module-toggle" role="switch" aria-checked="false" tabindex="0" id="darkModeSwitch" title="Simulate a dark-mode email client in the preview (preview only)">' +
+    '<span class="track"></span>Dark mode' +
+  '</span>' +
+  '<div class="seg-control" role="group" aria-label="Dark mode client" id="darkClientControl" style="width:auto" hidden>' +
+    '<button type="button" class="active" data-dm="gmail" aria-pressed="true" title="Gmail mobile app (iOS) — inverts the entire email, then re-inverts images">Gmail</button>' +
+    '<button type="button" data-dm="outlook" aria-pressed="false" title="Outlook.com / OWA (web) — selectively repairs contrast instead of inverting">Outlook</button>' +
+    '<button type="button" data-dm="applemail" aria-pressed="false" title="Apple Mail (macOS 12.4+ / iOS 13+) — respects author dark-mode CSS; this email has none, so it renders unchanged">Apple Mail</button>' +
+  '</div>'
+);
+
+const darkModeSwitch = document.getElementById('darkModeSwitch');
+const darkClientControl = document.getElementById('darkClientControl');
+function syncDarkModeSwitch() {
+  darkModeSwitch.classList.toggle('on', darkModeEnabled);
+  darkModeSwitch.setAttribute('aria-checked', String(darkModeEnabled));
+  darkClientControl.hidden = !darkModeEnabled;
+  previewStage.classList.toggle('dark', darkModeEnabled);
+}
+function flipDarkMode() {
+  darkModeEnabled = !darkModeEnabled;
+  syncDarkModeSwitch();
+  scheduleRender();
+}
+darkModeSwitch.addEventListener('click', flipDarkMode);
+darkModeSwitch.addEventListener('keydown', (e) => {
   if (e.key === ' ' || e.key === 'Enter') {
     e.preventDefault();
-    flipTestData();
+    flipDarkMode();
   }
 });
-syncTestDataSwitch();
+syncDarkModeSwitch();
+wireSegControl(darkClientControl.querySelectorAll('button[data-dm]'), (btn) => {
+  darkModeClient = btn.dataset.dm;
+  scheduleRender();
+});
 
 // ---------- Reusable module toggle factory ----------
 // Returns { element, isOn } — caller is responsible for DOM insertion.
