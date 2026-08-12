@@ -48,6 +48,14 @@
         "TASK-030"
       ],
       "idea": "SPRINT-006-007-compound"
+    },
+    "TASK-032": {
+      "status": "ready",
+      "depends_on": [
+        "TASK-031",
+        "TASK-028"
+      ],
+      "idea": "SPRINT-006-007-compound"
     }
   }
 }
