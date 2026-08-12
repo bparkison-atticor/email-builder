@@ -3695,11 +3695,11 @@ async function runCopyAction() {
     if (promoResult.formatErrors.length) {
       promoFormatError = true;
       promoFormatMessage = promoResult.formatErrors[0];
-      // Mark the relevant input invalid.
-      if (promoResult.formatErrors[0].startsWith('promo image URL')) {
-        markInvalid(els.promoImageUrl);
-      } else {
-        markInvalid(els.promoUrl);
+      // Mark every offending field invalid, even though only the first
+      // message is shown — mirrors the missing[] loop above.
+      for (const err of promoResult.formatErrors) {
+        if (err.startsWith('promo image URL')) markInvalid(els.promoImageUrl);
+        else markInvalid(els.promoUrl);
       }
     }
   }
