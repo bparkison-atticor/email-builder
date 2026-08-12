@@ -3406,9 +3406,18 @@ wireSegControl(viewportButtons, (btn) => {
 //
 // One-time migration: preserve the pre-TASK-014 saved preference.
 // Old key: emailBuilder.testDataEnabled ; new factory key: emailBuilder.module.testData
-if (localStorage.getItem('emailBuilder.module.testData') === null) {
-  const legacy = localStorage.getItem('emailBuilder.testDataEnabled');
-  if (legacy !== null) localStorage.setItem('emailBuilder.module.testData', legacy);
+try {
+  if (localStorage.getItem('emailBuilder.module.testData') === null) {
+    const legacy = localStorage.getItem('emailBuilder.testDataEnabled');
+    if (legacy !== null) {
+      localStorage.setItem('emailBuilder.module.testData', legacy);
+      localStorage.removeItem('emailBuilder.testDataEnabled');
+    }
+  }
+} catch {
+  // Storage write blocked (quota exceeded, hardened profile, extension
+  // stub) — degrade to createModuleToggle's own defaultOn value instead
+  // of aborting the rest of module init.
 }
 function onTestDataToggle(isOn) {
   testDataEnabled = isOn;
