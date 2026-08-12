@@ -2677,6 +2677,67 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
     body.appendChild(row);
   }
+
+  // --- Section 11: rich-text italics — em/i normalisation (TASK-025) ---
+  // Fixture 4 (byte-parity) is the load-bearing row here: its `expected`
+  // value was captured from the UNMODIFIED richTextToMjText (before the
+  // italic pass existed) so this section doubles as a regression lock that
+  // the new DOM pass never perturbs non-italic output.
+  const h11 = document.createElement('h3');
+  h11.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h11.textContent = 'rich-text italics — em/i normalisation';
+  body.appendChild(h11);
+
+  const ITALIC_TPL = { ctaBackgroundColor: '#ED1C24' };
+  const ITALIC_FIXTURES = [
+    {
+      label: '<em> gets an explicit inline font-style:italic;',
+      html: '<p>a <em>b</em> c</p>',
+      check: out => out.includes('<em style="font-style:italic;">b</em>'),
+      description: 'A pasted-through <em> must carry an explicit inline style so no email client\'s default em handling is load-bearing.',
+    },
+    {
+      label: '<i> is normalised the same way as <em>',
+      html: '<p><i>x</i></p>',
+      check: out => out.includes('<i style="font-style:italic;">x</i>'),
+      description: 'A pasted-through <i> element must be normalised identically to <em>.',
+    },
+    {
+      label: 'Nested <strong> inside <em> is untouched',
+      html: '<p><em><strong>x</strong></em></p>',
+      check: out => out.includes('font-style:italic;') && out.includes('<strong>x</strong>'),
+      description: '<strong> must not gain a style attribute while adding the italic pass — bold already renders correctly with none, and styling it too would change every existing bold email.',
+    },
+    {
+      label: 'Byte-parity: non-italic output is untouched by the new pass',
+      html: '<p>plain</p>',
+      check: out => out === '        <mj-text padding="0 0 14px 0">\n          <p style="margin:0;">plain</p>\n        </mj-text>',
+      description: 'Captured from the unmodified richTextToMjText before the italic pass was added (TASK-025 Implementation Step 1) — the parity gate for the new DOM pass.',
+    },
+    {
+      label: 'Toolbar/whitelist config includes italic',
+      html: null,
+      check: () => allowedFormats.includes('italic') && JSON.stringify(richToolbar[0]).includes('italic'),
+      description: 'richToolbar and allowedFormats are shared by both body editors (bodyAboveQuill/bodyBelowQuill); both must expose italic.',
+    },
+  ];
+
+  for (const fixture of ITALIC_FIXTURES) {
+    const actual = richTextToMjText(fixture.html, ITALIC_TPL);
+    const pass = (() => { try { return fixture.check(actual); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input HTML:</strong><pre>' + escapeHtml(fixture.html || '(none — config assertion)') + '</pre></div>' +
+      '<div class="harness-field"><strong>Check:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual output:</strong> <code>' + escapeHtml(actual) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
+    body.appendChild(row);
+  }
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
