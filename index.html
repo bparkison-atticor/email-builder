@@ -1159,17 +1159,17 @@ class PassthroughLink extends QuillLink {
 }
 Quill.register(PassthroughLink, true);
 
-const richToolbar = [['bold', 'link'], [{ list: 'ordered' }, { list: 'bullet' }]];
+const richToolbar = [['bold', 'italic', 'link'], [{ list: 'ordered' }, { list: 'bullet' }]];
 // Whitelist only the formats our toolbar exposes. This also governs paste:
-// anything pasted with other formats (italic, color, headers, images, tables,
-// base64 data URLs, etc.) gets stripped to plain text on the way in.
-const allowedFormats = ['bold', 'link', 'list'];
+// anything pasted with other formats (color, headers, images, tables,
+// base64 data URLs, etc.) still gets stripped to plain text on the way in.
+const allowedFormats = ['bold', 'italic', 'link', 'list'];
 
 const bodyAboveQuill = new Quill('#bodyAbove', {
   modules: { toolbar: [...richToolbar] },
   formats: [...allowedFormats],
   theme: 'snow',
-  placeholder: 'Enter copy. Bold, lists, and links supported.'
+  placeholder: 'Enter copy. Bold, italics, lists, and links supported.'
 });
 
 const bodyBelowQuill = new Quill('#bodyBelow', {
