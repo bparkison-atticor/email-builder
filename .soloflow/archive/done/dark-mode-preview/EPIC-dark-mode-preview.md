@@ -1,7 +1,7 @@
 ---
 epic: dark-mode-preview
 created: 2026-08-11T00:00:00Z
-status: active
+status: complete
 originating_ideas: [IDEA-005]
 ---
 
