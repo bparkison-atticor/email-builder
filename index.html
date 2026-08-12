@@ -3167,7 +3167,7 @@ function remapInlineColors(html) {
 function outlookDarkTransform(html) {
   const css = [
     '/* EB-DARKSIM outlook — preview only, never present in copied HTML */',
-    'html { background-color: #1b1b1b !important; }',
+    'html { background-color: ' + OUTLOOK_DARK_SURFACE + ' !important; }',
   ].join('\n');
   return injectPreviewStyle(remapInlineColors(html), css);
 }
