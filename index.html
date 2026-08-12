@@ -1474,11 +1474,18 @@ function autoLinkPhones(root) {
   });
 }
 
+// Pure: does this Quill innerHTML carry any real content? Quill's "empty"
+// states are '', '<p><br></p>', and '<p></p>'.
+function hasRichHtml(html) {
+  if (!html) return false;
+  const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
+  return !!(cleaned && cleaned !== '<p></p>');
+}
+
 function richTextToMjText(html, tpl) {
-  if (!html) return '';
+  if (!hasRichHtml(html)) return '';
   // Strip empty paragraphs Quill inserts when the user hits Enter twice.
   const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
-  if (!cleaned || cleaned === '<p></p>') return '';
 
   // Parse into a DOM so we can normalize styling for email clients, which
   // don't collapse margins like browsers and vary wildly on default list styles.
@@ -3704,9 +3711,7 @@ function clearPromoFields() {
 
 // Copy validation
 function hasRichContent(quill) {
-  const html = quill.root.innerHTML;
-  const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
-  return !!(cleaned && cleaned !== '<p></p>');
+  return hasRichHtml(quill.root.innerHTML);
 }
 
 function isValidPhone(value) {
