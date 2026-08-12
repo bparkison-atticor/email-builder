@@ -52,10 +52,10 @@ to a canonical example — read those for the actual implementation.
 
 ### `createModuleToggle`
 
-- **Location:** `index.html` ~line 1920.
+- **Location:** `index.html` — `createModuleToggle()` (~line 3463).
 - **Use it for:** Building an enable/disable toggle for an optional module. `createModuleToggle(id, label, defaultOn, onChange)` returns `{ element, isOn }`; caller appends `element` to the DOM. `onChange(state)` fires once on init and on every flip.
-- **Canonical example:** CTA toggle ~line 1992 (`createModuleToggle('cta', ...)`).
-- **Gotcha:** state persists under `emailBuilder.module.<id>`. The legacy `testDataEnabled` toggle uses a different key (`emailBuilder.testDataEnabled`) — migrating it onto this factory needs a one-time key migration or the saved preference resets.
+- **Canonical example:** CTA toggle ~line 3535; test-data toggle ~line 3411 (grep `createModuleToggle('` for all callers).
+- **Gotcha:** the factory always persists to `emailBuilder.module.<id>` — there is no opt-out. That is why the dark-mode switch (~line 3422), whose state must not persist, is hand-rolled against the same markup/CSS instead of calling this factory; migrate it here if an opt-out ever lands. The test-data toggle carries a one-time copy shim (~line 3403) preserving its pre-TASK-014 `emailBuilder.testDataEnabled` value.
 
 ### `.seg-body` collapse primitive
 
