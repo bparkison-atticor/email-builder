@@ -1661,6 +1661,7 @@ ${ctaToggle.isOn() ? `        <mj-button href="${escapeHtml(ctaHref)}" target="$
 }
 
 let lastHtml = '';
+let promoJsonError = ''; // staged by buildPromoJsonLd's catch; folded into render()'s warnings
 
 // --- Gmail Promotions tab annotation helpers (TASK-018) ---
 
@@ -1701,6 +1702,7 @@ function humanizePromoError(message) {
 // the mj-raw tags). Returns '' when the toggle is off, fields are invalid,
 // or serialisation fails (failure routed through humanizePromoError).
 function buildPromoJsonLd() {
+  promoJsonError = '';
   if (!promoToggle.isOn()) return '';
   const headline = (els.promoHeadline.value || '').trim();
   const imageUrl = (els.promoImageUrl.value || '').trim();
@@ -1710,7 +1712,10 @@ function buildPromoJsonLd() {
   try {
     return serializePromoCard({ headline, imageUrl, url });
   } catch (e) {
-    showWarn(humanizePromoError(e.message));
+    // Staged here instead of calling showWarn directly — render()'s
+    // unconditional showWarn(warnings.join(' · ')) runs right after
+    // buildMjml() and would otherwise clobber this message.
+    promoJsonError = humanizePromoError(e.message);
     return '';
   }
 }
@@ -3358,6 +3363,7 @@ function render() {
     }
     if (templateError) warnings.unshift(templateError);
     if (darkModeError) warnings.push(darkModeError);
+    if (promoJsonError) warnings.push(promoJsonError);
     if (promoToggle.isOn()) {
       const promoUrlVal = els.promoUrl.value.trim();
       if (promoUrlVal && isHttpsUrl(promoUrlVal) && !promoUrlVal.includes('utm_')) {
