@@ -2738,6 +2738,40 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
     body.appendChild(row);
   }
+
+  // --- Section 12: richTextToMjText — default parity + style overrides (TASK-026) ---
+  const h12 = document.createElement('h3');
+  h12.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h12.textContent = 'richTextToMjText — default parity + style overrides';
+  body.appendChild(h12);
+
+  const RICHTEXT_TPL = { ctaBackgroundColor: '#ED1C24' };
+  const RICHTEXT_PARITY_FIXTURES = [
+    { label: 'Byte-parity: empty string', html: '', expected: '' },
+    { label: 'Byte-parity: Quill double-Enter empty paragraph', html: '<p><br></p>', expected: '' },
+    { label: 'Byte-parity: plain paragraph', html: '<p>plain</p>', expected: '        <mj-text padding="0 0 14px 0">\n          <p style="margin:0;">plain</p>\n        </mj-text>' },
+    { label: 'Byte-parity: bold + link', html: '<p>a <strong>b</strong> <a href="https://x.test">c</a></p>', expected: '        <mj-text padding="0 0 14px 0">\n          <p style="margin:0;">a <strong>b</strong> <a href="https://x.test" style="color:#ED1C24;text-decoration:underline;" target="_blank">c</a></p>\n        </mj-text>' },
+    { label: 'Byte-parity: Quill bullet <ol> conversion', html: '<ol><li data-list="bullet">one</li><li data-list="bullet">two</li></ol>', expected: '        <mj-text padding="0 0 14px 0">\n          <ul style="margin:0;padding-left:24px;"><li style="margin:0 0 6px 0;">one</li><li style="margin:0 0 6px 0;">two</li></ul>\n        </mj-text>' },
+    { label: 'Byte-parity: plaintext phone auto-link', html: '<p>Call 555-123-4567 now.</p>', expected: '        <mj-text padding="0 0 14px 0">\n          <p style="margin:0;">Call <a href="tel:5551234567" style="color:#0000ee;text-decoration:underline;" data-autolinked="phone">555-123-4567</a> now.</p>\n        </mj-text>' },
+    { label: 'Byte-parity: typed asterisk bullet (default converts to <ul>)', html: '<p>* Restrictions apply.</p>', expected: '        <mj-text padding="0 0 14px 0">\n          <ul style="margin:0;padding-left:24px;"><li style="margin:0 0 6px 0;">Restrictions apply.</li></ul>\n        </mj-text>' },
+  ];
+
+  for (const fixture of RICHTEXT_PARITY_FIXTURES) {
+    const actual = richTextToMjText(fixture.html, RICHTEXT_TPL);
+    const pass = actual === fixture.expected;
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input HTML (JSON):</strong><pre>' + escapeHtml(JSON.stringify(fixture.html)) + '</pre></div>' +
+      '<div class="harness-field"><strong>Expected (JSON):</strong><pre>' + escapeHtml(JSON.stringify(fixture.expected)) + '</pre></div>' +
+      '<div class="harness-field"><strong>Actual (JSON):</strong><pre>' + escapeHtml(JSON.stringify(actual)) + '</pre></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — actual !== expected') + '</code></div>';
+    body.appendChild(row);
+  }
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
