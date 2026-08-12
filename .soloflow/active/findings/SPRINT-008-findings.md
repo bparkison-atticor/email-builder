@@ -1,7 +1,7 @@
 ---
 sprint: SPRINT-008
-pending_count: 11
-last_updated: "2026-08-12T22:10:00.000Z"
+pending_count: 18
+last_updated: "2026-08-12T23:55:00.000Z"
 ---
 # Findings Queue
 
@@ -69,11 +69,11 @@ last_updated: "2026-08-12T22:10:00.000Z"
 - **source:** TASK-026 (verifier)
 - **type:** improvement
 - **severity:** low
-- **status:** open
+- **status:** resolved
 - **location:** index.html — harness Section 12 `RICHTEXT_OVERRIDE_FIXTURES` (grep `Style overrides: attribute emission + order`)
 - **description:** Two Section 12 override fixtures assert less than they cheaply could. (1) The attribute-order fixture uses `out.includes('<mj-text padding="0 0 18px 0" font-size="13px" color="#6b6b6b">')` because the return value begins with eight spaces of indentation, which makes a literal `startsWith` on the tag alone impossible. The stricter `out.startsWith('        <mj-text padding="0 0 18px 0" font-size="13px" color="#6b6b6b">')` (indentation included) does pass against the current implementation — verified independently during TASK-026 verification — so the tag's position is assertable and simply is not asserted here; it is pinned only indirectly by the seven `===` parity fixtures. (2) The auto-linked-phone `linkColor` fixture checks only `out.includes('color:#6b6b6b')` and does not assert that the creation-time `#0000ee` is gone, unlike its manual-phone sibling which does. Both fixtures pass today; the weakness is latent, not live — but a regression emitting `color:#0000ee` alongside `color:#6b6b6b` on an auto-linked anchor would still show PASS.
 - **suggested_action:** Change the attribute-order check to `startsWith` with the eight-space prefix included, and add `&& !out.includes('#0000ee')` to the auto-linked-phone fixture. Both are one-line edits with no behaviour change.
-- **resolved_by:** 
+- **resolved_by:** verifier — status-sync: TASK-027. Both edits landed in commit 62591a4 (`test(TASK-026): strengthen two Section 12 override fixtures per FIND-SPRINT-008-7`) but the status was never flipped. Confirmed in the current tree: the attribute-order fixture now reads `out.startsWith('        <mj-text padding="0 0 18px 0" font-size="13px" color="#6b6b6b">')` with the eight-space prefix, and the auto-linked-phone fixture now reads `out.includes('color:#6b6b6b') && !out.includes('#0000ee')`. Both rows PASS in the Section 12 run (19/19).
 
 ## FIND-SPRINT-008-8
 - **source:** TASK-026 (code-reviewer)
@@ -113,4 +113,84 @@ last_updated: "2026-08-12T22:10:00.000Z"
 - **location:** index.html — `richTextToMjText`, the third anchor pass (grep `if (linkColor) {`)
 - **description:** The three anchor passes use two different override mechanisms for the same concept. Passes one and two precompute a colour with the `linkColor || <default>` idiom and run unconditionally; pass three instead runs only `if (linkColor)`. The gate exists to preserve byte-parity — but it is probably unnecessary, because `autoLinkPhones` already sets exactly `style="color:#0000ee;text-decoration:underline;"` on every anchor it creates, which is the identical string an ungated third pass would write with `linkColor || '#0000ee'`. `setAttribute` updates an existing attribute in place without moving it, so serialisation would be unchanged. Unifying the three passes would delete a branch, collapse three colour concepts to two, and — the real prize — remove the reason the "auto-linked phones are intentionally left unstyled" comment (FIND-SPRINT-008-5) exists at all, since the pass would simply restate the blue that `autoLinkPhones` already applied. Not raised as a review blocker: TASK-026's approved acceptance criteria explicitly pin the opt-in/gated shape ("the new anchor pass is opt-in only"), so changing it is a follow-up decision, not a defect in this task's execution.
 - **suggested_action:** Replace the `if (linkColor) { … }` block with an ungated `div.querySelectorAll('a[data-autolinked]').forEach(a => a.setAttribute('style', \`color:${phoneLinkColor};text-decoration:underline;\`));` reusing the existing `phoneLinkColor`. Gate the change on the seven Section 12 parity fixtures staying green — in particular "Byte-parity: plaintext phone auto-link", which pins the attribute order of the generated anchor. If any parity fixture reddens, abandon the simplification and keep the gate.
+- **resolved_by:** 
+
+## FIND-SPRINT-008-12
+- **source:** TASK-027 (verifier)
+- **type:** bug
+- **severity:** medium
+- **status:** open
+- **location:** index.html — `richTextToMjText`'s anchor passes (grep `Brand color + target="_blank" only for non-phone links`) and `applyLink` (grep `function applyLink`)
+- **description:** Manually-inserted phone links ship `target="_blank"` in the compiled email, contradicting the stated design intent in three places. The anchor-pass comment says phone links "keep standard-blue and no target"; FIND-SPRINT-008-8 asserts "The 'no target' half is still unconditionally true"; and TASK-027's acceptance criterion 3 verifies "the phone one renders muted in the preview with no `target` attribute in View HTML". All three are false. The cause is that Quill 2's default Link blot creates the anchor already carrying `target="_blank" rel="noopener noreferrer"`, and `richTextToMjText`'s selector `a:not([data-autolinked]):not([data-link-type="phone"])` only declines to *add* target — it never *removes* the one Quill put there. Verified empirically in the body-copy editor on both the pre-TASK-027 tree (bae4a25) and the current tree: identical editor HTML `<a href="tel:5559876543" rel="noopener noreferrer" target="_blank" data-link-type="phone">` and identical compiled output `<a href="tel:5559876543" rel="noopener noreferrer" target="_blank" style="color:#0000ee;text-decoration:underline;">`. Pre-existing and unchanged by TASK-027 — microcopy inherits exactly the body-copy behaviour, which is what its criterion actually requires — so it is not a blocker for this task. Auto-linked phones (`data-autolinked="phone"`) are unaffected: `autoLinkPhones` builds those anchors itself and they carry no target, as the Section 12 parity fixture pins. Real-world impact is that a `tel:` href with `target="_blank"` can open a blank tab instead of raising the dial intent in webmail clients, which is precisely the failure the code comment says it is avoiding.
+- **suggested_action:** In `richTextToMjText`'s `a[data-link-type="phone"]` pass, add `a.removeAttribute('target'); a.removeAttribute('rel');` alongside the existing `removeAttribute('data-link-type')`. This changes compiled output for any existing email containing a manual phone link, so it needs its own byte-parity fixture rather than being folded into a feature diff. Fix the two code comments and correct FIND-SPRINT-008-8's "no target" claim in the same pass.
+- **resolved_by:** 
+
+## FIND-SPRINT-008-13
+- **source:** TASK-027 (code-reviewer)
+- **type:** improvement
+- **severity:** low
+- **status:** open
+- **location:** index.html — `buildMjml()` (grep `function buildMjml`), the CTA interpolation line (grep `` `        <mj-button href=` ``)
+- **description:** `buildMjml()` establishes a consistent hoisted-block pattern: every conditional fragment is computed into a named const above the return and interpolated as a bare `${name}` — `previewTag`, `bannerHrefAttr`, `bannerBgAttr`, `bannerBlock`. The CTA block is the one exception; it inlines `ctaToggle.isOn() ? \`…\` : ''` with a nested template literal directly in the MJML body. TASK-027 added a second ternary *inside* that nested literal, so one physical line now closes an inner template literal, resolves two ternaries, and runs a third interpolation: `` ${microcopyBlock ? microcopyBlock + '\n' : ''}` : ''}${richTextToMjText(bodyBelowQuill.root.innerHTML, tpl)} ``. Nothing is wrong with the output — the shadow-verifier byte-verified both branches — but this line is where the feature's entire safety story lives (byte-parity when microcopy is empty), and it is now the least readable line in the function while the pattern for making it readable already exists ten lines above it.
+- **suggested_action:** Hoist a `const ctaBlock = ctaToggle.isOn() ? \`        <mj-button …>\n          …\n        </mj-button>\n${microcopyBlock ? microcopyBlock + '\n' : ''}\` : '';` alongside `bannerBlock`, then interpolate `${ctaBlock}` in the body. Byte-identical by construction; gate the change on the Section 13 rows plus a View-HTML diff with microcopy empty and populated.
+- **resolved_by:** 
+
+## FIND-SPRINT-008-14
+- **source:** TASK-027 (code-reviewer)
+- **type:** improvement
+- **severity:** low
+- **status:** open
+- **location:** index.html — `buildMicrocopyBlock` / `ctaButtonPadding` (grep `function ctaButtonPadding`) and their three call sites in `buildMjml()`
+- **description:** "Is there microcopy?" is derived three times from the same input on every render: once inside `buildMicrocopyBlock` (`if (!hasRichHtml(html)) return ''`), once inside `ctaButtonPadding` (`hasRichHtml(microcopyHtml) ? … : …`), and once again as the truthiness check `microcopyBlock ? microcopyBlock + '\n' : ''` in the template. The three agree today because `richTextToMjText` gates on the same predicate, so there is no live bug — but the button's padding and the emitted block are independently derived from raw HTML rather than from one another, and the whole point of the conditional padding is that the two must never disagree. If `buildMicrocopyBlock` ever gains a second reason to return `''` (a length floor, a brand opt-out key), the button silently tightens to 6px with no caption beneath it. Related: the `18px` in `buildMicrocopyBlock`'s `padding: '0 0 18px 0'` and the `18px` in `ctaButtonPadding`'s no-microcopy return encode a single layout decision ("the 18px bottom gap moves from the button to the caption") as two unrelated literals in two functions.
+- **suggested_action:** Make the padding a function of the emitted block rather than the raw HTML — `ctaButtonPadding(microcopyBlock)` keyed on `!!block`, or drop the helper and read `microcopyBlock ? CTA_PADDING_WITH_MICROCOPY : CTA_PADDING_DEFAULT`. Requires rewriting the two Section 13 padding fixtures, which currently pin the html-taking signature (`ctaButtonPadding('<p>x</p>')`), so it is a follow-up rather than an in-place edit. Consider naming the shared `18px` once (`CTA_BLOCK_BOTTOM_GAP`) so both call sites read from it.
+- **resolved_by:** 
+
+## FIND-SPRINT-008-15
+- **source:** TASK-027 (code-reviewer)
+- **type:** improvement
+- **severity:** medium
+- **status:** resolved
+- **location:** index.html — harness Section 13 (grep `Section 13: CTA microcopy`)
+- **description:** Two of TASK-027's acceptance criteria have no harness coverage, and the patterns to cover them already exist in the same function. (1) Criterion 2 — "toolbar is bold + italics + link only, no list buttons" — is verified only by a devtools one-liner. Section 11 (grep `Toolbar/whitelist config includes italic`) established a no-input config-assertion fixture for exactly this class of check, and `microcopyToolbar` / `microcopyFormats` are module-scope consts the harness can read directly. Nothing reddens today if a future change points `ctaMicrocopyQuill` at the shared `richToolbar`/`allowedFormats`: the typed-bullet fixture keeps passing (`convertTypedBullets` is a separate switch), and the marketer silently gains list buttons whose output renders as a bulleted list inside a 13px muted caption. (2) The criterion's own DOM assertion, `document.querySelectorAll('.rich-editor-wrap.compact .ql-list').length === 0`, is a one-line predicate that would have slotted straight into the existing `MICROCOPY_DOM_GUARDS` array next to the two guards already there. (3) Minor: the styled-emission row checks three separate `includes` where FIND-SPRINT-008-7 had just established the stronger `startsWith('        <mj-text padding="…" font-size="…" color="…">')` form for the identical assertion one section above; the weaker form passes even if `buildMicrocopyBlock` starts forwarding extra opts.
+- **suggested_action:** Add a config-assertion row (`!microcopyFormats.includes('list') && !JSON.stringify(microcopyToolbar).includes('list')`) using Section 11's no-input shape, add the `.ql-list` count as a third entry in `MICROCOPY_DOM_GUARDS`, and tighten the styled-emission row to `startsWith` with the eight-space indent included.
+- **resolved_by:** test-writer — (1) added the config-assertion row to `MICROCOPY_BLOCK_FIXTURES` exactly as suggested. (2) added `.rich-editor-wrap.compact .ql-list` count === 0 as a third `MICROCOPY_DOM_GUARDS` entry, plus a fourth guard that invokes `ctaMicrocopyQuill.getModule('toolbar').handlers.link()` directly and asserts it routes through `openLinkModal(ctaMicrocopyQuill)` (`ownerEditor === ctaMicrocopyQuill` + modal visible), closing the separately-flagged gap that nothing asserted the "Toolbar override" forEach loop actually includes `ctaMicrocopyQuill` (criterion 3) — verified against a scratch copy that this guard goes red (throws, caught by the harness's own try/catch) when `ctaMicrocopyQuill` is dropped from that loop. (3) the `startsWith` tightening on the styled-emission row was left out of scope — not requested by the task that dispatched this fix; still open if wanted as a follow-up. Harness re-run: 0 FAIL, no page errors, 3 new PASS rows.
+
+## FIND-SPRINT-008-16
+- **source:** TASK-027 (code-reviewer)
+- **type:** cleanup
+- **severity:** low
+- **status:** open
+- **location:** index.html — grep `Toolbar override — must happen after both Quill instances are created`
+- **description:** The comment heading the link-handler loop still says "both Quill instances". TASK-027 changed the line directly beneath it from `[bodyAboveQuill, bodyBelowQuill]` to `[bodyAboveQuill, bodyBelowQuill, ctaMicrocopyQuill]`, so the count is now three. Trivial, but it is the third comment in this file made stale by SPRINT-008 (see FIND-SPRINT-008-5 and -8), and the three sit within a few hundred lines of each other in the code a future contributor reads to understand editor wiring.
+- **suggested_action:** Change "both Quill instances" to "all three Quill instances" (or "every Quill instance"). Fold into the comment-accuracy pass alongside FIND-SPRINT-008-5 and -8.
+- **resolved_by:** 
+
+## FIND-SPRINT-008-17
+- **source:** TASK-027 (code-reviewer)
+- **type:** improvement
+- **severity:** low
+- **status:** open
+- **location:** index.html — grep `id="bodyAbove"` and `id="bodyBelow"`; contrast with grep `ctaMicrocopyQuill.root.setAttribute('aria-labelledby'`
+- **description:** Outside the TASK-027 diff, surfaced by comparison with it. TASK-027 gave the microcopy editor an accessible name by pairing a `<label id="ctaMicrocopyLabel">` with `ctaMicrocopyQuill.root.setAttribute('aria-labelledby', …)` — the correct treatment for a `contenteditable` that cannot take a `for`. The two body editors got no such treatment: `#bodyAbove` and `#bodyBelow` sit in bare `.rich-editor-wrap` divs whose only nearby text is a `.seg-title` span ("Body") with no programmatic association, so a screen reader announces them as unlabelled edit regions. The app is now internally inconsistent: the newest and least important of the three editors is the only one that is named.
+- **suggested_action:** Give the two `.seg-head` titles ids (`bodyAboveLabel`, `bodyBelowLabel`) and mirror the `aria-labelledby` call for both body Quill roots immediately after their construction. Consider folding the three into one small `nameEditor(quill, labelId)` helper since the pattern would then have three call sites.
+- **resolved_by:** 
+
+## FIND-SPRINT-008-18
+- **source:** TASK-027 (code-reviewer)
+- **type:** improvement
+- **severity:** medium
+- **status:** open
+- **location:** index.html — `humanizeTemplateError` (grep `function humanizeTemplateError`), every `return` in the function
+- **description:** Pre-existing, but widened by TASK-027. Every branch of `humanizeTemplateError` hard-prefixes its message with the literal `'Body copy: '`, and the function is the sole error surface for Handlebars compile/render failures raised in `applyTestData()`, which compiles the WHOLE rendered document. Handlebars tokens are a first-class feature of several fields — the preheader (`<mj-preview>`), the link dialog's "URL variable" mode, and now microcopy, which routes marketer-typed text into the same compile pass. A malformed `{{#if}}` typed into the microcopy field therefore surfaces as "Body copy: unclosed {{#if}} block — add a matching {{/if}}.", sending the marketer to a field that contains no error. CLAUDE.md's binding convention requires these messages to be "plain-English action-oriented"; the humanisation itself is intact and the suggested fix is correct, but the field attribution is wrong, which is the half of the action the marketer acts on first. Microcopy makes this the third token-bearing surface, at which point the fixed prefix is misleading more often than it is right.
+- **suggested_action:** Either drop the field name for a neutral prefix ("Template: …"), or thread the originating field through — e.g. have `applyTestData()` scan the offending source snippet against each editor's text and pass a field label into `humanizeTemplateError(message, field)`, defaulting to "Template" when it cannot attribute. Extend `HUMANIZE_FIXTURES` (grep `const HUMANIZE_FIXTURES`) with a microcopy-attributed case. Needs its own task — every existing fixture's `expected_pattern` is prefix-agnostic, so the fixtures will not catch a partial change.
+- **resolved_by:** 
+
+## FIND-SPRINT-008-19
+- **source:** TASK-027 (code-reviewer)
+- **type:** cleanup
+- **severity:** low
+- **status:** open
+- **location:** index.html — `plainTextLength` (grep `function plainTextLength`), its caller `updateMicrocopyCount` (grep `function updateMicrocopyCount`), and the preheader counter (grep `els.preheaderCount.textContent`)
+- **description:** Two small placement/naming residues. (1) `plainTextLength` is defined between `richTextToMjText` and `buildCtaHref`, i.e. inside the MJML-emission helper cluster, but it has nothing to do with emission — its only caller is the UI character counter roughly 2,200 lines further down, and no compile-path function references it. A reader auditing the emission pipeline meets a function that is not part of it. (2) The name is generic while the behaviour is Quill-specific: it strips trailing newlines (because `quill.getText()` always appends one) and counts interior newlines as one character each. Anyone reusing it for a plain `<input>` — for instance to unify it with the preheader counter, which is the app's other character counter and is implemented inline as `els.preheaderCount.textContent = els.preheader.value.length` with no named helper and no startup call — would silently get different semantics. The app now has two character counters built two different ways.
+- **suggested_action:** Move `plainTextLength` next to `updateMicrocopyCount` (or into a small UI-helpers cluster) and rename it to something that carries the Quill contract, e.g. `quillTextLength` or `visibleTextLength`. If the preheader counter is ever revisited, unify both behind one `wireCharCount(el, countEl, read)` helper. Section 13's four `plainTextLength` fixtures move with the function; the label strings need updating if it is renamed.
 - **resolved_by:** 
