@@ -1482,8 +1482,16 @@ function hasRichHtml(html) {
   return !!(cleaned && cleaned !== '<p></p>');
 }
 
-function richTextToMjText(html, tpl) {
+function richTextToMjText(html, tpl, opts = {}) {
   if (!hasRichHtml(html)) return '';
+  const {
+    fontSize = null,        // mj-text font-size attribute; null = inherit mj-attributes (16px)
+    color = null,           // mj-text color attribute; null = inherit (#333333)
+    linkColor = null,       // when set, overrides the brand-accent + phone-blue link passes
+    padding = '0 0 14px 0', // mj-text padding attribute
+    blockMargin = 14,       // p/ul/ol bottom margin in px
+    convertTypedBullets = true,
+  } = opts;
   // Strip empty paragraphs Quill inserts when the user hits Enter twice.
   const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
 
@@ -1527,7 +1535,9 @@ function richTextToMjText(html, tpl) {
   // route through the existing ul/ol and li styling passes below.
   // Placed AFTER the Quill list conversion (toolbar lists are already <ul>/<ol>,
   // not <p>) and BEFORE autoLinkPhones so phone numbers inside bullets are linked.
-  {
+  // Gated by convertTypedBullets — microcopy passes false because fine-print
+  // starting with '*' or '—' is a sentence, not a list.
+  if (convertTypedBullets) {
     // Recognize the bullet glyphs real editors actually emit, not just U+2022.
     // Copy from Word/Outlook (and content routed through them) yields private-use
     // Symbol-font bullets (U+F0B7 etc.), square/circle bullets, or a middle dot —
@@ -1575,15 +1585,25 @@ function richTextToMjText(html, tpl) {
   // Brand color + target="_blank" only for non-phone links. Both auto-linked
   // phones (data-autolinked="phone") and manually-inserted phone links from
   // the link dialog (data-link-type="phone") keep standard-blue and no target.
+  const urlLinkColor = linkColor || tpl.ctaBackgroundColor;
+  const phoneLinkColor = linkColor || '#0000ee';
   div.querySelectorAll('a:not([data-autolinked]):not([data-link-type="phone"])').forEach(a => {
-    a.setAttribute('style', `color:${tpl.ctaBackgroundColor};text-decoration:underline;`);
+    a.setAttribute('style', `color:${urlLinkColor};text-decoration:underline;`);
     a.setAttribute('target', '_blank');
   });
   div.querySelectorAll('a[data-link-type="phone"]').forEach(a => {
-    a.setAttribute('style', 'color:#0000ee;text-decoration:underline;');
+    a.setAttribute('style', `color:${phoneLinkColor};text-decoration:underline;`);
     // Strip the marker before emit; SendGrid doesn't care, but it keeps output clean.
     a.removeAttribute('data-link-type');
   });
+  // Auto-linked phones are intentionally left unstyled in body copy (they
+  // inherit the client's default link colour). A caller that specifies
+  // linkColor wants EVERY anchor muted, including these.
+  if (linkColor) {
+    div.querySelectorAll('a[data-autolinked]').forEach(a => {
+      a.setAttribute('style', `color:${linkColor};text-decoration:underline;`);
+    });
+  }
 
   // Italics: email clients almost universally honour <em>, but an explicit
   // inline style removes the dependency on their default stylesheet and
@@ -1594,14 +1614,14 @@ function richTextToMjText(html, tpl) {
     el.setAttribute('style', 'font-style:italic;');
   });
 
-  // Paragraphs: consistent 14px bottom margin, zero top.
+  // Paragraphs: consistent bottom margin, zero top.
   div.querySelectorAll('p').forEach(p => {
-    p.setAttribute('style', 'margin:0 0 14px 0;');
+    p.setAttribute('style', `margin:0 0 ${blockMargin}px 0;`);
   });
 
   // Lists: reset default margins, give a predictable indent.
   div.querySelectorAll('ul, ol').forEach(list => {
-    list.setAttribute('style', 'margin:0 0 14px 0;padding-left:24px;');
+    list.setAttribute('style', `margin:0 0 ${blockMargin}px 0;padding-left:24px;`);
   });
   div.querySelectorAll('li').forEach(li => {
     li.setAttribute('style', 'margin:0 0 6px 0;');
@@ -1613,7 +1633,12 @@ function richTextToMjText(html, tpl) {
     last.setAttribute('style', last.getAttribute('style').replace(/margin:[^;]*;?/, 'margin:0;'));
   }
 
-  return `        <mj-text padding="0 0 14px 0">\n          ${div.innerHTML}\n        </mj-text>`;
+  const attrs = [
+    `padding="${escapeHtml(padding)}"`,
+    fontSize ? `font-size="${escapeHtml(fontSize)}"` : '',
+    color ? `color="${escapeHtml(color)}"` : '',
+  ].filter(Boolean).join(' ');
+  return `        <mj-text ${attrs}>\n          ${div.innerHTML}\n        </mj-text>`;
 }
 
 function buildCtaHref() {
