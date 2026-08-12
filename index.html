@@ -3200,11 +3200,11 @@ function outlookDarkTransform(html) {
 // ---------------------------------------------------------------------
 
 // detectAuthorDarkScheme(html) — classifies an HTML string into one of
-// three author-dark-CSS states: 'authored' (a real
-// @media (prefers-color-scheme: dark) block, or the CSS property form
-// used outside a media query), 'meta-only' (a bare color-scheme /
-// supported-color-schemes signal with no actual dark rules behind it),
-// or 'none' (neither).
+// three author-dark-CSS states: 'authored' (the string
+// `prefers-color-scheme` appears anywhere — today only as an
+// @media (prefers-color-scheme: dark) block), 'meta-only' (a
+// color-scheme / supported-color-schemes signal in either meta-name or
+// CSS-property form, with no dark rules behind it), or 'none' (neither).
 //
 // BRANCH ORDER IS LOAD-BEARING: the string `prefers-color-scheme`
 // contains `color-scheme` as a substring, so the 'authored' check MUST
