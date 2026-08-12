@@ -21,19 +21,20 @@ The server binds to `127.0.0.1` (localhost only) so nothing on your Wi-Fi can re
 
 ## Workflow
 
-1. Pick template (Postman Law / NDC / Wettermark Keith)
+1. Pick template — eight brand configs ship today; see [Templates](#templates) below for the full list
 2. Write the preheader — the preview text that shows up next to the subject in the inbox (under 90 chars recommended)
-3. Paste body copy above CTA — rich text editor supports **bold**, bullet/numbered lists, and hyperlinks
+3. Paste body copy above CTA — rich text editor supports **bold**, *italics*, bullet/numbered lists, and hyperlinks
 4. Enter CTA button text — the dashed CTA preview chip below mirrors the brand's button color in real time
 5. Pick CTA type — `Phone` (becomes `tel:` link) or `URL variable` (wrapped as `{{variable}}` Handlebars tag)
 6. Enter destination (phone number in any format, or variable name without braces)
-7. Optional: body copy below CTA (also rich text)
-8. Optional: edit the **Test data** JSON to substitute `{{tokens}}` in the live preview (does not affect copied HTML)
-9. Toggle viewport between **Desktop** and **Mobile** in the preview header to spot-check responsive layout
-10. Toggle **Dark mode** and pick a client (Gmail, Outlook, or Apple Mail) in the preview header to preview how each renders the email in dark mode
-11. Hit **Copy HTML** (or open **View HTML** to inspect / copy from the raw HTML modal)
-12. Paste into SendGrid → Design → Code Editor
-13. **Don't forget:** set the subject line directly in SendGrid (it's not in the HTML)
+7. Optional: add CTA microcopy — a short supporting sentence rendered as small, muted text directly under the button
+8. Optional: body copy below CTA (also rich text)
+9. Optional: edit the **Test data** JSON to substitute `{{tokens}}` in the live preview (does not affect copied HTML)
+10. Toggle viewport between **Desktop** and **Mobile** in the preview header to spot-check responsive layout
+11. Toggle **Dark mode** and pick a client (Gmail, Outlook, or Apple Mail) in the preview header to preview how each renders the email in dark mode
+12. Hit **Copy HTML** (or open **View HTML** to inspect / copy from the raw HTML modal)
+13. Paste into SendGrid → Design → Code Editor
+14. **Don't forget:** set the subject line directly in SendGrid (it's not in the HTML)
 
 ### Body copy editor notes
 
@@ -43,7 +44,18 @@ The server binds to `127.0.0.1` (localhost only) so nothing on your Wi-Fi can re
 - Links in output are automatically styled with the template's CTA brand color and set to `target="_blank"`
 - Plaintext US phone numbers (`555-123-4567`, `(555) 123 4567`, `+1 555.123.4567`) are auto-linked as `tel:` in the rendered output. Separators between the 3-3-4 groups are required so we don't auto-link order IDs or other long digit runs
 - Merge fields in plain text (e.g. `Dear {{Client.FirstName}},`) just work — type them directly
-- Paste is sanitized: italic, colors, headers, images, base64 data URLs, and any other formatting outside the toolbar's whitelist (`bold`, `link`, `list`) get stripped to plain text on the way in
+- Paste is sanitized: colors, headers, images, base64 data URLs, and any other formatting outside the toolbar's whitelist (`bold`, `italic`, `link`, `list`) get stripped to plain text on the way in
+
+### CTA microcopy
+
+An optional sentence or two rendered under the CTA button — a reassurance line ("No fees unless we win.") or a fine-print caveat. Leave it empty and nothing renders at all.
+
+- **It's part of the CTA module.** Switching the **Call to action** toggle off hides the field and drops the microcopy from the output along with the button; what you typed comes back when the toggle goes back on.
+- **Toolbar is bold, italics, and link — no lists, on purpose.** This field is fine print, not a list.
+- **Links inside microcopy stay muted grey**, not the brand accent color body-copy links use. Auto-linked phone numbers are muted here too.
+- **A leading `*` or `—` stays literal.** In body copy that pattern becomes a bullet; here it's deliberately left alone so `* Restrictions apply.` reads as fine print, not a one-item list.
+- The character count under the field is guidance only — there's no limit, and nothing is blocked or truncated.
+- Content doesn't survive a reload, same as every other copy field.
 
 ### Test data panel
 
@@ -111,7 +123,7 @@ The switch and the selected client **reset on reload**, unlike the Test data tog
 
 ## Templates
 
-Three brands are configured in `index.html`: Postman Law, National Disability Center, and Wettermark Keith. Scroll to the `TEMPLATE CONFIGS` block in the `<script>` to edit them. Each brand has:
+Eight brands are configured in `index.html`: Postman Law, National Disability Center, Keller Postman (Attorney-Client and Lead Outreach variants), Wettermark Keith, National Justice Center, Parrish DeVaughn, and Keches Law Group (Lead Outreach). Scroll to the `TEMPLATE CONFIGS` block in the `<script>` to edit them. Each brand has:
 
 - `bannerImageUrl` — publicly hosted banner image
 - `bannerAlt` — alt text (should match brand name for accessibility)
@@ -119,8 +131,12 @@ Three brands are configured in `index.html`: Postman Law, National Disability Ce
 - `bannerHref` — optional; wraps banner in a clickable link
 - `ctaBackgroundColor` — brand hex for the CTA button fill (also used to style links in body copy)
 - `ctaTextColor` — usually `#ffffff`
+- `ctaMicrocopyFontSize` — size of the optional microcopy under the CTA button; every brand ships the shared default `DEFAULT_CTA_MICROCOPY_FONT_SIZE` (`13px`)
+- `ctaMicrocopyColor` — color of the optional microcopy under the CTA button; every brand ships the shared default `DEFAULT_CTA_MICROCOPY_COLOR` (`#6b6b6b`)
 - `unsubscribeHtml` — standalone unsubscribe link block. Most brands can use `DEFAULT_UNSUBSCRIBE`. Override if you need different verbiage.
 - `disclosureHtml` — legal/compliance copy: address, dynamic fields (e.g. `{{Case.CaseType}}`, `{{Client.Email}}`), entity name, anti-spam language.
+
+`ctaMicrocopyFontSize` and `ctaMicrocopyColor` exist as per-brand override slots even though every brand currently resolves to the shared default — override either on a brand entry the same way you'd override `unsubscribeHtml`.
 
 Footer renders as two separate blocks (matches SendGrid's template pattern): a 12px unsubscribe link sits alone, followed by the smaller 11px disclosure. Both on an `#f1f1f1` background to visually separate from the white content card.
 
@@ -137,10 +153,11 @@ To add a new brand: copy one of the existing entries, give it a new key, edit th
 - CTA button: 16px font, 4px border-radius (modern mobile tap target)
 - Footer: 11–12px `#6b6b6b` on `#f1f1f1` background (passes WCAG AA contrast)
 - `format-detection` and `x-apple-disable-message-reformatting` meta tags are emitted to suppress iOS auto-detection and Apple's auto-reformatting
+- CTA microcopy (when present) renders as a 13px `#6b6b6b` block directly beneath the CTA button, with any links inside it muted rather than brand-colored, and the button's own bottom padding tightens from 18px to 6px so the caption reads as attached to the button
 
 ## Scope
 
-**In:** single CTA, two rich-text body sections (bold / lists / links), multiple brand templates, live preview with desktop/mobile viewport toggle, dark-mode preview simulation (Gmail / Outlook / Apple Mail), raw HTML inspector modal, one-click copy with validation + invalid-field highlighting, plaintext phone auto-linking, preview-only Handlebars test data (full SendGrid helper dialect — `#if` / `#each` / `#equals` / `#notEquals` / `#greaterThan` / `#lessThan` / `insert` / `formatDate`) with missing-data chips, humanized syntax-error banner, and `localStorage` persistence.
+**In:** single CTA with optional supporting microcopy, two rich-text body sections (bold / italics / lists / links), multiple brand templates, live preview with desktop/mobile viewport toggle, dark-mode preview simulation (Gmail / Outlook / Apple Mail), raw HTML inspector modal, one-click copy with validation + invalid-field highlighting, plaintext phone auto-linking, preview-only Handlebars test data (full SendGrid helper dialect — `#if` / `#each` / `#equals` / `#notEquals` / `#greaterThan` / `#lessThan` / `insert` / `formatDate`) with missing-data chips, humanized syntax-error banner, and `localStorage` persistence.
 
 **Out:** multiple CTAs, image uploads, A/B variants, subject line injection, persistence of email content (only the test-data JSON and toggle state persist).
 
