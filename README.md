@@ -140,7 +140,7 @@ To add a new brand: copy one of the existing entries, give it a new key, edit th
 
 ## Scope
 
-**In:** single CTA, two rich-text body sections (bold / lists / links), multiple brand templates, live preview with desktop/mobile viewport toggle, raw HTML inspector modal, one-click copy with validation + invalid-field highlighting, plaintext phone auto-linking, preview-only Handlebars test data (full SendGrid helper dialect — `#if` / `#each` / `#equals` / `#notEquals` / `#greaterThan` / `#lessThan` / `insert` / `formatDate`) with missing-data chips, humanized syntax-error banner, and `localStorage` persistence.
+**In:** single CTA, two rich-text body sections (bold / lists / links), multiple brand templates, live preview with desktop/mobile viewport toggle, dark-mode preview simulation (Gmail / Outlook / Apple Mail), raw HTML inspector modal, one-click copy with validation + invalid-field highlighting, plaintext phone auto-linking, preview-only Handlebars test data (full SendGrid helper dialect — `#if` / `#each` / `#equals` / `#notEquals` / `#greaterThan` / `#lessThan` / `insert` / `formatDate`) with missing-data chips, humanized syntax-error banner, and `localStorage` persistence.
 
 **Out:** multiple CTAs, image uploads, A/B variants, subject line injection, persistence of email content (only the test-data JSON and toggle state persist).
 
