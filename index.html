@@ -3067,7 +3067,10 @@ function liftForContrast(rgb, bgHex, min) {
 // caniemail.com and hteumeuleu's email-bugs repo.
 const OUTLOOK_DARK_SURFACE = '#1b1b1b';
 
-const BACKGROUND_COLOR_PROPS = ['background-color', 'bgcolor'];
+// 'bgcolor' is deliberately excluded — it is not a valid style-attribute
+// property (only a real HTML attribute), which remapInlineColors handles
+// separately via its own bgcolor= regex.
+const BACKGROUND_COLOR_PROPS = ['background-color'];
 const FOREGROUND_COLOR_PROPS = ['color', 'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color'];
 
 // remapBackgroundValue(value, isShorthand) — shared by remapDeclarations
