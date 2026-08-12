@@ -53,7 +53,7 @@ An optional sentence or two rendered under the CTA button — a reassurance line
 - **It's part of the CTA module.** Switching the **Call to action** toggle off hides the field and drops the microcopy from the output along with the button; what you typed comes back when the toggle goes back on.
 - **Toolbar is bold, italics, and link — no lists, on purpose.** This field is fine print, not a list.
 - **Links inside microcopy stay muted grey**, not the brand accent color body-copy links use. Auto-linked phone numbers are muted here too.
-- **A leading `*` or `—` stays literal.** In body copy that pattern becomes a bullet; here it's deliberately left alone so `* Restrictions apply.` reads as fine print, not a one-item list.
+- **A leading `*` or `-` stays literal.** In body copy that pattern becomes a bullet; here it's deliberately left alone so `* Restrictions apply.` reads as fine print, not a one-item list.
 - The character count under the field is guidance only — there's no limit, and nothing is blocked or truncated.
 - Content doesn't survive a reload, same as every other copy field.
 
