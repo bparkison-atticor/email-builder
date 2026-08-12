@@ -963,8 +963,19 @@ Handlebars.registerHelper('blockHelperMissing', function (context, options) {
 //   unsubscribeHtml    — standalone unsubscribe link (rendered as its own block,
 //                        matches SendGrid's template pattern). Use {{{unsubscribe}}}.
 //   disclosureHtml     — legal/compliance copy (address, dynamic fields, etc.)
+//   ctaMicrocopyFontSize — mj-text font-size for the CTA's supporting sentence;
+//                        shared default DEFAULT_CTA_MICROCOPY_FONT_SIZE ('13px').
+//   ctaMicrocopyColor  — mj-text color for the CTA's supporting sentence;
+//                        shared default DEFAULT_CTA_MICROCOPY_COLOR ('#6b6b6b').
 // ============================================================
 const DEFAULT_UNSUBSCRIBE = `<a href="{{{unsubscribe}}}" style="color:#6b6b6b;text-decoration:underline;">Unsubscribe</a>`;
+
+// Microcopy style — the optional supporting sentence under the CTA button.
+// Deliberately a third step on the size scale: body 16px, microcopy 13px,
+// unsubscribe 12px, disclosure 11px. #6b6b6b is the app's single muted token
+// and gives 5.3:1 against the white content card (passes WCAG AA).
+const DEFAULT_CTA_MICROCOPY_FONT_SIZE = '13px';
+const DEFAULT_CTA_MICROCOPY_COLOR = '#6b6b6b';
 
 const templates = {
   postmanLaw: {
@@ -975,6 +986,8 @@ const templates = {
     bannerHref: "https://www.postmanlaw.com",
     ctaBackgroundColor: "#000000",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="font-size:12px;margin:0 0 8px 0;">***</p>
@@ -994,6 +1007,8 @@ const templates = {
     bannerWidth: "600px",
     ctaBackgroundColor: "#333333",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="margin:0 0 10px 0;">You are receiving this email because you contacted Disability Benefit Center about a potential {{CaseType.CaseName}} claim. Use the unsubscribe link above to opt out at any time.</p>
@@ -1010,6 +1025,8 @@ const templates = {
     bannerHref: "https://www.kellerpostman.com",
     ctaBackgroundColor: "#00b18b",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="font-size:10px;text-align:center;margin:0 0 6px 0;">* * *</p>
@@ -1029,6 +1046,8 @@ const templates = {
     bannerHref: "https://www.kellerpostman.com",
     ctaBackgroundColor: "#00183e",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="font-size:10px;text-align:center;margin:0 0 6px 0;">* * *</p>
@@ -1049,6 +1068,8 @@ const templates = {
     bannerHref: "https://wkfirm.com",
     ctaBackgroundColor: "#000000",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="font-size:12px;margin:0 0 6px 0;">* * *</p>
@@ -1065,6 +1086,8 @@ const templates = {
     bannerBackgroundColor: "#61203e",
     ctaBackgroundColor: "#61203e",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="font-size:14px;margin:0 0 14px 0;"><strong>National Justice Center.</strong> Fighting for the Injured.</p>
@@ -1082,6 +1105,8 @@ const templates = {
     bannerHref: "https://parrishdevaughn.com",
     ctaBackgroundColor: "#ED1C24",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="font-size:12px;margin:0 0 6px 0;">* * *</p>
@@ -1100,6 +1125,8 @@ const templates = {
     bannerBackgroundColor: "#245280",
     ctaBackgroundColor: "#245280",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="font-size:12px;margin:0 0 6px 0;">* * *</p>
