@@ -2883,6 +2883,37 @@ function renderTestHarness() {
       },
       description: 'The container is runtime-extended and order-dependent (see the HTML comment on its static trailing divider). This fixture is the executable form of that contract — a static child added to the markup would land at index 0 and fail it.',
     },
+    {
+      label: 'Live Dark mode switch: click drives darkModeEnabled, picker visibility and stage dark class together',
+      check() {
+        const switchEl = document.getElementById('darkModeSwitch');
+        const picker = document.getElementById('darkClientControl');
+        const stage = document.getElementById('previewStage');
+        const savedOn = switchEl.classList.contains('on');
+        try {
+          switchEl.click();
+          const onAfterFirst = switchEl.classList.contains('on');
+          const firstClickCorrect = darkModeEnabled === onAfterFirst
+            && picker.hidden === !onAfterFirst
+            && stage.classList.contains('dark') === onAfterFirst;
+          switchEl.click();
+          const onAfterSecond = switchEl.classList.contains('on');
+          const secondClickCorrect = onAfterSecond === savedOn
+            && darkModeEnabled === onAfterSecond
+            && picker.hidden === !onAfterSecond
+            && stage.classList.contains('dark') === onAfterSecond;
+          return firstClickCorrect && secondClickCorrect;
+        } finally {
+          // Belt-and-suspenders restore, mirroring Section 8's purity guard:
+          // the two clicks above already return to savedOn on their own, but
+          // if a thrown error ever skipped the second click this puts the
+          // real switch back rather than leaving dark mode on for the rest
+          // of the session.
+          if (switchEl.classList.contains('on') !== savedOn) switchEl.click();
+        }
+      },
+      description: 'Fixtures 1-3 above only exercise throwaway probe toggles that are never inserted into the DOM. This fixture drives the actual #darkModeSwitch the app renders — the element onDarkModeToggle is wired to — and asserts all three of its documented side effects (darkModeEnabled, #darkClientControl.hidden, .preview-stage\'s dark class) move together on a real click, then clicks again to leave dark mode exactly as this fixture found it.',
+    },
   ];
 
   renderPredicateFixtures(body, MODULE_TOGGLE_FIXTURES);
