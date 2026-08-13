@@ -1,7 +1,7 @@
 ---
 sprint: SPRINT-009
-pending_count: 12
-last_updated: "2026-08-13T17:35:00.000Z"
+pending_count: 20
+last_updated: "2026-08-13T20:15:00.000Z"
 ---
 # Findings Queue
 
@@ -145,4 +145,84 @@ SPRINT-009 started with missing infra: maestro; tests deferred.
 - **location:** index.html:2984-2999
 - **description:** Two residues on Section 12's new live-picker-click fixture, which correctly resolves the review's Important finding (mutation-verified: deleting `syncDarkNote()` from the `wireSegControl` callback flips exactly this row red). (1) Its `description` locates the guarded call site as "the wireSegControl callback (index.html ~4183)", but the same commit that wrote that string shifted the call to 4203 — the reference was stale on arrival, and it is the third line-number-style drift this sprint after FIND-SPRINT-009-1 and -9. (2) The fixture asserts on a single click of the Apple Mail button, so its mutation sensitivity is conditional on `darkModeClient` not already being `'applemail'` when the harness opens: if a marketer selects Apple Mail and then presses Ctrl+Shift+T, the click is a no-change, the caption already reads the Apple Mail sentence from the switch-on sync, and the row goes green with the wiring deleted. On a fresh load the default client is `'gmail'`, which is the state the acceptance criteria specify, so the guard works as intended today.
 - **suggested_action:** (1) Replace "~4183" with a symbolic pointer — "the `wireSegControl` callback at the end of the dark-mode block" — since the surrounding sentence already names `wireSegControl` and the number adds nothing but a decay surface. (2) Make the assertion unconditional by clicking two different clients in sequence and asserting the caption text after each (e.g. Apple Mail then Outlook): whatever the entry client, at least one click is a genuine change, so a removed call site always goes red. The existing `savedBtn.click()` restore in the `finally` already covers both.
+- **resolved_by:** 
+
+## FIND-SPRINT-009-15
+- **source:** TASK-032 (verifier)
+- **type:** improvement
+- **severity:** medium
+- **status:** open
+- **location:** index.html:3428-3436
+- **description:** The templates-schema fixture tests each live brand key against the *whole* fetched README (`sources['README.md'].includes(k)`) rather than against the README `## Templates` section it is supposed to police. Any key whose name happens to appear as an ordinary English word anywhere else in README passes without ever being documented in the schema bullet list. This is reachable, not theoretical: README already contains the substrings `padding`, `image`, `label`, `html`, `data` and `check` outside the Templates section, so adding e.g. `padding` or `linkColor`-adjacent theming keys to a brand entry — exactly the most plausible future edit to that map — would leave the row green with the key undocumented. Verified with a headless run: the fixture correctly reddens for a genuinely novel key (`zzTestKey` mutation names it in the label), so the guard is not vacuous today; the hole is specific to keys that collide with unrelated README prose. The whole-file match is what the plan's step 8 sketch prescribed, so this is not a TASK-032 defect — it is the residual weakness that survived the plan.
+- **suggested_action:** Slice the fetched README to the `## Templates` section before matching (from the `## Templates` heading to the next `^## ` heading) and test `section.includes('`' + k + '`')` so a key must appear as inline code inside the schema list, not as prose anywhere in the file. Both halves are one line each and preserve the existing "no hardcoded key list" property.
+- **resolved_by:** 
+
+## FIND-SPRINT-009-16
+- **source:** TASK-032 (verifier)
+- **type:** improvement
+- **severity:** low
+- **status:** open
+- **location:** index.html:3383-3402
+- **description:** The anchor-drift section's `try`/`catch` wraps only the fetch stage. Everything after it — needle extraction, floor rows, the `Object.values(templates)` schema derivation and the final `renderPredicateFixtures(anchorSection, fixtures)` — runs outside any handler inside a fire-and-forget async IIFE. A throw there produces an unhandled promise rejection and leaves the section rendered as a bare heading with an empty container and zero rows, which reads as "nothing to check" rather than as a failure. That is the same silent-vacuity failure mode the per-file `ANCHOR_FLOORS` rows were added to close, reintroduced one level up: the floors defend against a doc losing its anchors, but nothing defends against the row-building code itself dying. Confirmed the fetch-failure half is solid — a 404 path and a `file://` open each render exactly one explanatory row with no uncaught exception and all 15 other sections intact.
+- **suggested_action:** Extend the `try` to cover the whole IIFE body, or add a second `catch` around the post-fetch block that renders one failing row naming the thrown error. Alternatively have the fetch-failure `catch` be the only exit and assert non-emptiness — e.g. a first row asserting `fixtures.length >= ANCHOR_DOCS.length + 1` — so an empty section can never look green.
+- **resolved_by:** 
+
+## FIND-SPRINT-009-17
+- **source:** TASK-032 (verifier)
+- **type:** cleanup
+- **severity:** low
+- **status:** open
+- **location:** index.html:3418-3424
+- **description:** When one doc carries the same anchor twice, the per-needle row label repeats the filename: the shipped harness renders `CODE-PATTERNS.md + CODE-PATTERNS.md -> function wireSegControl`, because CODE-PATTERNS.md anchors `function wireSegControl` in both its seg-control entry and the new Documentation Conventions entry, and `seen.get(needle).push(doc)` appends per occurrence rather than per file. Purely cosmetic — the row is a correct PASS and the needle is deduplicated correctly (19 unique needles, 19 rows, 19 unique labels confirmed in a headless run) — but a reader scanning the section sees what looks like a rendering bug. The plan's step 7 sketch has the same behaviour, so this is inherited, not introduced.
+- **suggested_action:** Guard the push with `if (!seen.get(needle).includes(doc))`, or build `seen` as `needle -> Set<doc>` and spread it at label time.
+- **resolved_by:** 
+
+## FIND-SPRINT-009-18
+- **source:** TASK-032 (verifier)
+- **type:** claude-md
+- **severity:** medium
+- **status:** open
+- **location:** .soloflow/active/sprint.json
+- **description:** TASK-032's verification ran against a working tree that a second task was concurrently writing to. `sprint.json` declares `execution_mode: "serial"` yet listed both `TASK-032: in_progress` and `TASK-033: in_progress` at the same time, and TASK-033's executor wrote `index.html`, `README.md`, `CODE-PATTERNS.md` and `CHANGELOG.md` into the shared checkout mid-verification (file mtimes 12:00:31–12:01:13, while the harness runs were still in flight). Verification only stayed sound by accident of timing: the fixture sandbox had been copied at 11:55 and every headless run finished at 11:59:08, and the sandbox was afterwards proven byte-identical to `HEAD` (modulo CRLF) for all five scanned files. Had the runs been sixty seconds later, the harness would have been asserting against TASK-033's uncommitted `align` work and the verdict would have been about code that was never in TASK-032's commits. This is especially sharp for this repo because every task owns `index.html`, so any overlap is a direct collision, and because the shipped guard fetches the *served* files rather than reading a snapshot — its results are a function of whatever is on disk at that instant.
+- **suggested_action:** Either (a) have the verifier operate on a detached checkout of the task's terminal commit (`git worktree add` at the task SHA) rather than the live working tree, which also removes the CRLF-vs-`git show` comparison trap, or (b) make the orchestrator hold a task in `verifying` and refuse to start the next task's executor until the verdict lands when `execution_mode` is `serial`. Worth a line in CLAUDE.md / the orchestrator prompt: in a single-file repo, "serial" has to mean serial through verification, not just through execution.
+- **resolved_by:** 
+
+## FIND-SPRINT-009-19
+- **source:** TASK-032 (code-reviewer)
+- **type:** cleanup
+- **severity:** low
+- **status:** open
+- **location:** index.html:3368-3369 (grep `const ANCHOR_DOCS`, at 343e542)
+- **description:** The anchor-drift section declares two parallel constants that must be hand-kept in sync: `ANCHOR_DOCS` (the list of scanned files) and `ANCHOR_FLOORS` (per-file minimum anchor counts, keyed by the same filenames). `ANCHOR_DOCS` is exactly `Object.keys(ANCHOR_FLOORS)` today. The two drift directions fail asymmetrically: adding a file to `ANCHOR_DOCS` only makes `ANCHOR_FLOORS[doc]` `undefined`, so `found.length >= undefined` is false and the row reddens with the label "carries at least undefined doc anchors" — loud but confusing; adding a file to `ANCHOR_FLOORS` only leaves the doc **silently unscanned**, with no row and no failure. That silent direction is the same vacuous-green class the floors themselves exist to close. The shape came from the plan's step 5 sketch, so it is inherited rather than introduced, and both constants are correct as shipped (floors match the observed counts exactly: README 2, CODE-PATTERNS 18, ARCHITECTURE 2, CLAUDE 1).
+- **suggested_action:** Delete `ANCHOR_DOCS` and derive it — `const ANCHOR_DOCS = Object.keys(ANCHOR_FLOORS);` — so a scanned doc cannot exist without a floor and vice versa. One line, no behaviour change today.
+- **resolved_by:** 
+
+## FIND-SPRINT-009-20
+- **source:** TASK-032 (code-reviewer)
+- **type:** cleanup
+- **severity:** medium
+- **status:** open
+- **location:** index.html:992-1003 (grep `TEMPLATE CONFIGS`, the banner comment above `const templates`)
+- **description:** The `TEMPLATE CONFIGS` banner comment directly above the `templates` map is a second, competing copy of the brand-entry schema list, and it is stale in exactly the way TASK-032 just repaired in README. It documents 8 keys (`bannerImageUrl`, `bannerHref`, `ctaBackgroundColor`, `ctaTextColor`, `unsubscribeHtml`, `disclosureHtml`, `ctaMicrocopyFontSize`, `ctaMicrocopyColor`) and omits 5 live ones (`name`, `bannerAlt`, `bannerWidth`, `bannerHtml`, `bannerBackgroundColor`) — including two of the three keys this task added to README. This matters more than an ordinary stale comment because README's Templates section now points the reader *at this block* ("Scroll to the `TEMPLATE CONFIGS` block ... to edit them"), so a developer following the documented path lands on the stale list rather than the freshly-reconciled one, and because the new schema fixture polices only the README copy — nothing guards this one, so it will keep drifting. Out of diff: TASK-032 did not touch this region and no acceptance criterion covered it, so this is queued rather than raised against the task.
+- **suggested_action:** Either (a) reduce the banner comment to a pointer — "Brand entry schema is documented in README.md's Templates section; every key on any entry must appear there (enforced by the harness's Documentation anchor drift guard)" — which removes the second copy entirely and is the lower-maintenance option, or (b) bring the comment back in sync and extend the schema fixture to assert the same key set against the fetched `index.html` banner-comment block so both copies are guarded. Prefer (a).
+- **resolved_by:**
+
+## FIND-SPRINT-009-21
+- **source:** TASK-033 (verifier)
+- **type:** improvement
+- **severity:** low
+- **location:** index.html:1250-1255 (the `ctaMicrocopyQuill` construction; no CSS rule targets `#ctaMicrocopy .ql-editor`)
+- **status:** open
+- **description:** TASK-033 centers the microcopy in the *output* but nothing centers it in the *compose panel*, so the CTA microcopy field is now the only editor in the app whose on-screen alignment disagrees with what it compiles to. Verified in a headless run against 341b5e1: typing "No cost, no obligation." leaves the Quill editor rendering flush-left (no `text-align` rule exists for `#ctaMicrocopy .ql-editor`, and Quill's default is inherited left) while the compiled cell is `align="center"` / `text-align:center`. The marketer is not blind to this — the preview iframe shows the true centered result — but the field they are typing into now lies about its own output, which is the kind of small divergence that generates "why does it move when I copy it out" support questions. Body copy has no such gap (left in both). Out of diff in the sense that the plan deliberately scoped the change to `richTextToMjText`/`buildMicrocopyBlock` and never mentioned editor chrome, so this is queued rather than raised against the task.
+- **suggested_action:** Add a single CSS rule — `#ctaMicrocopy .ql-editor { text-align: center; }` — so the compose field previews its own alignment, and add a DOM guard to `MICROCOPY_DOM_GUARDS` asserting the computed `text-align` of `#ctaMicrocopy .ql-editor` matches the `align` value `buildMicrocopyBlock` passes, so the two cannot drift apart if the output alignment is ever changed or made brand-configurable.
+- **resolved_by:**
+
+## FIND-SPRINT-009-22
+- **source:** TASK-033 (verifier)
+- **type:** claude-md
+- **severity:** medium
+- **location:** .soloflow/active/plans/TASK-033-plan.md (step 9) vs .soloflow/active/findings/SPRINT-009-findings.md (FIND-SPRINT-009-11)
+- **status:** open
+- **description:** Findings whose `suggested_action` is addressed to "whichever task next owns file X" are not reaching the planner, so they silently expire. Concrete instance: FIND-SPRINT-009-11 says "In whichever task next owns CHANGELOG.md, add a 'Test harness Section 12' bullet to the 2026-08-12 dark-mode caption entry naming the four caption fixtures and stating the 11-13 to 13-15 renumbering." TASK-033 was that task — it owns CHANGELOG.md in `files_owned` and edited it — but the plan's step 9 reads only "Add a CHANGELOG.md entry," never referencing the queue, so the executor correctly implemented the plan and the finding stayed open with its dangling cross-reference intact. This is not a TASK-033 defect: executors work from plans, not from the findings queue. It is a routing gap, and it will keep recurring because file-scoped suggested_actions are a natural thing for verifiers and code-reviewers to write. Cost compounds: the deferred cleanup gets re-flagged every sprint while the file keeps being edited past it. TASK-033's own CHANGELOG entry also documents its two new fixtures inline in the Fixed paragraph rather than with the "Test harness Sections N" bullet every neighbouring entry uses, which is the same convention FIND-11 was pointing at.
+- **suggested_action:** Have the planner grep the active findings file for `status: open` entries whose `location` or `suggested_action` names any file in the new task's `files_owned`, and either fold them into the plan's steps or state in the plan why they are being skipped. A one-line addition to the planner prompt plus a note in CLAUDE.md's conventions section ("a plan that owns a file should account for the open findings against that file") would close it.
 - **resolved_by:** 

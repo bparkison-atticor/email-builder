@@ -14,12 +14,13 @@
   },
   "tasks": {
     "TASK-032": {
-      "status": "pending",
+      "status": "in_progress",
       "depends_on": [
         "TASK-031",
         "TASK-028"
       ],
-      "idea": "SPRINT-006-007-compound"
+      "idea": "SPRINT-006-007-compound",
+      "started": "2026-08-13T15:37:58.503Z"
     }
   }
 }
