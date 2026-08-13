@@ -1540,6 +1540,7 @@ function richTextToMjText(html, tpl, opts = {}) {
     padding = '0 0 14px 0', // mj-text padding attribute
     blockMargin = 14,       // p/ul/ol bottom margin in px
     convertTypedBullets = true,
+    align = null,           // mj-text align attribute; null = inherit MJML's left default
   } = opts;
   // Strip empty paragraphs Quill inserts when the user hits Enter twice.
   const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
@@ -1686,6 +1687,7 @@ function richTextToMjText(html, tpl, opts = {}) {
     `padding="${escapeHtml(padding)}"`,
     fontSize ? `font-size="${escapeHtml(fontSize)}"` : '',
     color ? `color="${escapeHtml(color)}"` : '',
+    align ? `align="${escapeHtml(align)}"` : '',
   ].filter(Boolean).join(' ');
   return `        <mj-text ${attrs}>\n          ${div.innerHTML}\n        </mj-text>`;
 }
@@ -1697,8 +1699,9 @@ function plainTextLength(text) {
 }
 
 // Pure. '' for an empty editor; otherwise a muted, smaller mj-text block
-// styled from the active brand's microcopy keys. Links are muted rather than
-// brand-accent, and the typed-bullet converter is off (see microcopyToolbar).
+// styled from the active brand's microcopy keys, centered to match the CTA
+// button above it. Links are muted rather than brand-accent, and the
+// typed-bullet converter is off (see microcopyToolbar).
 function buildMicrocopyBlock(html, tpl) {
   if (!hasRichHtml(html)) return '';
   const color = tpl.ctaMicrocopyColor || DEFAULT_CTA_MICROCOPY_COLOR;
@@ -1709,6 +1712,7 @@ function buildMicrocopyBlock(html, tpl) {
     padding: '0 0 18px 0',
     blockMargin: 8,
     convertTypedBullets: false,
+    align: 'center',
   });
 }
 
