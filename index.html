@@ -2454,12 +2454,14 @@ function renderTestHarness() {
     body.appendChild(row);
   }
 
-  // Shared row renderer for every predicate-shaped harness section below.
-  // A fixture is { label, check(), description }; check() is called
-  // inside a try/catch so a throwing predicate renders as FAIL rather
-  // than aborting the whole harness. Sections 5 and 6 deliberately do NOT
-  // use this — they render a different field shape (input/expected/actual)
-  // and are left alone. body/fixtures/failText are the parameters below.
+  // Shared row renderer for the predicate-shaped harness sections (7-10).
+  // A fixture is { label, check(), description }; check() is called inside
+  // a try/catch so a throwing predicate renders as FAIL rather than
+  // aborting the whole harness. New predicate sections should call this.
+  // Not yet migrated: Section 13's MICROCOPY_DOM_GUARDS loop, which is the
+  // same shape but is pinned by TASK-029's fixture-count criterion
+  // (FIND-SPRINT-009-2). The other loops in Sections 1-6 and 11-13 render
+  // an input/expected/actual field shape and deliberately do not fit here.
   function renderPredicateFixtures(body, fixtures, failText = 'FAIL') {
     for (const fixture of fixtures) {
       const pass = (() => { try { return fixture.check(); } catch { return false; } })();
