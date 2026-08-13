@@ -170,6 +170,8 @@
     left: 12px;
     right: 12px;
   }
+  /* Compact variant — microcopy is one or two sentences, not body copy. */
+  .rich-editor-wrap.compact .ql-editor { min-height: 64px; }
   .preview-panel {
     display: flex;
     flex-direction: column;
@@ -691,6 +693,13 @@
         <div class="cta-preview" aria-hidden="true">
           <span class="btn" id="ctaPreviewBtn">Click Here</span>
         </div>
+        <div class="field">
+          <label id="ctaMicrocopyLabel">Microcopy <span class="seg-tag">optional</span></label>
+          <div class="rich-editor-wrap compact">
+            <div id="ctaMicrocopy"></div>
+          </div>
+          <div class="hint"><span id="ctaMicrocopyCount">0</span> chars · aim for under 140 — two short sentences. Renders as small, muted text directly under the button.</div>
+        </div>
       </div>
     </div>
 
@@ -963,8 +972,19 @@ Handlebars.registerHelper('blockHelperMissing', function (context, options) {
 //   unsubscribeHtml    — standalone unsubscribe link (rendered as its own block,
 //                        matches SendGrid's template pattern). Use {{{unsubscribe}}}.
 //   disclosureHtml     — legal/compliance copy (address, dynamic fields, etc.)
+//   ctaMicrocopyFontSize — mj-text font-size for the CTA's supporting sentence;
+//                        shared default DEFAULT_CTA_MICROCOPY_FONT_SIZE ('13px').
+//   ctaMicrocopyColor  — mj-text color for the CTA's supporting sentence;
+//                        shared default DEFAULT_CTA_MICROCOPY_COLOR ('#6b6b6b').
 // ============================================================
 const DEFAULT_UNSUBSCRIBE = `<a href="{{{unsubscribe}}}" style="color:#6b6b6b;text-decoration:underline;">Unsubscribe</a>`;
+
+// Microcopy style — the optional supporting sentence under the CTA button.
+// Deliberately a third step on the size scale: body 16px, microcopy 13px,
+// unsubscribe 12px, disclosure 11px. #6b6b6b is the app's single muted token
+// and gives 5.3:1 against the white content card (passes WCAG AA).
+const DEFAULT_CTA_MICROCOPY_FONT_SIZE = '13px';
+const DEFAULT_CTA_MICROCOPY_COLOR = '#6b6b6b';
 
 const templates = {
   postmanLaw: {
@@ -975,6 +995,8 @@ const templates = {
     bannerHref: "https://www.postmanlaw.com",
     ctaBackgroundColor: "#000000",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="font-size:12px;margin:0 0 8px 0;">***</p>
@@ -994,6 +1016,8 @@ const templates = {
     bannerWidth: "600px",
     ctaBackgroundColor: "#333333",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="margin:0 0 10px 0;">You are receiving this email because you contacted Disability Benefit Center about a potential {{CaseType.CaseName}} claim. Use the unsubscribe link above to opt out at any time.</p>
@@ -1010,6 +1034,8 @@ const templates = {
     bannerHref: "https://www.kellerpostman.com",
     ctaBackgroundColor: "#00b18b",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="font-size:10px;text-align:center;margin:0 0 6px 0;">* * *</p>
@@ -1029,6 +1055,8 @@ const templates = {
     bannerHref: "https://www.kellerpostman.com",
     ctaBackgroundColor: "#00183e",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="font-size:10px;text-align:center;margin:0 0 6px 0;">* * *</p>
@@ -1049,6 +1077,8 @@ const templates = {
     bannerHref: "https://wkfirm.com",
     ctaBackgroundColor: "#000000",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="font-size:12px;margin:0 0 6px 0;">* * *</p>
@@ -1065,6 +1095,8 @@ const templates = {
     bannerBackgroundColor: "#61203e",
     ctaBackgroundColor: "#61203e",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="font-size:14px;margin:0 0 14px 0;"><strong>National Justice Center.</strong> Fighting for the Injured.</p>
@@ -1082,6 +1114,8 @@ const templates = {
     bannerHref: "https://parrishdevaughn.com",
     ctaBackgroundColor: "#ED1C24",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="font-size:12px;margin:0 0 6px 0;">* * *</p>
@@ -1100,6 +1134,8 @@ const templates = {
     bannerBackgroundColor: "#245280",
     ctaBackgroundColor: "#245280",
     ctaTextColor: "#ffffff",
+    ctaMicrocopyFontSize: DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    ctaMicrocopyColor: DEFAULT_CTA_MICROCOPY_COLOR,
     unsubscribeHtml: DEFAULT_UNSUBSCRIBE,
     disclosureHtml: `
       <p style="font-size:12px;margin:0 0 6px 0;">* * *</p>
@@ -1139,6 +1175,7 @@ const els = {
   promoBody: document.getElementById('promoBody'),
   ctaDestinationLabel: document.getElementById('ctaDestinationLabel'),
   ctaDestinationHint: document.getElementById('ctaDestinationHint'),
+  ctaMicrocopyCount: document.getElementById('ctaMicrocopyCount'),
   preview: document.getElementById('preview'),
   copyBtn: document.getElementById('copyBtn'),
   warn: document.getElementById('warn'),
@@ -1159,17 +1196,17 @@ class PassthroughLink extends QuillLink {
 }
 Quill.register(PassthroughLink, true);
 
-const richToolbar = [['bold', 'link'], [{ list: 'ordered' }, { list: 'bullet' }]];
+const richToolbar = [['bold', 'italic', 'link'], [{ list: 'ordered' }, { list: 'bullet' }]];
 // Whitelist only the formats our toolbar exposes. This also governs paste:
-// anything pasted with other formats (italic, color, headers, images, tables,
-// base64 data URLs, etc.) gets stripped to plain text on the way in.
-const allowedFormats = ['bold', 'link', 'list'];
+// anything pasted with other formats (color, headers, images, tables,
+// base64 data URLs, etc.) still gets stripped to plain text on the way in.
+const allowedFormats = ['bold', 'italic', 'link', 'list'];
 
 const bodyAboveQuill = new Quill('#bodyAbove', {
   modules: { toolbar: [...richToolbar] },
   formats: [...allowedFormats],
   theme: 'snow',
-  placeholder: 'Enter copy. Bold, lists, and links supported.'
+  placeholder: 'Enter copy. Bold, italics, lists, and links supported.'
 });
 
 const bodyBelowQuill = new Quill('#bodyBelow', {
@@ -1178,6 +1215,20 @@ const bodyBelowQuill = new Quill('#bodyBelow', {
   theme: 'snow',
   placeholder: 'Optional.'
 });
+
+// Microcopy toolbar deliberately omits lists: this is one or two sentences
+// under the button, and the compiled output suppresses the typed-bullet
+// converter so fine-print starting with '*' or '—' stays a sentence.
+const microcopyToolbar = [['bold', 'italic', 'link']];
+const microcopyFormats = ['bold', 'italic', 'link'];
+
+const ctaMicrocopyQuill = new Quill('#ctaMicrocopy', {
+  modules: { toolbar: [...microcopyToolbar] },
+  formats: [...microcopyFormats],
+  theme: 'snow',
+  placeholder: 'Optional. One or two supporting sentences.'
+});
+ctaMicrocopyQuill.root.setAttribute('aria-labelledby', 'ctaMicrocopyLabel');
 
 // --- Link insert modal state (TASK-001) ---
 let ownerEditor = null;
@@ -1278,7 +1329,7 @@ function closeLinkModal() {
 }
 
 // Toolbar override — must happen after both Quill instances are created
-[bodyAboveQuill, bodyBelowQuill].forEach(q => {
+[bodyAboveQuill, bodyBelowQuill, ctaMicrocopyQuill].forEach(q => {
   q.getModule('toolbar').addHandler('link', () => openLinkModal(q));
 });
 
@@ -1447,11 +1498,26 @@ function autoLinkPhones(root) {
   });
 }
 
-function richTextToMjText(html, tpl) {
-  if (!html) return '';
+// Pure: does this Quill innerHTML carry any real content? Quill's "empty"
+// states are '', '<p><br></p>', and '<p></p>'.
+function hasRichHtml(html) {
+  if (!html) return false;
+  const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
+  return !!(cleaned && cleaned !== '<p></p>');
+}
+
+function richTextToMjText(html, tpl, opts = {}) {
+  if (!hasRichHtml(html)) return '';
+  const {
+    fontSize = null,        // mj-text font-size attribute; null = inherit mj-attributes (16px)
+    color = null,           // mj-text color attribute; null = inherit (#333333)
+    linkColor = null,       // when set, overrides the brand-accent + phone-blue link passes
+    padding = '0 0 14px 0', // mj-text padding attribute
+    blockMargin = 14,       // p/ul/ol bottom margin in px
+    convertTypedBullets = true,
+  } = opts;
   // Strip empty paragraphs Quill inserts when the user hits Enter twice.
   const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
-  if (!cleaned || cleaned === '<p></p>') return '';
 
   // Parse into a DOM so we can normalize styling for email clients, which
   // don't collapse margins like browsers and vary wildly on default list styles.
@@ -1493,7 +1559,9 @@ function richTextToMjText(html, tpl) {
   // route through the existing ul/ol and li styling passes below.
   // Placed AFTER the Quill list conversion (toolbar lists are already <ul>/<ol>,
   // not <p>) and BEFORE autoLinkPhones so phone numbers inside bullets are linked.
-  {
+  // Gated by convertTypedBullets — microcopy passes false because fine-print
+  // starting with '*' or '—' is a sentence, not a list.
+  if (convertTypedBullets) {
     // Recognize the bullet glyphs real editors actually emit, not just U+2022.
     // Copy from Word/Outlook (and content routed through them) yields private-use
     // Symbol-font bullets (U+F0B7 etc.), square/circle bullets, or a middle dot —
@@ -1541,24 +1609,43 @@ function richTextToMjText(html, tpl) {
   // Brand color + target="_blank" only for non-phone links. Both auto-linked
   // phones (data-autolinked="phone") and manually-inserted phone links from
   // the link dialog (data-link-type="phone") keep standard-blue and no target.
+  const urlLinkColor = linkColor || tpl.ctaBackgroundColor;
+  const phoneLinkColor = linkColor || '#0000ee';
   div.querySelectorAll('a:not([data-autolinked]):not([data-link-type="phone"])').forEach(a => {
-    a.setAttribute('style', `color:${tpl.ctaBackgroundColor};text-decoration:underline;`);
+    a.setAttribute('style', `color:${urlLinkColor};text-decoration:underline;`);
     a.setAttribute('target', '_blank');
   });
   div.querySelectorAll('a[data-link-type="phone"]').forEach(a => {
-    a.setAttribute('style', 'color:#0000ee;text-decoration:underline;');
+    a.setAttribute('style', `color:${phoneLinkColor};text-decoration:underline;`);
     // Strip the marker before emit; SendGrid doesn't care, but it keeps output clean.
     a.removeAttribute('data-link-type');
   });
+  // Auto-linked phones are intentionally left unstyled in body copy (they
+  // inherit the client's default link colour). A caller that specifies
+  // linkColor wants EVERY anchor muted, including these.
+  if (linkColor) {
+    div.querySelectorAll('a[data-autolinked]').forEach(a => {
+      a.setAttribute('style', `color:${linkColor};text-decoration:underline;`);
+    });
+  }
 
-  // Paragraphs: consistent 14px bottom margin, zero top.
+  // Italics: email clients almost universally honour <em>, but an explicit
+  // inline style removes the dependency on their default stylesheet and
+  // survives clients that normalise unrecognised inline tags. Deliberately
+  // NOT mirrored for <strong> — bold already works with no inline style, and
+  // adding one would change existing output for every email that uses bold.
+  div.querySelectorAll('em, i').forEach(el => {
+    el.setAttribute('style', 'font-style:italic;');
+  });
+
+  // Paragraphs: consistent bottom margin, zero top.
   div.querySelectorAll('p').forEach(p => {
-    p.setAttribute('style', 'margin:0 0 14px 0;');
+    p.setAttribute('style', `margin:0 0 ${blockMargin}px 0;`);
   });
 
   // Lists: reset default margins, give a predictable indent.
   div.querySelectorAll('ul, ol').forEach(list => {
-    list.setAttribute('style', 'margin:0 0 14px 0;padding-left:24px;');
+    list.setAttribute('style', `margin:0 0 ${blockMargin}px 0;padding-left:24px;`);
   });
   div.querySelectorAll('li').forEach(li => {
     li.setAttribute('style', 'margin:0 0 6px 0;');
@@ -1570,7 +1657,42 @@ function richTextToMjText(html, tpl) {
     last.setAttribute('style', last.getAttribute('style').replace(/margin:[^;]*;?/, 'margin:0;'));
   }
 
-  return `        <mj-text padding="0 0 14px 0">\n          ${div.innerHTML}\n        </mj-text>`;
+  const attrs = [
+    `padding="${escapeHtml(padding)}"`,
+    fontSize ? `font-size="${escapeHtml(fontSize)}"` : '',
+    color ? `color="${escapeHtml(color)}"` : '',
+  ].filter(Boolean).join(' ');
+  return `        <mj-text ${attrs}>\n          ${div.innerHTML}\n        </mj-text>`;
+}
+
+// Pure. Length of the visible microcopy text, ignoring Quill's trailing
+// newline(s). Interior newlines (paragraph breaks) count as one char each.
+function plainTextLength(text) {
+  return String(text || '').replace(/\n+$/, '').length;
+}
+
+// Pure. '' for an empty editor; otherwise a muted, smaller mj-text block
+// styled from the active brand's microcopy keys. Links are muted rather than
+// brand-accent, and the typed-bullet converter is off (see microcopyToolbar).
+function buildMicrocopyBlock(html, tpl) {
+  if (!hasRichHtml(html)) return '';
+  const color = tpl.ctaMicrocopyColor || DEFAULT_CTA_MICROCOPY_COLOR;
+  return richTextToMjText(html, tpl, {
+    fontSize: tpl.ctaMicrocopyFontSize || DEFAULT_CTA_MICROCOPY_FONT_SIZE,
+    color,
+    linkColor: color,
+    padding: '0 0 18px 0',
+    blockMargin: 8,
+    convertTypedBullets: false,
+  });
+}
+
+// Pure. The mj-button's padding depends on whether microcopy follows it:
+// with a caption below, the button's own 18px bottom gap would read as a
+// detached sentence, so it tightens to 6px. With no microcopy the value is
+// byte-identical to what shipped before microcopy existed.
+function ctaButtonPadding(microcopyHtml) {
+  return hasRichHtml(microcopyHtml) ? '14px 0 6px 0' : '14px 0 18px 0';
 }
 
 function buildCtaHref() {
@@ -1592,6 +1714,9 @@ function buildMjml() {
   const isPhone = getCtaType() === 'phone';
   const ctaTarget = isPhone ? '_self' : '_blank';
   const ctaRelAttr = isPhone ? '' : ' rel="noopener noreferrer"';
+  const microcopyHtml = ctaToggle.isOn() ? ctaMicrocopyQuill.root.innerHTML : '';
+  const microcopyBlock = buildMicrocopyBlock(microcopyHtml, tpl);
+  const ctaPadding = ctaButtonPadding(microcopyHtml);
   const preheader = (els.preheader.value || '').trim();
   const previewTag = preheader
     ? `<mj-preview>${escapeHtml(preheader)}</mj-preview>\n    `
@@ -1637,10 +1762,10 @@ function buildMjml() {
     <mj-section padding="28px 24px 8px 24px" background-color="#ffffff">
       <mj-column>
 ${richTextToMjText(bodyAboveQuill.root.innerHTML, tpl)}
-${ctaToggle.isOn() ? `        <mj-button href="${escapeHtml(ctaHref)}" target="${ctaTarget}"${ctaRelAttr} background-color="${tpl.ctaBackgroundColor}" color="${tpl.ctaTextColor}" padding="14px 0 18px 0">
+${ctaToggle.isOn() ? `        <mj-button href="${escapeHtml(ctaHref)}" target="${ctaTarget}"${ctaRelAttr} background-color="${tpl.ctaBackgroundColor}" color="${tpl.ctaTextColor}" padding="${ctaPadding}">
           ${escapeHtml(ctaText)}
         </mj-button>
-` : ''}${richTextToMjText(bodyBelowQuill.root.innerHTML, tpl)}
+${microcopyBlock ? microcopyBlock + '\n' : ''}` : ''}${richTextToMjText(bodyBelowQuill.root.innerHTML, tpl)}
       </mj-column>
     </mj-section>
     <mj-section padding="16px 24px 4px 24px" background-color="#f1f1f1">
@@ -2668,6 +2793,372 @@ function renderTestHarness() {
       '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
     body.appendChild(row);
   }
+
+  // --- Section 11: rich-text italics — em/i normalisation (TASK-025) ---
+  // Fixture 4 (byte-parity) is the load-bearing row here: its `expected`
+  // value was captured from the UNMODIFIED richTextToMjText (before the
+  // italic pass existed) so this section doubles as a regression lock that
+  // the new DOM pass never perturbs non-italic output.
+  const h11 = document.createElement('h3');
+  h11.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h11.textContent = 'rich-text italics — em/i normalisation';
+  body.appendChild(h11);
+
+  const ITALIC_TPL = { ctaBackgroundColor: '#ED1C24' };
+  const ITALIC_FIXTURES = [
+    {
+      label: '<em> gets an explicit inline font-style:italic;',
+      html: '<p>a <em>b</em> c</p>',
+      check: out => out.includes('<em style="font-style:italic;">b</em>'),
+      description: 'A pasted-through <em> must carry an explicit inline style so no email client\'s default em handling is load-bearing.',
+    },
+    {
+      label: '<i> is normalised the same way as <em>',
+      html: '<p><i>x</i></p>',
+      check: out => out.includes('<i style="font-style:italic;">x</i>'),
+      description: 'A pasted-through <i> element must be normalised identically to <em>.',
+    },
+    {
+      label: 'Nested <strong> inside <em> is untouched',
+      html: '<p><em><strong>x</strong></em></p>',
+      check: out => out.includes('font-style:italic;') && out.includes('<strong>x</strong>'),
+      description: '<strong> must not gain a style attribute while adding the italic pass — bold already renders correctly with none, and styling it too would change every existing bold email.',
+    },
+    {
+      label: 'Byte-parity: non-italic output is untouched by the new pass',
+      html: '<p>plain</p>',
+      check: out => out === '        <mj-text padding="0 0 14px 0">\n          <p style="margin:0;">plain</p>\n        </mj-text>',
+      description: 'Captured from the unmodified richTextToMjText before the italic pass was added (TASK-025 Implementation Step 1) — the parity gate for the new DOM pass.',
+    },
+    {
+      label: 'Toolbar/whitelist config includes italic',
+      html: null,
+      check: () => allowedFormats.includes('italic') && JSON.stringify(richToolbar[0]).includes('italic'),
+      description: 'richToolbar and allowedFormats are shared by both body editors (bodyAboveQuill/bodyBelowQuill); both must expose italic.',
+    },
+  ];
+
+  for (const fixture of ITALIC_FIXTURES) {
+    const actual = richTextToMjText(fixture.html, ITALIC_TPL);
+    const pass = (() => { try { return fixture.check(actual); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input HTML:</strong><pre>' + escapeHtml(fixture.html || '(none — config assertion)') + '</pre></div>' +
+      '<div class="harness-field"><strong>Check:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual output:</strong> <code>' + escapeHtml(actual) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  // --- Section 12: richTextToMjText — default parity + style overrides (TASK-026) ---
+  const h12 = document.createElement('h3');
+  h12.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h12.textContent = 'richTextToMjText — default parity + style overrides';
+  body.appendChild(h12);
+
+  const RICHTEXT_TPL = { ctaBackgroundColor: '#ED1C24' };
+  const RICHTEXT_PARITY_FIXTURES = [
+    { label: 'Byte-parity: empty string', html: '', expected: '' },
+    { label: 'Byte-parity: Quill double-Enter empty paragraph', html: '<p><br></p>', expected: '' },
+    { label: 'Byte-parity: plain paragraph', html: '<p>plain</p>', expected: '        <mj-text padding="0 0 14px 0">\n          <p style="margin:0;">plain</p>\n        </mj-text>' },
+    { label: 'Byte-parity: bold + link', html: '<p>a <strong>b</strong> <a href="https://x.test">c</a></p>', expected: '        <mj-text padding="0 0 14px 0">\n          <p style="margin:0;">a <strong>b</strong> <a href="https://x.test" style="color:#ED1C24;text-decoration:underline;" target="_blank">c</a></p>\n        </mj-text>' },
+    { label: 'Byte-parity: Quill bullet <ol> conversion', html: '<ol><li data-list="bullet">one</li><li data-list="bullet">two</li></ol>', expected: '        <mj-text padding="0 0 14px 0">\n          <ul style="margin:0;padding-left:24px;"><li style="margin:0 0 6px 0;">one</li><li style="margin:0 0 6px 0;">two</li></ul>\n        </mj-text>' },
+    { label: 'Byte-parity: plaintext phone auto-link', html: '<p>Call 555-123-4567 now.</p>', expected: '        <mj-text padding="0 0 14px 0">\n          <p style="margin:0;">Call <a href="tel:5551234567" style="color:#0000ee;text-decoration:underline;" data-autolinked="phone">555-123-4567</a> now.</p>\n        </mj-text>' },
+    { label: 'Byte-parity: typed asterisk bullet (default converts to <ul>)', html: '<p>* Restrictions apply.</p>', expected: '        <mj-text padding="0 0 14px 0">\n          <ul style="margin:0;padding-left:24px;"><li style="margin:0 0 6px 0;">Restrictions apply.</li></ul>\n        </mj-text>' },
+  ];
+
+  for (const fixture of RICHTEXT_PARITY_FIXTURES) {
+    const actual = richTextToMjText(fixture.html, RICHTEXT_TPL);
+    const pass = actual === fixture.expected;
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input HTML (JSON):</strong><pre>' + escapeHtml(JSON.stringify(fixture.html)) + '</pre></div>' +
+      '<div class="harness-field"><strong>Expected (JSON):</strong><pre>' + escapeHtml(JSON.stringify(fixture.expected)) + '</pre></div>' +
+      '<div class="harness-field"><strong>Actual (JSON):</strong><pre>' + escapeHtml(JSON.stringify(actual)) + '</pre></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — actual !== expected') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  // Note: richTextToMjText only ever reads tpl.ctaBackgroundColor — the
+  // ctaMicrocopyFontSize/ctaMicrocopyColor brand-config keys are read by the
+  // (future) caller and passed in as opts.fontSize/opts.color, not by this
+  // function directly, so this fixture tpl omits them.
+  const RICHTEXT_MICROCOPY_TPL = { ctaBackgroundColor: '#ED1C24' };
+  const RICHTEXT_OVERRIDE_FIXTURES = [
+    {
+      label: 'Style overrides: attribute emission + order (padding, font-size, color)',
+      html: '<p>x</p>',
+      opts: { fontSize: '13px', color: '#6b6b6b', padding: '0 0 18px 0' },
+      check: out => out.startsWith('        <mj-text padding="0 0 18px 0" font-size="13px" color="#6b6b6b">'),
+      description: 'With fontSize/color/padding set, the mj-text tag must open with exactly padding, then font-size, then color, in that order.',
+    },
+    {
+      label: 'linkColor overrides the brand-accent pass on a URL link',
+      html: '<p><a href="https://x.test">c</a></p>',
+      opts: { linkColor: '#6b6b6b' },
+      check: out => out.includes('color:#6b6b6b') && !out.includes('#ED1C24'),
+      description: 'opts.linkColor must override tpl.ctaBackgroundColor for ordinary links, not merely supplement it.',
+    },
+    {
+      label: 'linkColor overrides the phone-blue pass on a manually-inserted phone link',
+      html: '<p><a href="tel:5551234567" data-link-type="phone">c</a></p>',
+      opts: { linkColor: '#6b6b6b' },
+      check: out => out.includes('color:#6b6b6b') && !out.includes('#0000ee'),
+      description: 'opts.linkColor must override the hard-coded #0000ee phone-blue for manually-inserted phone links.',
+    },
+    {
+      label: 'linkColor colours auto-linked phone numbers too (opt-in only)',
+      html: '<p>Call 555-123-4567.</p>',
+      opts: { linkColor: '#6b6b6b' },
+      check: out => out.includes('color:#6b6b6b') && !out.includes('#0000ee'),
+      description: 'The auto-linked-phone anchor pass only runs when linkColor is supplied — when it is, every anchor class is muted, including auto-linked phones. A regression that left the creation-time #0000ee in place alongside the new colour must fail.',
+    },
+    {
+      label: 'convertTypedBullets:false leaves a typed asterisk paragraph as a paragraph',
+      html: '<p>* Restrictions apply.</p>',
+      opts: { convertTypedBullets: false },
+      check: out => !out.includes('<ul') && out.includes('* Restrictions apply.'),
+      description: 'Fine print starting with * or — is a sentence, not a list — convertTypedBullets:false must skip the typed-bullet-to-<ul> conversion entirely.',
+    },
+    {
+      label: 'convertTypedBullets omitted (default true) still converts the typed bullet',
+      html: '<p>* Restrictions apply.</p>',
+      opts: {},
+      check: out => out.includes('<ul'),
+      description: 'Paired with the fixture above: with the flag omitted, default behaviour (convert) is unchanged.',
+    },
+    {
+      label: 'blockMargin:8 sets the paragraph bottom margin; last-block zeroing still applies',
+      html: '<p>one</p><p>two</p>',
+      opts: { blockMargin: 8 },
+      check: out => out.includes('margin:0 0 8px 0;') && /margin:0;">two/.test(out),
+      description: 'blockMargin threads through the p/ul/ol margin passes; the last block is still zeroed regardless of blockMargin.',
+    },
+  ];
+
+  for (const fixture of RICHTEXT_OVERRIDE_FIXTURES) {
+    const actual = richTextToMjText(fixture.html, RICHTEXT_MICROCOPY_TPL, fixture.opts);
+    const pass = (() => { try { return fixture.check(actual); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input HTML:</strong><pre>' + escapeHtml(fixture.html) + '</pre></div>' +
+      '<div class="harness-field"><strong>opts:</strong> <code>' + escapeHtml(JSON.stringify(fixture.opts)) + '</code></div>' +
+      '<div class="harness-field"><strong>Check:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual output:</strong> <code>' + escapeHtml(actual) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  const HAS_RICH_HTML_FIXTURES = [
+    { label: 'hasRichHtml(\'\') === false', html: '', expected: false },
+    { label: 'hasRichHtml(\'<p><br></p>\') === false', html: '<p><br></p>', expected: false },
+    { label: 'hasRichHtml(\'<p></p>\') === false', html: '<p></p>', expected: false },
+    { label: 'hasRichHtml(\'  \') === false', html: '  ', expected: false },
+    { label: 'hasRichHtml(\'<p>x</p>\') === true', html: '<p>x</p>', expected: true },
+  ];
+
+  for (const fixture of HAS_RICH_HTML_FIXTURES) {
+    const actual = hasRichHtml(fixture.html);
+    const pass = actual === fixture.expected;
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input HTML (JSON):</strong><pre>' + escapeHtml(JSON.stringify(fixture.html)) + '</pre></div>' +
+      '<div class="harness-field"><strong>Expected:</strong> <code>' + String(fixture.expected) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual:</strong> <code>' + String(actual) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — actual !== expected') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  // --- Section 13: CTA microcopy — emission gating and muted styling (TASK-027) ---
+  const h13 = document.createElement('h3');
+  h13.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h13.textContent = 'CTA microcopy — emission gating and muted styling';
+  body.appendChild(h13);
+
+  const MICROCOPY_TPL = { ctaBackgroundColor: '#ED1C24', ctaMicrocopyFontSize: '13px', ctaMicrocopyColor: '#6b6b6b' };
+  const MICROCOPY_BLOCK_FIXTURES = [
+    {
+      label: 'Emptiness gate: empty string emits nothing',
+      html: '',
+      check: out => out === '',
+      description: 'An untouched microcopy editor must contribute nothing to the compiled MJML.',
+    },
+    {
+      label: 'Emptiness gate: Quill double-Enter empty paragraph emits nothing',
+      html: '<p><br></p>',
+      check: out => out === '',
+      description: 'Quill inserts <p><br></p> when the marketer hits Enter twice with no text — still empty.',
+    },
+    {
+      label: 'Emptiness gate: empty paragraph emits nothing',
+      html: '<p></p>',
+      check: out => out === '',
+      description: 'A bare empty paragraph must also gate to nothing.',
+    },
+    {
+      label: 'Styled emission: font-size, color, and padding read from brand config',
+      html: '<p>No obligation.</p>',
+      check: out => out.includes('font-size="13px"') && out.includes('color="#6b6b6b"') && out.includes('padding="0 0 18px 0"'),
+      description: 'A populated field emits an mj-text styled from tpl.ctaMicrocopyFontSize/ctaMicrocopyColor, with the 18px bottom padding that replaces the button\'s own gap.',
+    },
+    {
+      label: 'Muted URL link: brand-accent colour is overridden',
+      html: '<p><a href="https://x.test">terms</a></p>',
+      check: out => out.includes('color:#6b6b6b') && !out.includes('#ED1C24'),
+      description: 'Links inside microcopy must render muted, not in the brand accent colour used for the CTA button.',
+    },
+    {
+      label: 'Muted manual phone link: phone-blue is overridden',
+      html: '<p><a href="tel:5551234567" data-link-type="phone">call</a></p>',
+      check: out => out.includes('color:#6b6b6b') && !out.includes('#0000ee'),
+      description: 'A manually-inserted phone link (from the link dialog) must also mute to the microcopy colour, not the standard phone-blue.',
+    },
+    {
+      label: 'Muted auto-linked phone: creation-time blue is overridden',
+      html: '<p>Call 555-123-4567.</p>',
+      check: out => out.includes('color:#6b6b6b') && !out.includes('#0000ee'),
+      description: 'autoLinkPhones() hard-codes #0000ee on anchors it creates; buildMicrocopyBlock\'s linkColor pass must override that for a phone number typed as plain text.',
+    },
+    {
+      label: 'Typed-bullet suppression: asterisk-prefixed sentence stays a sentence',
+      html: '<p>* Restrictions apply.</p>',
+      check: out => !out.includes('<ul') && out.includes('* Restrictions apply.'),
+      description: 'Microcopy passes convertTypedBullets:false — fine print starting with * or — is a sentence, not a list, even though its own toolbar forbids list buttons.',
+    },
+    {
+      label: 'Toolbar/whitelist config has no list — microcopy stays sentence-only (FIND-SPRINT-008-15)',
+      html: null,
+      check: () => !microcopyFormats.includes('list') && !JSON.stringify(microcopyToolbar).includes('list'),
+      description: 'microcopyToolbar/microcopyFormats are ctaMicrocopyQuill\'s own consts, not aliases of the shared richToolbar/allowedFormats the body editors use. This must go red if a future change points ctaMicrocopyQuill at the shared config — the typed-bullet fixture above would keep passing (convertTypedBullets is a separate switch) while the marketer silently gained list buttons over a 13px muted caption.',
+    },
+  ];
+
+  for (const fixture of MICROCOPY_BLOCK_FIXTURES) {
+    const actual = buildMicrocopyBlock(fixture.html, MICROCOPY_TPL);
+    const pass = (() => { try { return fixture.check(actual); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input HTML:</strong><pre>' + escapeHtml(fixture.html) + '</pre></div>' +
+      '<div class="harness-field"><strong>Check:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual output:</strong> <code>' + escapeHtml(actual) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — check returned false') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  const CTA_BUTTON_PADDING_FIXTURES = [
+    { label: 'ctaButtonPadding(\'\') === \'14px 0 18px 0\'', html: '', expected: '14px 0 18px 0' },
+    { label: 'ctaButtonPadding(\'<p>x</p>\') === \'14px 0 6px 0\'', html: '<p>x</p>', expected: '14px 0 6px 0' },
+  ];
+
+  for (const fixture of CTA_BUTTON_PADDING_FIXTURES) {
+    const actual = ctaButtonPadding(fixture.html);
+    const pass = actual === fixture.expected;
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input HTML (JSON):</strong><pre>' + escapeHtml(JSON.stringify(fixture.html)) + '</pre></div>' +
+      '<div class="harness-field"><strong>Expected:</strong> <code>' + escapeHtml(fixture.expected) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual:</strong> <code>' + escapeHtml(actual) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — actual !== expected') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  const PLAIN_TEXT_LENGTH_FIXTURES = [
+    { label: 'plainTextLength(\'abc\\n\') === 3', text: 'abc\n', expected: 3 },
+    { label: 'plainTextLength(\'\\n\') === 0', text: '\n', expected: 0 },
+    { label: 'plainTextLength(\'a\\nb\\n\') === 3', text: 'a\nb\n', expected: 3 },
+    { label: 'plainTextLength(\'\') === 0', text: '', expected: 0 },
+  ];
+
+  for (const fixture of PLAIN_TEXT_LENGTH_FIXTURES) {
+    const actual = plainTextLength(fixture.text);
+    const pass = actual === fixture.expected;
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(fixture.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Input text (JSON):</strong><pre>' + escapeHtml(JSON.stringify(fixture.text)) + '</pre></div>' +
+      '<div class="harness-field"><strong>Expected:</strong> <code>' + String(fixture.expected) + '</code></div>' +
+      '<div class="harness-field"><strong>Actual:</strong> <code>' + String(actual) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — actual !== expected') + '</code></div>';
+    body.appendChild(row);
+  }
+
+  const MICROCOPY_DOM_GUARDS = [
+    {
+      label: '#ctaMicrocopy lives inside #ctaBody — the CTA collapse hides it for free',
+      check() { return els.ctaBody.contains(document.getElementById('ctaMicrocopy')); },
+      description: 'Microcopy must be a descendant of #ctaBody so onCtaToggle\'s existing .collapsed class hides it without any toggle-factory change.',
+    },
+    {
+      label: '#ctaBody.scrollHeight stays under the .seg-body collapse-animation ceiling',
+      check() { return els.ctaBody.scrollHeight < 1000; },
+      description: 'The .seg-body { max-height: 1000px } rule must still exceed the fully-expanded content height, or the collapse/expand animation clips the field.',
+    },
+    {
+      label: 'Compact wrap toolbar renders no list buttons (FIND-SPRINT-008-15)',
+      check() { return document.querySelectorAll('.rich-editor-wrap.compact .ql-list').length === 0; },
+      description: 'Criterion 2\'s own DOM assertion: even if the config-assertion fixture above were bypassed, the rendered toolbar inside the compact wrap must never contain a .ql-list button.',
+    },
+    {
+      label: 'Toolbar-handler loop wires the link button to ctaMicrocopyQuill, not just the body editors (FIND-SPRINT-008-15)',
+      check() {
+        const handler = ctaMicrocopyQuill.getModule('toolbar').handlers.link;
+        if (typeof handler !== 'function') return false;
+        handler();
+        const wired = ownerEditor === ctaMicrocopyQuill && linkModal.classList.contains('visible');
+        closeLinkModal();
+        return wired;
+      },
+      description: 'Invokes the toolbar module\'s own "link" handler — the same function Quill calls on a real click — to prove the "Toolbar override" forEach loop includes ctaMicrocopyQuill and routes it through openLinkModal(ctaMicrocopyQuill), not just bodyAboveQuill/bodyBelowQuill or Quill\'s unwired default link behaviour.',
+    },
+  ];
+
+  for (const guard of MICROCOPY_DOM_GUARDS) {
+    const pass = (() => { try { return guard.check(); } catch { return false; } })();
+    const row = document.createElement('div');
+    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+    row.innerHTML =
+      '<div class="harness-row-label">' +
+        '<span>' + escapeHtml(guard.label) + '</span>' +
+        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+      '</div>' +
+      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(guard.description) + '</code></div>' +
+      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — guard returned false') + '</code></div>';
+    body.appendChild(row);
+  }
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
@@ -3397,6 +3888,14 @@ function scheduleRender() {
 bodyAboveQuill.on('text-change', scheduleRender);
 bodyBelowQuill.on('text-change', scheduleRender);
 
+function updateMicrocopyCount() {
+  els.ctaMicrocopyCount.textContent = plainTextLength(ctaMicrocopyQuill.getText());
+}
+ctaMicrocopyQuill.on('text-change', () => {
+  updateMicrocopyCount();
+  scheduleRender();
+});
+
 // Viewport toggle (segmented control in the preview top bar)
 const viewportButtons = document.querySelectorAll('.seg-control button[data-vp]');
 const previewStage = document.getElementById('previewStage');
@@ -3573,9 +4072,7 @@ function clearPromoFields() {
 
 // Copy validation
 function hasRichContent(quill) {
-  const html = quill.root.innerHTML;
-  const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
-  return !!(cleaned && cleaned !== '<p></p>');
+  return hasRichHtml(quill.root.innerHTML);
 }
 
 function isValidPhone(value) {
@@ -3837,6 +4334,7 @@ copyFromModal.addEventListener('click', async () => {
 loadTestData();
 autoSizeTestData();
 updateCtaPreview();
+updateMicrocopyCount();
 clearPromoFields();
 render();
 </script>
