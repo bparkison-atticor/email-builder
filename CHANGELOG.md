@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-13 — CTA microcopy centers under the button
+
+### Fixed
+- **CTA microcopy rendered flush-left instead of centered under the CTA button (TASK-033).** `buildMicrocopyBlock` never passed an alignment option to `richTextToMjText`, and neither the function's six original opts nor the head's `<mj-attributes>` mj-text rule set one, so the caption fell back to MJML's left default while the `mj-button` above it centered via MJML's own default — a short caption read as detached body copy instead of a button caption. `richTextToMjText` gained a seventh opt, `align` (default `null`, only emitted when non-null, always appended last so existing attribute-order fixtures are unaffected), and `buildMicrocopyBlock` now passes `align: 'center'`. Body-copy call sites (`bodyAboveQuill`, `bodyBelowQuill`) pass no `opts` and stay byte-identical. New fixtures in `MICROCOPY_BLOCK_FIXTURES` and `RICHTEXT_OVERRIDE_FIXTURES` cover the emission and the omission case respectively.
+
 ## 2026-08-12 — Dark mode preview: visible client caption
 
 ### Added
