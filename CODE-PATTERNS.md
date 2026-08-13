@@ -61,10 +61,12 @@ to a canonical example — read those for the actual implementation.
 
 ### `createModuleToggle`
 
-- **Location:** `index.html` — grep `function createModuleToggle`.
-- **Use it for:** Building an enable/disable toggle for an optional module. `createModuleToggle(id, label, defaultOn, onChange)` returns `{ element, isOn }`; caller appends `element` to the DOM. `onChange(state)` fires once on init and on every flip.
-- **Canonical example:** grep `createModuleToggle('` for all callers — CTA (`'cta'`), Promo (`'promo'`), Test data (`'testData'`).
-- **Gotcha:** the factory always persists to `emailBuilder.module.<id>` — there is no opt-out. That is why the dark-mode switch (grep `darkModeSwitch`), whose state must not persist, is hand-rolled against the same markup/CSS instead of calling this factory; migrate it here if an opt-out ever lands. The test-data toggle carries a one-time copy shim (grep `emailBuilder.testDataEnabled`) preserving its pre-TASK-014 preference.
+- **Location:** `index.html` — `createModuleToggle()` (grep `function createModuleToggle`).
+- **Use it for:** Building an enable/disable toggle for an optional module. `createModuleToggle(id, label, defaultOn, onChange, persist = true)` returns `{ element, isOn }`; caller appends `element` to the DOM. `onChange(state)` fires once on init and on every flip.
+- **Canonical example:** grep `createModuleToggle('` for all callers — CTA, Promo, Test data (persisting) and Dark mode (non-persisting).
+- **Gotcha — persistence:** state persists under `emailBuilder.module.<id>` unless the 5th argument `persist` is `false`, which makes the toggle session-only: it neither reads nor writes `localStorage` and always starts at `defaultOn`. The Dark mode toggle is the canonical non-persisting caller. Do NOT hand-roll a `module-toggle` element to avoid persistence — that is what produced two forked switch implementations across SPRINT-007.
+- **Gotcha — onChange fires during construction:** the callback runs once *inside* the factory, before the caller can insert `element` into the DOM. Anything the callback touches must already exist. The dark-mode caller handles this by inserting its client picker first, then `insertBefore`-ing the toggle ahead of it.
+- **Note:** the Test data toggle carries a one-time copy shim preserving its pre-TASK-014 `emailBuilder.testDataEnabled` value.
 
 ### `injectPreviewStyle`
 
