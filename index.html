@@ -2573,9 +2573,31 @@ function renderTestHarness() {
       description: 'With no </head> in the compiled HTML, the style block must be inserted immediately after the opening <body> tag.',
     },
     {
-      label: 'Preview-only purity guard: lastHtml never carries EB-DARKSIM',
-      check() { return typeof lastHtml === 'string' && lastHtml.indexOf('EB-DARKSIM') === -1; },
-      description: 'lastHtml (Copy HTML / View HTML source) must never carry a preview-only dark-mode stylesheet, regardless of toggle state.',
+      label: 'Preview-only purity guard: lastHtml never carries EB-DARKSIM (dark mode forced ON)',
+      check() {
+        const savedEnabled = darkModeEnabled;
+        const savedClient = darkModeClient;
+        try {
+          // Force the condition the invariant is about. A fresh load has dark
+          // mode OFF, which makes applyDarkMode the identity function — the
+          // pre-TASK-029 version of this fixture passed vacuously on every
+          // ordinary harness run (FIND-SPRINT-007-7).
+          darkModeEnabled = true;
+          darkModeClient = 'gmail';
+          render();
+          const previewIsTransformed = String(els.preview.srcdoc).indexOf('EB-DARKSIM') !== -1;
+          const exportIsPure = typeof lastHtml === 'string' && lastHtml.length > 0
+            && lastHtml.indexOf('EB-DARKSIM') === -1;
+          // Both halves are required: exportIsPure alone would still pass if
+          // the transform silently stopped running.
+          return previewIsTransformed && exportIsPure;
+        } finally {
+          darkModeEnabled = savedEnabled;
+          darkModeClient = savedClient;
+          render();
+        }
+      },
+      description: 'With dark mode forced ON and Gmail selected, the preview srcdoc must carry the EB-DARKSIM marker while lastHtml (Copy HTML / View HTML source) must not. The finally block restores the real toggle state and re-renders.',
     },
     {
       label: 'injectPreviewStyle: literal </style> inside css is neutralized',
