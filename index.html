@@ -2817,6 +2817,76 @@ function renderTestHarness() {
 
   renderPredicateFixtures(body, APPLEMAIL_DARK_FIXTURES);
 
+  // --- Section 14: module toggle factory — persistence opt-out + header order (TASK-030) ---
+  // Numbered 14, not 11, even though it is grouped here with the dark-mode
+  // fixtures (Sections 8-10): Sections 11-13 (rich-text italics, richtext
+  // parity, CTA microcopy) already existed on disk from earlier sprints by
+  // the time this task landed, and renumbering them would desync
+  // CHANGELOG.md's "Test harness Sections 11-13" entry, which is out of this
+  // task's file scope. 14 is the next free number; it appears out of
+  // positional order in the DOM (between Sections 10 and 11) intentionally.
+  const h14 = document.createElement('h3');
+  h14.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h14.textContent = 'Module toggle factory — persistence opt-out';
+  body.appendChild(h14);
+
+  const MODULE_TOGGLE_FIXTURES = [
+    {
+      label: 'persist=false: flipping writes no localStorage key',
+      check() {
+        const k = 'emailBuilder.module.__harnessProbeA';
+        localStorage.removeItem(k);
+        try {
+          const t = createModuleToggle('__harnessProbeA', 'probe', false, () => {}, false);
+          t.element.click();
+          return t.isOn() === true && localStorage.getItem(k) === null;
+        } finally { localStorage.removeItem(k); }
+      },
+      description: 'A non-persisting toggle must still flip its in-memory state but must never touch emailBuilder.module.<id>. This is the invariant that let the dark-mode switch stop being hand-rolled.',
+    },
+    {
+      label: 'persist=false: a pre-existing stored value is ignored',
+      check() {
+        const k = 'emailBuilder.module.__harnessProbeB';
+        localStorage.setItem(k, 'false');
+        try {
+          const t = createModuleToggle('__harnessProbeB', 'probe', true, () => {}, false);
+          return t.isOn() === true;
+        } finally { localStorage.removeItem(k); }
+      },
+      description: 'With persist=false the factory must not read storage either — defaultOn wins over a stale saved value.',
+    },
+    {
+      label: 'persist defaults to true: flipping still writes its key',
+      check() {
+        const k = 'emailBuilder.module.__harnessProbeC';
+        localStorage.removeItem(k);
+        try {
+          const t = createModuleToggle('__harnessProbeC', 'probe', false, () => {});
+          t.element.click();
+          return localStorage.getItem(k) === 'true';
+        } finally { localStorage.removeItem(k); }
+      },
+      description: 'The opt-out must be opt-IN: omitting the 5th argument preserves the persisting behavior every existing caller (cta, promo, testData) relies on.',
+    },
+    {
+      label: 'Preview header append order: viewport, divider, Test data, divider, Dark mode, client picker',
+      check() {
+        const kids = Array.from(document.querySelector('.preview-header-left').children);
+        const at = (pred) => kids.findIndex(pred);
+        const vp = at(el => !!el.querySelector && !!el.querySelector('button[data-vp]'));
+        const td = at(el => el.classList.contains('module-toggle') && el.textContent.includes('Test data'));
+        const dm = at(el => el.id === 'darkModeSwitch');
+        const pk = at(el => el.id === 'darkClientControl');
+        const toggles = kids.filter(el => el.classList.contains('module-toggle')).length;
+        return vp === 0 && vp < td && td < dm && dm < pk && toggles === 2;
+      },
+      description: 'The container is runtime-extended and order-dependent (see the HTML comment on its static trailing divider). This fixture is the executable form of that contract — a static child added to the markup would land at index 0 and fail it.',
+    },
+  ];
+
+  renderPredicateFixtures(body, MODULE_TOGGLE_FIXTURES);
+
   // --- Section 11: rich-text italics — em/i normalisation (TASK-025) ---
   // Fixture 4 (byte-parity) is the load-bearing row here: its `expected`
   // value was captured from the UNMODIFIED richTextToMjText (before the
