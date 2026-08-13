@@ -3155,6 +3155,20 @@ function renderTestHarness() {
       check: out => out.includes('margin:0 0 8px 0;') && /margin:0;">two/.test(out),
       description: 'blockMargin threads through the p/ul/ol margin passes; the last block is still zeroed regardless of blockMargin.',
     },
+    {
+      label: 'align omitted emits no align attribute at all (TASK-033 parity guard)',
+      html: '<p>x</p>',
+      opts: {},
+      check: out => !out.includes('align='),
+      description: 'align defaults to null, which must inherit MJML\'s left default rather than always emitting align="left" — the two body-copy call sites depend on this to stay byte-identical.',
+    },
+    {
+      label: 'align:"center" appends align="center" last, after color (TASK-033)',
+      html: '<p>x</p>',
+      opts: { fontSize: '13px', color: '#6b6b6b', padding: '0 0 18px 0', align: 'center' },
+      check: out => out.startsWith('        <mj-text padding="0 0 18px 0" font-size="13px" color="#6b6b6b" align="center">'),
+      description: 'align must be appended after padding, font-size, and color so the pre-existing attribute-order fixture above keeps matching through color="#6b6b6b" unchanged.',
+    },
   ];
 
   for (const fixture of RICHTEXT_OVERRIDE_FIXTURES) {
@@ -3231,6 +3245,12 @@ function renderTestHarness() {
       html: '<p>No obligation.</p>',
       check: out => out.includes('font-size="13px"') && out.includes('color="#6b6b6b"') && out.includes('padding="0 0 18px 0"'),
       description: 'A populated field emits an mj-text styled from tpl.ctaMicrocopyFontSize/ctaMicrocopyColor, with the 18px bottom padding that replaces the button\'s own gap.',
+    },
+    {
+      label: 'Centered emission: align="center" matches the centered CTA button above it (TASK-033)',
+      html: '<p>No cost, no obligation.</p>',
+      check: out => out.includes('align="center"'),
+      description: 'The mj-button above this block has no align attribute and defaults to MJML\'s centered mj-button behavior; the caption must be explicitly centered too or it reads as detached body copy under a centered button.',
     },
     {
       label: 'Muted URL link: brand-accent colour is overridden',
