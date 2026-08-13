@@ -746,6 +746,14 @@
             Mobile
           </button>
         </div>
+        <!-- RUNTIME-EXTENDED CONTAINER. Everything after this divider is
+             appended by JS, in this order: the Test data toggle
+             (createModuleToggle('testData', ...) → previewHeaderLeft.appendChild),
+             then the dark-mode divider + #darkClientControl
+             (previewHeaderLeft.insertAdjacentHTML), then the Dark mode toggle
+             (previewHeaderLeft.insertBefore, ahead of the picker). A new
+             *static* child added here would render BEFORE all of them — add
+             new header controls at those JS call sites instead. -->
         <span class="divider" aria-hidden="true"></span>
       </div>
       <div class="copy-group">
