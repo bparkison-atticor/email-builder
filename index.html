@@ -3925,6 +3925,14 @@ wireSegControl(viewportButtons, (btn) => {
   previewStage.classList.toggle('mobile', btn.dataset.vp === 'mobile');
 });
 
+// Preview header, left group. `.preview-header-left`'s static markup ends
+// at the viewport .seg-control plus one <span class="divider">; every
+// control after that divider is appended here at runtime, in source order:
+//   1. Test data toggle          (appendChild, below)
+//   2. dark-mode divider + client picker (insertAdjacentHTML, below)
+//   3. Dark mode toggle          (insertBefore the picker, below)
+const previewHeaderLeft = document.querySelector('.preview-header-left');
+
 // Test-data substitution toggle (preview only — never affects copied HTML).
 // Built via the shared createModuleToggle() factory (below) rather than a
 // hand-rolled switch (TASK-014 consolidation).
@@ -3950,48 +3958,39 @@ function onTestDataToggle(isOn) {
 }
 const testDataToggle = createModuleToggle('testData', 'Test data', true, onTestDataToggle);
 testDataToggle.element.title = 'Substitute {{tokens}} in preview';
-document.querySelector('.preview-header-left').appendChild(testDataToggle.element);
+previewHeaderLeft.appendChild(testDataToggle.element);
 
-// Dark-mode preview controls (IDEA-005 / TASK-021). Runtime-inserted, same
-// as the Test data toggle above: static markup here would render before
-// that toggle, since TASK-014 appends it at runtime. Deliberately hand-rolled
-// rather than createModuleToggle() — that factory persists to localStorage
-// under emailBuilder.module.<id>, and dark-mode state must NOT be persisted
-// (locked at the idea checkpoint). Reuses the factory's module-toggle /
-// track markup shape so it shares the same CSS.
-document.querySelector('.preview-header-left').insertAdjacentHTML('beforeend',
+// Dark-mode preview controls (IDEA-005 / TASK-021, migrated onto the shared
+// factory in TASK-030). Runtime-inserted, same as the Test data toggle above.
+//
+// The client picker is inserted BEFORE the toggle is created, and the toggle
+// element is then insertBefore'd ahead of it. That ordering is load-bearing:
+// createModuleToggle fires onChange once during construction, and
+// onDarkModeToggle reads darkClientControl — so the picker must already
+// exist in the DOM when the factory runs.
+previewHeaderLeft.insertAdjacentHTML('beforeend',
   '<span class="divider" aria-hidden="true"></span>' +
-  '<span class="module-toggle" role="switch" aria-checked="false" tabindex="0" id="darkModeSwitch" title="Simulate a dark-mode email client in the preview (preview only)">' +
-    '<span class="track"></span>Dark mode' +
-  '</span>' +
   '<div class="seg-control" role="group" aria-label="Dark mode client" id="darkClientControl" style="width:auto" hidden>' +
     '<button type="button" class="active" data-dm="gmail" aria-pressed="true" title="Gmail mobile app (iOS) — inverts the entire email, then re-inverts images">Gmail</button>' +
     '<button type="button" data-dm="outlook" aria-pressed="false" title="Outlook.com / OWA (web) — selectively repairs contrast instead of inverting">Outlook</button>' +
     '<button type="button" data-dm="applemail" aria-pressed="false" title="Apple Mail (macOS 12.4+ / iOS 13+) — respects author dark-mode CSS; this email has none, so it renders unchanged">Apple Mail</button>' +
   '</div>'
 );
-
-const darkModeSwitch = document.getElementById('darkModeSwitch');
 const darkClientControl = document.getElementById('darkClientControl');
-function syncDarkModeSwitch() {
-  darkModeSwitch.classList.toggle('on', darkModeEnabled);
-  darkModeSwitch.setAttribute('aria-checked', String(darkModeEnabled));
-  darkClientControl.hidden = !darkModeEnabled;
-  previewStage.classList.toggle('dark', darkModeEnabled);
-}
-function flipDarkMode() {
-  darkModeEnabled = !darkModeEnabled;
-  syncDarkModeSwitch();
+
+function onDarkModeToggle(isOn) {
+  darkModeEnabled = isOn;
+  darkClientControl.hidden = !isOn;
+  previewStage.classList.toggle('dark', isOn);
   scheduleRender();
 }
-darkModeSwitch.addEventListener('click', flipDarkMode);
-darkModeSwitch.addEventListener('keydown', (e) => {
-  if (e.key === ' ' || e.key === 'Enter') {
-    e.preventDefault();
-    flipDarkMode();
-  }
-});
-syncDarkModeSwitch();
+// persist = false — dark mode is a review-time convenience, not a content
+// decision; IDEA-005 locked it as non-persisting. See CODE-PATTERNS.md.
+const darkModeToggle = createModuleToggle('darkMode', 'Dark mode', false, onDarkModeToggle, false);
+darkModeToggle.element.id = 'darkModeSwitch';
+darkModeToggle.element.title = 'Simulate a dark-mode email client in the preview (preview only)';
+previewHeaderLeft.insertBefore(darkModeToggle.element, darkClientControl);
+
 wireSegControl(darkClientControl.querySelectorAll('button[data-dm]'), (btn) => {
   darkModeClient = btn.dataset.dm;
   scheduleRender();
