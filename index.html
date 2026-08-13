@@ -2483,10 +2483,11 @@ function renderTestHarness() {
   // A fixture is { label, check(), description }; check() is called inside
   // a try/catch so a throwing predicate renders as FAIL rather than
   // aborting the whole harness. New predicate sections should call this.
-  // Not yet migrated: Section 13's MICROCOPY_DOM_GUARDS loop, which is the
-  // same shape but is pinned by TASK-029's fixture-count criterion
-  // (FIND-SPRINT-009-2). The other loops in Sections 1-6 and 11-13 render
-  // an input/expected/actual field shape and deliberately do not fit here.
+  // Section 15's MICROCOPY_DOM_GUARDS loop was migrated onto this helper by
+  // TASK-031 (FIND-SPRINT-009-2) — it was the same { label, check(),
+  // description } shape, differing only in its failText. The other loops
+  // in Sections 1-6 and 13-15 render an input/expected/actual field shape
+  // and deliberately do not fit here.
   function renderPredicateFixtures(body, fixtures, failText = 'FAIL') {
     for (const fixture of fixtures) {
       const pass = (() => { try { return fixture.check(); } catch { return false; } })();
@@ -2834,18 +2835,17 @@ function renderTestHarness() {
 
   renderPredicateFixtures(body, APPLEMAIL_DARK_FIXTURES);
 
-  // --- Section 14: module toggle factory — persistence opt-out + header order (TASK-030) ---
-  // Numbered 14, not 11, even though it is grouped here with the dark-mode
-  // fixtures (Sections 8-10): Sections 11-13 (rich-text italics, richtext
-  // parity, CTA microcopy) already existed on disk from earlier sprints by
-  // the time this task landed, and renumbering them would desync
-  // CHANGELOG.md's "Test harness Sections 11-13" entry, which is out of this
-  // task's file scope. 14 is the next free number; it appears out of
-  // positional order in the DOM (between Sections 10 and 11) intentionally.
-  const h14 = document.createElement('h3');
-  h14.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
-  h14.textContent = 'Module toggle factory — persistence opt-out';
-  body.appendChild(h14);
+  // --- Section 11: module toggle factory — persistence opt-out + header order (TASK-030) ---
+  // Renumbered from 14 to 11 by TASK-031 (FIND-SPRINT-009-6), which owns
+  // CHANGELOG.md and could therefore update its "Test harness Sections
+  // 11-13" entry in the same commit. Source order is now monotonic:
+  // 1-10, 11 (this section), 12 (TASK-031's dark-mode caption, immediately
+  // below), 13-15 (rich-text italics / richtext parity / CTA microcopy,
+  // shifted up two to make room).
+  const h11 = document.createElement('h3');
+  h11.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h11.textContent = 'Module toggle factory — persistence opt-out';
+  body.appendChild(h11);
 
   const MODULE_TOGGLE_FIXTURES = [
     {
@@ -2935,15 +2935,61 @@ function renderTestHarness() {
 
   renderPredicateFixtures(body, MODULE_TOGGLE_FIXTURES);
 
-  // --- Section 11: rich-text italics — em/i normalisation (TASK-025) ---
+  // --- Section 12: dark-mode disclosure caption (TASK-031) ---
+  const h12 = document.createElement('h3');
+  h12.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h12.textContent = 'Dark-mode disclosure caption';
+  body.appendChild(h12);
+
+  const DARK_NOTE_FIXTURES = [
+    {
+      label: 'Every registered dark-mode client has a caption',
+      check() {
+        return Object.keys(DARK_MODE_TRANSFORMS).every(k =>
+          typeof DARK_MODE_CLIENT_NOTES[k] === 'string' && DARK_MODE_CLIENT_NOTES[k].length > 0);
+      },
+      description: 'Adding a fourth client to DARK_MODE_TRANSFORMS without a caption would ship a blank disclosure strip for it. This fixture is the coupling between the two maps.',
+    },
+    {
+      label: 'Picker button titles are sourced from DARK_MODE_CLIENT_NOTES',
+      check() {
+        const btns = Array.from(darkClientControl.querySelectorAll('button[data-dm]'));
+        return btns.length === 3 && btns.every(b => b.title === DARK_MODE_CLIENT_NOTES[b.dataset.dm]);
+      },
+      description: 'One source of truth for the hover detail and the visible caption — a hardcoded title in the markup string would drift from the caption silently.',
+    },
+    {
+      label: 'Caption tracks the toggle and the client selection',
+      check() {
+        const savedEnabled = darkModeEnabled;
+        const savedClient = darkModeClient;
+        try {
+          darkModeEnabled = true; darkModeClient = 'applemail'; syncDarkNote();
+          const onApple = darkNote.hidden === false && darkNote.textContent === DARK_MODE_CLIENT_NOTES.applemail;
+          darkModeClient = 'outlook'; syncDarkNote();
+          const onOutlook = darkNote.textContent === DARK_MODE_CLIENT_NOTES.outlook;
+          darkModeEnabled = false; syncDarkNote();
+          const off = darkNote.hidden === true;
+          return onApple && onOutlook && off;
+        } finally {
+          darkModeEnabled = savedEnabled; darkModeClient = savedClient; syncDarkNote();
+        }
+      },
+      description: 'The caption must be hidden when dark mode is off and must swap text on every client change — wiring only one of the two call sites leaves it stale.',
+    },
+  ];
+
+  renderPredicateFixtures(body, DARK_NOTE_FIXTURES);
+
+  // --- Section 13: rich-text italics — em/i normalisation (TASK-025) ---
   // Fixture 4 (byte-parity) is the load-bearing row here: its `expected`
   // value was captured from the UNMODIFIED richTextToMjText (before the
   // italic pass existed) so this section doubles as a regression lock that
   // the new DOM pass never perturbs non-italic output.
-  const h11 = document.createElement('h3');
-  h11.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
-  h11.textContent = 'rich-text italics — em/i normalisation';
-  body.appendChild(h11);
+  const h13 = document.createElement('h3');
+  h13.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h13.textContent = 'rich-text italics — em/i normalisation';
+  body.appendChild(h13);
 
   const ITALIC_TPL = { ctaBackgroundColor: '#ED1C24' };
   const ITALIC_FIXTURES = [
@@ -2996,11 +3042,11 @@ function renderTestHarness() {
     body.appendChild(row);
   }
 
-  // --- Section 12: richTextToMjText — default parity + style overrides (TASK-026) ---
-  const h12 = document.createElement('h3');
-  h12.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
-  h12.textContent = 'richTextToMjText — default parity + style overrides';
-  body.appendChild(h12);
+  // --- Section 14: richTextToMjText — default parity + style overrides (TASK-026) ---
+  const h14 = document.createElement('h3');
+  h14.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h14.textContent = 'richTextToMjText — default parity + style overrides';
+  body.appendChild(h14);
 
   const RICHTEXT_TPL = { ctaBackgroundColor: '#ED1C24' };
   const RICHTEXT_PARITY_FIXTURES = [
@@ -3130,11 +3176,11 @@ function renderTestHarness() {
     body.appendChild(row);
   }
 
-  // --- Section 13: CTA microcopy — emission gating and muted styling (TASK-027) ---
-  const h13 = document.createElement('h3');
-  h13.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
-  h13.textContent = 'CTA microcopy — emission gating and muted styling';
-  body.appendChild(h13);
+  // --- Section 15: CTA microcopy — emission gating and muted styling (TASK-027) ---
+  const h15 = document.createElement('h3');
+  h15.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h15.textContent = 'CTA microcopy — emission gating and muted styling';
+  body.appendChild(h15);
 
   const MICROCOPY_TPL = { ctaBackgroundColor: '#ED1C24', ctaMicrocopyFontSize: '13px', ctaMicrocopyColor: '#6b6b6b' };
   const MICROCOPY_BLOCK_FIXTURES = [
@@ -3287,19 +3333,7 @@ function renderTestHarness() {
     },
   ];
 
-  for (const guard of MICROCOPY_DOM_GUARDS) {
-    const pass = (() => { try { return guard.check(); } catch { return false; } })();
-    const row = document.createElement('div');
-    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
-    row.innerHTML =
-      '<div class="harness-row-label">' +
-        '<span>' + escapeHtml(guard.label) + '</span>' +
-        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
-      '</div>' +
-      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(guard.description) + '</code></div>' +
-      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — guard returned false') + '</code></div>';
-    body.appendChild(row);
-  }
+  renderPredicateFixtures(body, MICROCOPY_DOM_GUARDS, 'FAIL — guard returned false');
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
