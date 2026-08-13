@@ -2454,6 +2454,28 @@ function renderTestHarness() {
     body.appendChild(row);
   }
 
+  // Shared row renderer for every predicate-shaped harness section below.
+  // A fixture is { label, check(), description }; check() is called
+  // inside a try/catch so a throwing predicate renders as FAIL rather
+  // than aborting the whole harness. Sections 5 and 6 deliberately do NOT
+  // use this — they render a different field shape (input/expected/actual)
+  // and are left alone. body/fixtures/failText are the parameters below.
+  function renderPredicateFixtures(body, fixtures, failText = 'FAIL') {
+    for (const fixture of fixtures) {
+      const pass = (() => { try { return fixture.check(); } catch { return false; } })();
+      const row = document.createElement('div');
+      row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+      row.innerHTML =
+        '<div class="harness-row-label">' +
+          '<span>' + escapeHtml(fixture.label) + '</span>' +
+          '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+        '</div>' +
+        '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+        '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : failText) + '</code></div>';
+      body.appendChild(row);
+    }
+  }
+
   // --- Section 7: script-not-truncated regression guard (TASK-020) ---
   // Asserts that the module script body was NOT truncated by the HTML parser.
   // Strategy: if the script was truncated, render() never ran and lastHtml is
@@ -2482,19 +2504,7 @@ function renderTestHarness() {
     },
   ];
 
-  for (const guard of TRUNCATION_GUARDS) {
-    const pass = (() => { try { return guard.check(); } catch { return false; } })();
-    const row = document.createElement('div');
-    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
-    row.innerHTML =
-      '<div class="harness-row-label">' +
-        '<span>' + escapeHtml(guard.label) + '</span>' +
-        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
-      '</div>' +
-      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(guard.description) + '</code></div>' +
-      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — script was truncated or wiring did not run') + '</code></div>';
-    body.appendChild(row);
-  }
+  renderPredicateFixtures(body, TRUNCATION_GUARDS, 'FAIL — script was truncated or wiring did not run');
 
   // --- Section 8: dark-mode preview transforms — Gmail (TASK-021) ---
   // Every function under test is pure string-in/string-out, so fixtures
@@ -2581,19 +2591,7 @@ function renderTestHarness() {
     },
   ];
 
-  for (const fixture of DARK_MODE_FIXTURES) {
-    const pass = (() => { try { return fixture.check(); } catch { return false; } })();
-    const row = document.createElement('div');
-    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
-    row.innerHTML =
-      '<div class="harness-row-label">' +
-        '<span>' + escapeHtml(fixture.label) + '</span>' +
-        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
-      '</div>' +
-      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
-      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
-    body.appendChild(row);
-  }
+  renderPredicateFixtures(body, DARK_MODE_FIXTURES);
 
   // --- Section 9: dark-mode preview transforms — Outlook (TASK-022) ---
   // Same predicate-fixture shape and row renderer as Section 8. All
@@ -2705,19 +2703,7 @@ function renderTestHarness() {
     },
   ];
 
-  for (const fixture of OUTLOOK_DARK_FIXTURES) {
-    const pass = (() => { try { return fixture.check(); } catch { return false; } })();
-    const row = document.createElement('div');
-    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
-    row.innerHTML =
-      '<div class="harness-row-label">' +
-        '<span>' + escapeHtml(fixture.label) + '</span>' +
-        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
-      '</div>' +
-      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
-      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
-    body.appendChild(row);
-  }
+  renderPredicateFixtures(body, OUTLOOK_DARK_FIXTURES);
 
   // --- Section 10: dark-mode preview transforms — Apple Mail + author-CSS drift guard (TASK-023) ---
   // Same predicate-fixture shape and row renderer as Sections 8/9. Fixture
@@ -2780,19 +2766,7 @@ function renderTestHarness() {
     },
   ];
 
-  for (const fixture of APPLEMAIL_DARK_FIXTURES) {
-    const pass = (() => { try { return fixture.check(); } catch { return false; } })();
-    const row = document.createElement('div');
-    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
-    row.innerHTML =
-      '<div class="harness-row-label">' +
-        '<span>' + escapeHtml(fixture.label) + '</span>' +
-        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
-      '</div>' +
-      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
-      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
-    body.appendChild(row);
-  }
+  renderPredicateFixtures(body, APPLEMAIL_DARK_FIXTURES);
 
   // --- Section 11: rich-text italics — em/i normalisation (TASK-025) ---
   // Fixture 4 (byte-parity) is the load-bearing row here: its `expected`
