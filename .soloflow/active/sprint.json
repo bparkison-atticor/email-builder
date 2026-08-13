@@ -13,13 +13,6 @@
     "created_at": "2026-08-13T13:35:03.000Z"
   },
   "tasks": {
-    "TASK-031": {
-      "status": "pending",
-      "depends_on": [
-        "TASK-030"
-      ],
-      "idea": "SPRINT-006-007-compound"
-    },
     "TASK-032": {
       "status": "pending",
       "depends_on": [
