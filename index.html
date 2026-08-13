@@ -2740,11 +2740,18 @@ function renderTestHarness() {
 
   const APPLEMAIL_DARK_FIXTURES = [
     {
-      label: 'Detector: authored beats meta (substring-ordering trap)',
+      label: 'Detector: authored — plain @media block',
       check() {
         return detectAuthorDarkScheme('<style>@media (prefers-color-scheme: dark){body{color:#fff}}</style>') === 'authored';
       },
-      description: '"prefers-color-scheme" contains the substring "color-scheme", so a detector that checked meta-only first would misclassify this input as meta-only. It must return authored.',
+      description: 'Locks the primary authored-detection path. This input alone cannot detect a branch reorder in detectAuthorDarkScheme — it contains no meta-name signal for the swapped branch to falsely win against, so the next fixture exists specifically to catch that mutation.',
+    },
+    {
+      label: 'Detector: authored beats meta (substring-ordering trap)',
+      check() {
+        return detectAuthorDarkScheme('<meta name="color-scheme" content="light dark"><style>@media (prefers-color-scheme: dark){body{color:#fff}}</style>') === 'authored';
+      },
+      description: 'Both a meta-name signal and a real authored block are present; only the shipped branch order returns authored — either reordering returns meta-only.',
     },
     {
       label: 'Detector: color-scheme meta',
@@ -2762,6 +2769,16 @@ function renderTestHarness() {
         return detectAuthorDarkScheme('<html><head><meta name="format-detection" content="telephone=no"></head><body>x</body></html>') === 'none';
       },
       description: 'An input with neither prefers-color-scheme nor a color-scheme signal must classify as none.',
+    },
+    {
+      label: 'Detector: CSS color-scheme property with a keyword value is meta-only',
+      check() { return detectAuthorDarkScheme('<style>:root{color-scheme:light dark}</style>') === 'meta-only'; },
+      description: 'The CSS color-scheme property (not just the meta name) with a recognized keyword value must classify as meta-only — this is the real, common email-authoring pattern the tightened regex still needs to catch.',
+    },
+    {
+      label: 'Detector: prose "color-scheme:" with a non-keyword value is none',
+      check() { return detectAuthorDarkScheme('<p>Ask about our color-scheme: blue and white.</p>') === 'none'; },
+      description: 'Marketer body copy reaches this function through the compiled HTML. "color-scheme: blue and white" contains no HTML-special characters and survives escapeHtml verbatim — a false positive here would silently flip Apple Mail out of its identity pass-through into a partial invert (FIND-SPRINT-007-14).',
     },
     {
       label: 'Pass-through is exact identity when scheme is none',
