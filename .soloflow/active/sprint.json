@@ -2,7 +2,7 @@
   "version": 2,
   "sprint": {
     "id": "SPRINT-008",
-    "status": "active",
+    "status": "complete",
     "started": "2026-08-12T17:58:06.000Z",
     "execution_mode": "serial"
   },
