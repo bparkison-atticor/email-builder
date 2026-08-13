@@ -3896,6 +3896,20 @@ function appleMailDarkTransform(html) {
 }
 const DARK_MODE_TRANSFORMS = { gmail: gmailDarkTransform, outlook: outlookDarkTransform, applemail: appleMailDarkTransform };
 
+// DARK_MODE_CLIENT_NOTES — the single source of truth for what the
+// preview is currently simulating. Feeds BOTH the visible #darkNote
+// caption and the picker buttons' title attributes, so the two can never
+// drift. Visible text is what makes this reach keyboard and screen-reader
+// users: a title attribute is hover-only and loses the accessible-name
+// computation to the button's own text content (FIND-SPRINT-007-19/20).
+// Keys must stay in sync with DARK_MODE_TRANSFORMS — harness Section 12
+// asserts that.
+const DARK_MODE_CLIENT_NOTES = {
+  gmail: 'Simulating Gmail (iOS app): the whole email is inverted, then images are re-inverted so photos stay right.',
+  outlook: 'Simulating Outlook.com / OWA: light backgrounds are darkened and low-contrast text is lifted; colors that are already dark are left alone.',
+  applemail: 'Simulating Apple Mail: it only goes dark when the email carries its own dark-mode CSS. This email carries none, so the preview is intentionally unchanged.',
+};
+
 // applyDarkMode(html) — preview-only step in the srcdoc transform chain.
 // Returns `html` unchanged when dark mode is off or the selected client
 // has no registered transform. Never applied to lastHtml (Copy HTML /
@@ -4097,17 +4111,30 @@ previewHeaderLeft.appendChild(testDataToggle.element);
 previewHeaderLeft.insertAdjacentHTML('beforeend',
   '<span class="divider" aria-hidden="true"></span>' +
   '<div class="seg-control" role="group" aria-label="Dark mode client" id="darkClientControl" style="width:auto" hidden>' +
-    '<button type="button" class="active" data-dm="gmail" aria-pressed="true" title="Gmail mobile app (iOS) — inverts the entire email, then re-inverts images">Gmail</button>' +
-    '<button type="button" data-dm="outlook" aria-pressed="false" title="Outlook.com / OWA (web) — selectively repairs contrast instead of inverting">Outlook</button>' +
-    '<button type="button" data-dm="applemail" aria-pressed="false" title="Apple Mail (macOS 12.4+ / iOS 13+) — respects author dark-mode CSS; this email has none, so it renders unchanged">Apple Mail</button>' +
+    '<button type="button" class="active" data-dm="gmail" aria-pressed="true">Gmail</button>' +
+    '<button type="button" data-dm="outlook" aria-pressed="false">Outlook</button>' +
+    '<button type="button" data-dm="applemail" aria-pressed="false">Apple Mail</button>' +
   '</div>'
 );
 const darkClientControl = document.getElementById('darkClientControl');
+// Titles and the caption both read DARK_MODE_CLIENT_NOTES — one source,
+// no drift. The titles are supplementary hover detail only; the caption
+// is the disclosure that actually has to work.
+for (const btn of darkClientControl.querySelectorAll('button[data-dm]')) {
+  btn.title = DARK_MODE_CLIENT_NOTES[btn.dataset.dm] || '';
+}
+
+const darkNote = document.getElementById('darkNote');
+function syncDarkNote() {
+  darkNote.hidden = !darkModeEnabled;
+  darkNote.textContent = DARK_MODE_CLIENT_NOTES[darkModeClient] || '';
+}
 
 function onDarkModeToggle(isOn) {
   darkModeEnabled = isOn;
   darkClientControl.hidden = !isOn;
   previewStage.classList.toggle('dark', isOn);
+  syncDarkNote();
   scheduleRender();
 }
 // persist = false — dark mode is a review-time convenience, not a content
@@ -4119,6 +4146,7 @@ previewHeaderLeft.insertBefore(darkModeToggle.element, darkClientControl);
 
 wireSegControl(darkClientControl.querySelectorAll('button[data-dm]'), (btn) => {
   darkModeClient = btn.dataset.dm;
+  syncDarkNote();
   scheduleRender();
 });
 
