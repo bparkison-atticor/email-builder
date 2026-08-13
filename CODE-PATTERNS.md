@@ -92,5 +92,9 @@ to a canonical example — read those for the actual implementation.
   - `#testDataHint` (`.hint` element below the JSON textarea — grep `id="testDataHint"`) — JSON parse errors only, set via `setTestDataHint()`. Do NOT use for Handlebars compile or render errors.
   - `#warn` (`.warn` banner above the preview iframe — grep `id="warn"`) — template compile errors, MJML warnings, and placeholder image notices. Set via `showWarn()`. Template errors are staged in the module-scope `templateError` variable (set inside `applyTestData()`) and folded in by `render()` at the `warnings.unshift(templateError)` call. Any new error that requires marketer attention during preview must go through `#warn`.
 
+## Documentation Conventions
+
+- **Doc anchors, not line numbers.** CODE-PATTERNS.md, ARCHITECTURE.md, CLAUDE.md and README.md point at code with a greppable needle in the form grep `function wireSegControl` — a function name, an element id, or a unique call expression. Line-number pointers rot silently and were all removed in commit 043ee5d after drifting 400–1500 lines. Anchors still break when an identifier is renamed, so the Ctrl+Shift+T harness's *Documentation anchor drift guard* section extracts every anchor from these four files at runtime and fails if one no longer resolves in `index.html`. When you rename an anchored identifier, update the doc in the same commit.
+
 `/sf:compound` will append patterns extracted from completed sprints to
 this file over time.
