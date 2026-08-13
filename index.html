@@ -3707,8 +3707,10 @@ function outlookDarkTransform(html) {
 // three author-dark-CSS states: 'authored' (the string
 // `prefers-color-scheme` appears anywhere — today only as an
 // @media (prefers-color-scheme: dark) block), 'meta-only' (a
-// color-scheme / supported-color-schemes signal in either meta-name or
-// CSS-property form, with no dark rules behind it), or 'none' (neither).
+// color-scheme / supported-color-schemes signal — either as a meta name,
+// or as a CSS `color-scheme:` property whose value is a recognized
+// keyword (`light` / `dark` / `normal`, optionally prefixed `only`) —
+// with no dark rules behind it), or 'none' (neither).
 //
 // BRANCH ORDER IS LOAD-BEARING: the string `prefers-color-scheme`
 // contains `color-scheme` as a substring, so the 'authored' check MUST
@@ -3718,10 +3720,15 @@ function outlookDarkTransform(html) {
 function detectAuthorDarkScheme(html) {
   if (/prefers-color-scheme/i.test(html)) return 'authored';
   if (/name=["']?(?:color-scheme|supported-color-schemes)/i.test(html)) return 'meta-only';
-  // The [;{"'\s] prefix requires a preceding delimiter so this cannot
-  // match inside the substring "prefers-color-scheme:" — belt-and-braces
-  // given the authored check above already short-circuits that case.
-  if (/[;{"'\s]color-scheme\s*:/i.test(html)) return 'meta-only';
+  // Requires a recognized color-scheme keyword value. Without it, ordinary
+  // marketer prose ("Ask about our color-scheme: blue and white") — which
+  // contains no HTML-special characters and so survives escapeHtml verbatim
+  // into the compiled HTML — would flip Apple Mail out of its identity
+  // pass-through into a full partial invert (FIND-SPRINT-007-14). The
+  // [;{"'\s] prefix additionally keeps this from matching inside the
+  // substring "prefers-color-scheme:", belt-and-braces given the authored
+  // check above already short-circuits that case.
+  if (/[;{"'\s]color-scheme\s*:\s*(?:only\s+)?(?:light|dark|normal)\b/i.test(html)) return 'meta-only';
   return 'none';
 }
 
