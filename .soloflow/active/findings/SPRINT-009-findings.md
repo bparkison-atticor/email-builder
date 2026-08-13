@@ -1,7 +1,7 @@
 ---
 sprint: SPRINT-009
-pending_count: 20
-last_updated: "2026-08-13T20:15:00.000Z"
+pending_count: 25
+last_updated: "2026-08-13T17:02:17.852Z"
 ---
 # Findings Queue
 
@@ -85,7 +85,7 @@ SPRINT-009 started with missing infra: maestro; tests deferred.
 - **location:** index.html:2873-2884
 - **description:** Two small hygiene issues in the new "Preview header append order" fixture. (1) The label enumerates six children including both `<span class="divider">` elements, but the predicate only checks the viewport control, the Test data toggle, `#darkModeSwitch`, `#darkClientControl` and a `module-toggle` count of 2 — neither divider is asserted, so deleting the static trailing divider (the exact element the new HTML comment hangs its contract on) leaves this row green. (2) `at(el => !!el.querySelector && !!el.querySelector('button[data-vp]'))` guards against a missing `querySelector` method on a value that came from `Array.from(container.children)` and is therefore always an Element; the three sibling predicates on the next lines use `el.classList` / `el.id` with no such guard, so the file is internally inconsistent about a condition that cannot be false. Neither affects what the fixture currently catches (the load-bearing control ordering is asserted correctly), which is why this is queued rather than raised against the task.
 - **suggested_action:** When a future task next touches this fixture: drop the `!!el.querySelector &&` half of the viewport predicate, and either add a divider assertion (e.g. `kids.filter(el => el.classList.contains('divider')).length === 2`) or trim the label to name only what is checked.
-- **resolved_by:**
+- **resolved_by:** 
 
 ## FIND-SPRINT-009-9
 - **source:** TASK-031 (verifier)
@@ -95,7 +95,7 @@ SPRINT-009 started with missing infra: maestro; tests deferred.
 - **location:** index.html:2482
 - **description:** The `renderPredicateFixtures` header comment still opens with "Shared row renderer for the predicate-shaped harness sections (7-10)." That scope was accurate when TASK-029 extracted the helper, but Section 11 (TASK-030), Section 12 (TASK-031) and Section 15 (migrated by TASK-031 in this task) now call it too — seven call sites plus the definition. The rest of the comment was correctly updated by TASK-031 to retire the FIND-SPRINT-009-2 deferral note, so only the opening range is stale. A maintainer reading the first line would conclude the helper is dark-mode-transform-specific and hand-roll an eighth copy of the loop for a new section, which is exactly the duplication the extraction retired.
 - **suggested_action:** Replace "(7-10)" with a non-enumerating phrase — e.g. "for harness sections whose fixtures are `{ label, check(), description }`" — so the comment does not need editing every time a section is added. Avoid a new explicit range; the two prior ranges in this file both went stale within one sprint.
-- **resolved_by:**
+- **resolved_by:** 
 
 ## FIND-SPRINT-009-10
 - **source:** TASK-031 (verifier)
@@ -105,7 +105,7 @@ SPRINT-009 started with missing infra: maestro; tests deferred.
 - **location:** .soloflow/active/plans/dark-mode-preview-hardening/TASK-031-plan.md:75-79
 - **description:** Third instance in this sprint of the grep-proxy anti-pattern already logged as FIND-SPRINT-009-3 and FIND-SPRINT-009-5, and the second time a plan contradicts itself. TASK-031's step 1 defines a completeness gate — `grep -rn "reads as a deliberate result\|deliberate result" --include="*.html" --include="*.md" .` must return "zero matches outside `.soloflow/`" — but the same plan's step 9 supplies the replacement CHANGELOG text verbatim, and that text contains the phrase: `claimed it made the Apple Mail no-op "read as a deliberate result" have been corrected`. Writing step 9 as specified necessarily leaves one match at CHANGELOG.md:9, so step 1's gate is unsatisfiable by construction. The frontmatter acceptance criteria happen to be narrower and are literally satisfied (criterion 8 greps only `index.html`, criterion 9 greps the full phrase "reads as a deliberate result", which the new text does not contain because it quotes the claim in the past tense), so this cost nothing this time — but it only worked by accident of tense. Three occurrences in one sprint, all from different planning passes.
 - **suggested_action:** Add a planner rule: any grep-based completeness gate must be run mentally against the plan's own prescribed replacement text before the plan is issued, and a gate whose target string is deliberately quoted in the correction should scope itself (e.g. exclude the file that carries the correction, or match on the surrounding sentence rather than the fragment). Pairs with FIND-SPRINT-009-3 and -5; three instances makes this a CLAUDE.md / planner-prompt line rather than a per-plan note.
-- **resolved_by:**
+- **resolved_by:** 
 
 ## FIND-SPRINT-009-11
 - **source:** TASK-031 (verifier)
@@ -205,7 +205,7 @@ SPRINT-009 started with missing infra: maestro; tests deferred.
 - **location:** index.html:992-1003 (grep `TEMPLATE CONFIGS`, the banner comment above `const templates`)
 - **description:** The `TEMPLATE CONFIGS` banner comment directly above the `templates` map is a second, competing copy of the brand-entry schema list, and it is stale in exactly the way TASK-032 just repaired in README. It documents 8 keys (`bannerImageUrl`, `bannerHref`, `ctaBackgroundColor`, `ctaTextColor`, `unsubscribeHtml`, `disclosureHtml`, `ctaMicrocopyFontSize`, `ctaMicrocopyColor`) and omits 5 live ones (`name`, `bannerAlt`, `bannerWidth`, `bannerHtml`, `bannerBackgroundColor`) — including two of the three keys this task added to README. This matters more than an ordinary stale comment because README's Templates section now points the reader *at this block* ("Scroll to the `TEMPLATE CONFIGS` block ... to edit them"), so a developer following the documented path lands on the stale list rather than the freshly-reconciled one, and because the new schema fixture polices only the README copy — nothing guards this one, so it will keep drifting. Out of diff: TASK-032 did not touch this region and no acceptance criterion covered it, so this is queued rather than raised against the task.
 - **suggested_action:** Either (a) reduce the banner comment to a pointer — "Brand entry schema is documented in README.md's Templates section; every key on any entry must appear there (enforced by the harness's Documentation anchor drift guard)" — which removes the second copy entirely and is the lower-maintenance option, or (b) bring the comment back in sync and extend the schema fixture to assert the same key set against the fetched `index.html` banner-comment block so both copies are guarded. Prefer (a).
-- **resolved_by:**
+- **resolved_by:** 
 
 ## FIND-SPRINT-009-21
 - **source:** TASK-033 (verifier)
@@ -215,7 +215,7 @@ SPRINT-009 started with missing infra: maestro; tests deferred.
 - **status:** open
 - **description:** TASK-033 centers the microcopy in the *output* but nothing centers it in the *compose panel*, so the CTA microcopy field is now the only editor in the app whose on-screen alignment disagrees with what it compiles to. Verified in a headless run against 341b5e1: typing "No cost, no obligation." leaves the Quill editor rendering flush-left (no `text-align` rule exists for `#ctaMicrocopy .ql-editor`, and Quill's default is inherited left) while the compiled cell is `align="center"` / `text-align:center`. The marketer is not blind to this — the preview iframe shows the true centered result — but the field they are typing into now lies about its own output, which is the kind of small divergence that generates "why does it move when I copy it out" support questions. Body copy has no such gap (left in both). Out of diff in the sense that the plan deliberately scoped the change to `richTextToMjText`/`buildMicrocopyBlock` and never mentioned editor chrome, so this is queued rather than raised against the task.
 - **suggested_action:** Add a single CSS rule — `#ctaMicrocopy .ql-editor { text-align: center; }` — so the compose field previews its own alignment, and add a DOM guard to `MICROCOPY_DOM_GUARDS` asserting the computed `text-align` of `#ctaMicrocopy .ql-editor` matches the `align` value `buildMicrocopyBlock` passes, so the two cannot drift apart if the output alignment is ever changed or made brand-configurable.
-- **resolved_by:**
+- **resolved_by:** 
 
 ## FIND-SPRINT-009-22
 - **source:** TASK-033 (verifier)
@@ -226,3 +226,124 @@ SPRINT-009 started with missing infra: maestro; tests deferred.
 - **description:** Findings whose `suggested_action` is addressed to "whichever task next owns file X" are not reaching the planner, so they silently expire. Concrete instance: FIND-SPRINT-009-11 says "In whichever task next owns CHANGELOG.md, add a 'Test harness Section 12' bullet to the 2026-08-12 dark-mode caption entry naming the four caption fixtures and stating the 11-13 to 13-15 renumbering." TASK-033 was that task — it owns CHANGELOG.md in `files_owned` and edited it — but the plan's step 9 reads only "Add a CHANGELOG.md entry," never referencing the queue, so the executor correctly implemented the plan and the finding stayed open with its dangling cross-reference intact. This is not a TASK-033 defect: executors work from plans, not from the findings queue. It is a routing gap, and it will keep recurring because file-scoped suggested_actions are a natural thing for verifiers and code-reviewers to write. Cost compounds: the deferred cleanup gets re-flagged every sprint while the file keeps being edited past it. TASK-033's own CHANGELOG entry also documents its two new fixtures inline in the Fixed paragraph rather than with the "Test harness Sections N" bullet every neighbouring entry uses, which is the same convention FIND-11 was pointing at.
 - **suggested_action:** Have the planner grep the active findings file for `status: open` entries whose `location` or `suggested_action` names any file in the new task's `files_owned`, and either fold them into the plan's steps or state in the plan why they are being skipped. A one-line addition to the planner prompt plus a note in CLAUDE.md's conventions section ("a plan that owns a file should account for the open findings against that file") would close it.
 - **resolved_by:** 
+
+## FIND-SPRINT-009-23
+- **source:** SPRINT-009 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** medium
+- **status:** open
+- **location:** index.html:1916, 4294-4306 (grep `function onDarkModeToggle`); harness writers at 2556, 2617-2618, 2627-2628, 2973-2981
+- **description:** Dark-mode on/off now has two sources of truth, and the sprint's own harness writes the wrong one. TASK-030 rebuilt the dark-mode switch on `createModuleToggle`, so the authoritative state is the factory's internal `let state` closure, exposed as `darkModeToggle.isOn()`. But the pre-existing module global was kept:
+- **suggested_action:** Pick one owner for the flag. Preferred: delete `let darkModeEnabled`, have `applyDarkMode` and `syncDarkNote` read `darkModeToggle.isOn()`, and add a `set(bool)` method to the `createModuleToggle` return object (routing through the same `sync()` + `onChange()` path as `flip()`) so the harness can force state without bypassing the setter; then rewrite the eleven direct-assignment sites to call it. Cheaper alternative: keep the mirror but comment it at :1916 as a deliberate harness seam, and add one Section 11 fixture asserting `darkModeToggle.isOn() === darkModeEnabled` after a real click, so the two can never silently diverge.
+- **resolved_by:** 
+
+
+
+
+
+
+    let darkModeEnabled = false;                 // :1916 - mirror
+    function onDarkModeToggle(isOn) {            // :4294 - the only production writer
+      darkModeEnabled = isOn;
+      darkClientControl.hidden = !isOn;
+      previewStage.classList.toggle('dark', isOn);
+      syncDarkNote();
+      scheduleRender();
+    }
+
+`darkModeToggle.isOn()` is dead - grep shows zero call sites anywhere in the file, while `darkModeEnabled` is read by `applyDarkMode` (:4084) and `syncDarkNote` (:4290). This also splits the codebase's own convention: `ctaToggle.isOn()` and `promoToggle.isOn()` are read directly with no mirror; `testDataToggle`/`darkModeToggle` keep mirrors. It was 1-vs-2 before this sprint and is 2-vs-2 now.
+
+The consequence is coverage, not a live bug. `onDarkModeToggle` is a five-field setter, and eleven harness sites across two tasks assign `darkModeEnabled`/`darkModeClient` directly instead of going through it (TASK-029 at 2556/2617-2618/2627-2628, TASK-031 at 2973-2981). A sixth side effect added to `onDarkModeToggle` would be invisible to every one of them. During those fixtures the app also sits in a state production cannot reach - e.g. at :2617 `darkModeEnabled === true` while `#darkNote` is still hidden and `.preview-stage` still lacks `.dark`. Only TASK-030's Section 11 live-click fixture and TASK-031's Section 12 fixture 4 drive the real path.
+
+Suspected tasks: TASK-029, TASK-030, TASK-031
+
+## FIND-SPRINT-009-24
+- **source:** SPRINT-009 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** medium
+- **status:** open
+- **location:** index.html:3448 (grep `src.includes(needle)`), against the non-production occurrences at 767, 2861, 2874, 2886
+- **description:** TASK-032's anchor-drift guard can pass vacuously on needles that TASK-030 added elsewhere in the same sprint. The guard asserts only that a doc anchor occurs somewhere in index.html's source text:
+- **suggested_action:** Make the guard search production code only. Slice `src` at the `function renderTestHarness(` offset (and again at its closing brace) and run `includes(needle)` against the region outside it, then strip `<!-- ... -->` HTML comments from what remains. Both edits are local to the async IIFE at index.html:3396-3455. If that is too blunt, at minimum add a Section 16 row asserting that `createModuleToggle('` occurs at least twice outside the harness body, and replace the harness probe ids with a call spelling the needle cannot match (e.g. `const mk = createModuleToggle; mk('__harnessProbeA', ...)`).
+- **resolved_by:** 
+
+
+
+
+
+    check: () => src.includes(needle),     // :3448
+
+CODE-PATTERNS.md anchors `createModuleToggle('`. That string now occurs eight times in index.html, and four are not production code - all four added by TASK-030 in this sprint:
+
+    767:  (createModuleToggle('testData', ...) -> previewHeaderLeft.appendChild),   <-- HTML comment
+    2861: const t = createModuleToggle('__harnessProbeA', 'probe', false, ...);     <-- harness probe
+    2874: const t = createModuleToggle('__harnessProbeB', 'probe', true, ...);      <-- harness probe
+    2886: const t = createModuleToggle('__harnessProbeC', 'probe', false, ...);     <-- harness probe
+
+Deleting all four real call sites (4260, 4303, 4394, 4403) leaves the row green. The guard's own header comment at :3387 says "DO NOT write any anchor needle as a literal anywhere in this file" and names FIND-SPRINT-007-7 as the trap it exists to avoid - but that rule was already violated by commits that landed earlier in the same sprint, and the guard has no way to enforce it. A second instance predates the sprint: `.seg-body` occurs four times, two of which are harness fixture strings at 3357/3359, so the CSS rule at 133 could be deleted with the row still green.
+
+Neither per-task reviewer could see this: TASK-030's reviewer saw the probes with no guard yet in the tree, TASK-032's reviewer saw the guard and had no reason to audit another task's fixtures.
+
+Suspected tasks: TASK-030, TASK-032
+
+## FIND-SPRINT-009-25
+- **source:** SPRINT-009 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** medium
+- **status:** open
+- **location:** CHANGELOG.md:1-16 (the 2026-08-13 and 2026-08-12 entries) and CHANGELOG.md:33 (the 2026-08-11 dark-mode entry)
+- **description:** Two of the sprint's five completed tasks left no CHANGELOG trace. `git log --pretty=format:'%h %s' 7149a42..HEAD -- CHANGELOG.md` returns exactly two commits - 0bf9b49 (TASK-031) and 341b5e1 (TASK-033). TASK-030 and TASK-032 wrote none, despite both shipping changes at the same level of detail the file documents elsewhere:
+- **suggested_action:** Add one dated CHANGELOG entry covering TASK-030 and TASK-032 together - a `### Changed` bullet for the `persist` parameter and the dark-mode switch's migration onto `createModuleToggle`, and an `### Added` bullet for harness Section 16 plus the README schema reconciliation. In the same edit, amend CHANGELOG.md:33 so the 2026-08-11 sentence points forward to the migration instead of describing a control that no longer exists, and fold in the Section 11/12 bullets FIND-SPRINT-009-11 asks for so the harness inventory reads 11-16 in one pass.
+- **resolved_by:** 
+
+
+
+
+  - TASK-030 changed a documented factory signature - `createModuleToggle(id, label, defaultOn, onChange, persist = true)` - and replaced the hand-rolled dark-mode switch with a factory call. CODE-PATTERNS.md was updated (cd3b4ba); CHANGELOG.md was not.
+  - TASK-032 added harness Section 16 (the doc-anchor drift guard, ~90 lines) and corrected README's templates schema list. Neither is mentioned.
+
+The gap also leaves an existing entry stale rather than merely incomplete. CHANGELOG.md:33 (2026-08-11) still describes the switch as a standalone control: "New `module-toggle` in the preview header (next to the Test data toggle) flips a preview-only `darkModeEnabled` flag" - accurate for the hand-rolled version TASK-030 deleted, and it is the only place a reader is told how that control is built. Separately, the 2026-08-12 entry's harness inventory stops at "Test harness Sections 13-15", so Sections 11, 12 and 16 - all three added this sprint - appear nowhere in the file.
+
+This is aggregate-only: each per-task reviewer saw a task that either wrote a changelog entry or plausibly did not need one; the 2-of-5 pattern and the stale 2026-08-11 sentence appear only when the sprint is read as one PR. Related but narrower: FIND-SPRINT-009-11 (missing Section 12 bullet) and FIND-SPRINT-009-22 (why it never got written).
+
+Suspected tasks: TASK-030, TASK-032
+
+## FIND-SPRINT-009-26
+- **source:** SPRINT-009 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** low
+- **status:** open
+- **location:** ARCHITECTURE.md:27 (Dark-mode preview simulation), :30 (UI controls), :41-47 (Data Model)
+- **description:** ARCHITECTURE.md is the one entry doc CLAUDE.md points at that no task reconciled, even though TASK-032 owned the file and built the doc-drift guard. Three of its bullets are now incomplete in ways that matter to the next agent entering the codebase:
+- **suggested_action:** Extend the three bullets in one edit: add DARK_MODE_CLIENT_NOTES / #darkNote to the dark-mode bullet at :27 (with a grep-anchor for const DARK_MODE_CLIENT_NOTES so the drift guard covers it), add createModuleToggle() to the UI controls bullet at :30 noting the persist opt-out, and qualify the Data Model localStorage line at :43 as "test data JSON and persisting toggle state (dark mode opts out)". Raise ARCHITECTURE.md's ANCHOR_FLOORS value at index.html:3393 from 2 in the same commit if an anchor is added.
+- **resolved_by:** 
+
+
+
+  - :27 Dark-mode preview simulation - describes the transform registry and detectAuthorDarkScheme but not DARK_MODE_CLIENT_NOTES or the #darkNote disclosure caption, which TASK-031's own comment (index.html:4057-4064) calls "the PRIMARY disclosure that a simulation is running". The architecture doc still implies the simulation has no user-facing explanation surface.
+  - :30 UI controls - names wireSegControl() and updateCtaPreview() but never createModuleToggle, now the factory behind all four toggles in the app after TASK-030 migrated the last hand-rolled one onto it.
+  - :41-47 Data Model - "localStorage (test data JSON and toggle state)" is now conditional: persist:false toggles neither read nor write storage.
+
+TASK-032's guard cannot catch any of this. It asserts only that each grep-anchor needle still resolves in index.html; ARCHITECTURE.md's two anchors (const templates, id="preview") both resolve, so the section is green while the prose around them ages. Nothing here is false, so this is a completeness gap rather than a correctness bug.
+
+Suspected tasks: TASK-030, TASK-031, TASK-032
+
+## FIND-SPRINT-009-27
+- **source:** SPRINT-009 (sprint-code-reviewer)
+- **type:** improvement
+- **severity:** low
+- **status:** open
+- **location:** index.html:2612-2632 (Section 8 purity guard), 2905-2940 (Section 11 live switch), 2988-3005 (Section 12 live picker), 3396-3403 (Section 16 fetch)
+- **description:** Opening the harness now mutates the running app and recompiles the email several times. Before this sprint every fixture was pure string-in/string-out; three tasks each added "just one" live fixture and the aggregate is visible to the user:
+- **suggested_action:** Two cheap mitigations, both local to renderTestHarness. (1) Hide the churn: set style.visibility='hidden' on #previewStage (or wrap in a single class toggle) for the duration of the live-DOM fixtures in Sections 11 and 12 and restore it in the same finally blocks that already restore toggle state. (2) Drop one compile: Section 8's purity guard at :2612 only needs lastHtml and els.preview.srcdoc from a single render() - the finally's second render() exists to restore state, so gate it on whether the saved state actually differed (if (savedEnabled !== true || savedClient !== 'gmail') render()). Optionally give Section 16's fetch a module-level cache keyed by path so repeated Ctrl+Shift+T does not re-download index.html each time.
+- **resolved_by:** 
+
+
+  - TASK-029, Section 8: forces darkModeEnabled/darkModeClient and calls render() twice (once in the body, once in the finally) - two full synchronous mjml2html compiles.
+  - TASK-030, Section 11: clicks the real #darkModeSwitch twice, each firing onDarkModeToggle -> scheduleRender().
+  - TASK-031, Section 12: clicks the real Apple Mail picker button plus a restore click, each firing scheduleRender().
+  - TASK-032, Section 16: fetches README.md, CODE-PATTERNS.md, ARCHITECTURE.md, CLAUDE.md and index.html with cache:'no-store' - a full re-download of the app's own source on every harness open, repeated on every Ctrl+Shift+T.
+
+Because the two live sections drive the real toggle, the preview iframe visibly flips into dark mode and back while the harness renders, and .preview-stage picks up and drops its .dark class - a flicker in a dev tool that previously had no side effects. Every fixture restores correctly, so this is cost and surprise, not breakage. No per-task reviewer could weigh it: each saw one addition against a baseline that already looked cheap.
+
+Suspected tasks: TASK-029, TASK-030, TASK-031, TASK-032
