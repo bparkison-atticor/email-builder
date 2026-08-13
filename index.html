@@ -3354,6 +3354,89 @@ function renderTestHarness() {
   ];
 
   renderPredicateFixtures(body, MICROCOPY_DOM_GUARDS, 'FAIL — guard returned false');
+
+  // --- Section 16: documentation anchor drift guard (TASK-032) ---
+  // The dev docs point at code with greppable anchors instead of line
+  // numbers. This section fetches the docs, extracts every needle at
+  // runtime, and asserts each one still resolves in index.html.
+  //
+  // DO NOT write any anchor needle as a literal anywhere in this file.
+  // The guard asserts "needle occurs in index.html's source" — a needle
+  // quoted here would match itself and pass forever regardless of the
+  // real code. That is the FIND-SPRINT-007-7 vacuous-pass trap, and it
+  // is why every needle below is captured from the fetched markdown.
+  const ANCHOR_DOCS = ['README.md', 'CODE-PATTERNS.md', 'ARCHITECTURE.md', 'CLAUDE.md'];
+  const ANCHOR_FLOORS = { 'README.md': 2, 'CODE-PATTERNS.md': 18, 'ARCHITECTURE.md': 2, 'CLAUDE.md': 1 };
+
+  const h16 = document.createElement('h3');
+  h16.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h16.textContent = 'Documentation anchor drift guard';
+  body.appendChild(h16);
+  // Container captured synchronously. The awaited continuation appends
+  // only into this element, never into `body` — so if the harness is
+  // re-rendered while a fetch is in flight, the late rows land in a
+  // detached node and are simply never seen, instead of appending
+  // themselves to the bottom of a fresh run.
+  const anchorSection = document.createElement('div');
+  body.appendChild(anchorSection);
+
+  (async () => {
+    const paths = ANCHOR_DOCS.concat(['index.html']);
+    let sources;
+    try {
+      const texts = await Promise.all(paths.map(async (p) => {
+        const res = await fetch(p, { cache: 'no-store' });
+        if (!res.ok) throw new Error(p + ' -> HTTP ' + res.status);
+        return res.text();
+      }));
+      sources = Object.fromEntries(paths.map((p, i) => [p, texts[i]]));
+    } catch (err) {
+      renderPredicateFixtures(anchorSection, [{
+        label: 'Read the doc sources over HTTP',
+        check() { return false; },
+        description: 'Could not read the docs (' + String((err && err.message) || err) + '). This section needs the app served over http:// — see README "How to run". It cannot run from a page opened directly off disk.',
+      }], 'SKIPPED — serve over http:// and reopen the harness (Ctrl+Shift+T)');
+      return;
+    }
+
+    const src = sources['index.html'];
+    const fixtures = [];
+    const seen = new Map(); // needle -> [docs that carry it]
+
+    for (const doc of ANCHOR_DOCS) {
+      // Fresh regex per iteration — a /g regex hoisted out of the loop is
+      // stateful (see the PHONE_REGEX gotcha in CODE-PATTERNS.md).
+      const found = [...sources[doc].matchAll(/grep\s+`([^`\n]+)`/g)].map(m => m[1]);
+      fixtures.push({
+        label: doc + ': carries at least ' + ANCHOR_FLOORS[doc] + ' doc anchors (found ' + found.length + ')',
+        check: () => found.length >= ANCHOR_FLOORS[doc],
+        description: 'Floor check. Without it, a doc rewrite that silently drops the anchor convention would leave this whole section vacuously green — every per-needle row below would simply stop existing. If you removed an anchor deliberately, lower this file\'s value in ANCHOR_FLOORS in the same commit.',
+      });
+      for (const needle of found) {
+        if (!seen.has(needle)) seen.set(needle, []);
+        seen.get(needle).push(doc);
+      }
+    }
+
+    for (const [needle, docs] of seen) {
+      fixtures.push({
+        label: docs.join(' + ') + ' -> ' + needle,
+        check: () => src.includes(needle),
+        description: 'The doc anchor must occur at least once in index.html. A FAIL means the identifier was renamed or deleted and the doc now points at nothing — fix the doc (or restore the identifier) in the same commit.',
+      });
+    }
+
+    const tplKeys = [...new Set(Object.values(templates).flatMap(t => Object.keys(t)))];
+    const undocumented = tplKeys.filter(k => !sources['README.md'].includes(k));
+    fixtures.push({
+      label: 'README documents every key used by the templates map'
+        + (undocumented.length ? ' — undocumented: ' + undocumented.join(', ') : ''),
+      check: () => undocumented.length === 0,
+      description: 'The schema list under README\'s Templates section must name every key present on any brand entry. Adding a key to a brand without documenting it turns this row red. Keys are read from the live `templates` object, so this cannot go stale.',
+    });
+
+    renderPredicateFixtures(anchorSection, fixtures);
+  })();
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
