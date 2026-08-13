@@ -246,9 +246,13 @@
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     margin: 16px 0;
   }
-  /* Chrome around the iframe (not the email itself) so a no-op client
-     transform (Apple Mail, TASK-023) is still legibly different from
-     "the toggle is broken" (IDEA-005 / TASK-021). */
+  /* SECONDARY signal only. At desktop widths .preview-iframe is
+     width:100%/height:100% with no stage padding, so this surround is
+     fully occluded — measured at 1600x1000: zero #1a1a1a pixels visible.
+     It only shows in the mobile viewport, where the iframe narrows to
+     375px. The PRIMARY disclosure that a simulation is running is the
+     visible #darkNote caption above the stage (DARK_MODE_CLIENT_NOTES),
+     which is also what carries the Apple Mail no-op explanation. */
   .preview-stage.dark { background: #1a1a1a; }
   /* Required: the author rule `.seg-control { display: inline-flex; }`
      beats the UA stylesheet's `[hidden] { display: none }`, so without
@@ -271,6 +275,18 @@
     display: none;
   }
   .warn.visible { display: block; }
+
+  /* Primary dark-mode disclosure. Do NOT add a `display` declaration here:
+     visibility is driven by the `hidden` attribute, and an author
+     `display` rule beats the UA stylesheet's `[hidden] { display: none }`
+     — the same trap `.seg-control[hidden]` above exists to work around. */
+  .dark-note {
+    font-size: 12px;
+    color: var(--muted);
+    padding: 8px 20px;
+    background: #f9fafb;
+    border-bottom: 1px solid var(--border);
+  }
 
   /* ---------- Form panel cards (ENH-001) ---------- */
   .seg {
@@ -775,6 +791,7 @@
       </div>
     </div>
     <div class="warn" id="warn"></div>
+    <div class="dark-note" id="darkNote" role="status" hidden></div>
     <div class="preview-stage" id="previewStage">
       <iframe class="preview-iframe" id="preview" title="Email preview"></iframe>
     </div>
