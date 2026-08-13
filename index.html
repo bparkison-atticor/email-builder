@@ -2901,7 +2901,7 @@ function renderTestHarness() {
       description: 'The container is runtime-extended and order-dependent (see the HTML comment on its static trailing divider). This fixture is the executable form of that contract — a static child added to the markup would land at index 0 and fail it.',
     },
     {
-      label: 'Live Dark mode switch: click drives darkModeEnabled, picker visibility and stage dark class together',
+      label: 'Live Dark mode switch: click drives darkModeEnabled, picker visibility, stage dark class and #darkNote together',
       check() {
         const switchEl = document.getElementById('darkModeSwitch');
         const picker = document.getElementById('darkClientControl');
@@ -2912,13 +2912,15 @@ function renderTestHarness() {
           const onAfterFirst = switchEl.classList.contains('on');
           const firstClickCorrect = darkModeEnabled === onAfterFirst
             && picker.hidden === !onAfterFirst
-            && stage.classList.contains('dark') === onAfterFirst;
+            && stage.classList.contains('dark') === onAfterFirst
+            && darkNote.hidden === !onAfterFirst;
           switchEl.click();
           const onAfterSecond = switchEl.classList.contains('on');
           const secondClickCorrect = onAfterSecond === savedOn
             && darkModeEnabled === onAfterSecond
             && picker.hidden === !onAfterSecond
-            && stage.classList.contains('dark') === onAfterSecond;
+            && stage.classList.contains('dark') === onAfterSecond
+            && darkNote.hidden === !onAfterSecond;
           return firstClickCorrect && secondClickCorrect;
         } finally {
           // Belt-and-suspenders restore, mirroring Section 8's purity guard:
@@ -2929,7 +2931,7 @@ function renderTestHarness() {
           if (switchEl.classList.contains('on') !== savedOn) switchEl.click();
         }
       },
-      description: 'Fixtures 1-3 above only exercise throwaway probe toggles that are never inserted into the DOM. This fixture drives the actual #darkModeSwitch the app renders — the element onDarkModeToggle is wired to — and asserts all three of its documented side effects (darkModeEnabled, #darkClientControl.hidden, .preview-stage\'s dark class) move together on a real click, then clicks again to leave dark mode exactly as this fixture found it.',
+      description: 'Fixtures 1-3 above only exercise throwaway probe toggles that are never inserted into the DOM. This fixture drives the actual #darkModeSwitch the app renders — the element onDarkModeToggle is wired to — and asserts all four of its documented side effects (darkModeEnabled, #darkClientControl.hidden, .preview-stage\'s dark class, and #darkNote.hidden) move together on a real click, then clicks again to leave dark mode exactly as this fixture found it.',
     },
   ];
 
@@ -2954,7 +2956,7 @@ function renderTestHarness() {
       label: 'Picker button titles are sourced from DARK_MODE_CLIENT_NOTES',
       check() {
         const btns = Array.from(darkClientControl.querySelectorAll('button[data-dm]'));
-        return btns.length === 3 && btns.every(b => b.title === DARK_MODE_CLIENT_NOTES[b.dataset.dm]);
+        return btns.length === Object.keys(DARK_MODE_TRANSFORMS).length && btns.every(b => b.title === DARK_MODE_CLIENT_NOTES[b.dataset.dm]);
       },
       description: 'One source of truth for the hover detail and the visible caption — a hardcoded title in the markup string would drift from the caption silently.',
     },
@@ -2975,7 +2977,25 @@ function renderTestHarness() {
           darkModeEnabled = savedEnabled; darkModeClient = savedClient; syncDarkNote();
         }
       },
-      description: 'The caption must be hidden when dark mode is off and must swap text on every client change — wiring only one of the two call sites leaves it stale.',
+      description: 'The caption must be hidden when dark mode is off and must swap text on every client change — wiring only one of the two call sites leaves it stale. NOTE: this fixture calls syncDarkNote() itself and mutates state directly, so it cannot detect a broken wireSegControl callback wiring — see the next fixture for that.',
+    },
+    {
+      label: 'Live picker click updates #darkNote (real DOM click, not direct state assignment)',
+      check() {
+        const switchEl = document.getElementById('darkModeSwitch');
+        const picker = document.getElementById('darkClientControl');
+        const savedOn = switchEl.classList.contains('on');
+        const savedBtn = picker.querySelector('button[data-dm].active');
+        try {
+          if (!savedOn) switchEl.click();
+          picker.querySelector('button[data-dm="applemail"]').click();
+          return darkNote.textContent === DARK_MODE_CLIENT_NOTES.applemail && darkNote.hidden === false;
+        } finally {
+          savedBtn.click();
+          if (switchEl.classList.contains('on') !== savedOn) switchEl.click();
+        }
+      },
+      description: 'The previous fixture calls syncDarkNote() itself, so deleting the syncDarkNote() call from the wireSegControl callback (index.html ~4183) would leave it green while the caption feature is dead. This fixture drives the real #darkClientControl button click — the same event the app wires — and goes red if that call site is ever removed. Mirrors Section 11\'s live-click save/click/restore idiom; wireSegControl re-applies .active/aria-pressed on every click, so clicking the saved button is a complete restore.',
     },
   ];
 
