@@ -3999,10 +3999,15 @@ wireSegControl(darkClientControl.querySelectorAll('button[data-dm]'), (btn) => {
 
 // ---------- Reusable module toggle factory ----------
 // Returns { element, isOn } — caller is responsible for DOM insertion.
-// State persists under `emailBuilder.module.<id>` in localStorage.
-function createModuleToggle(id, label, defaultOn, onChange) {
+// State persists under `emailBuilder.module.<id>` in localStorage unless
+// `persist` is false, in which case the toggle is session-only: it neither
+// reads nor writes storage and always starts at `defaultOn`. The dark-mode
+// toggle is the canonical non-persisting caller (IDEA-005 locked its state
+// as non-persistent) — do NOT hand-roll a module-toggle element to dodge
+// persistence, pass persist: false.
+function createModuleToggle(id, label, defaultOn, onChange, persist = true) {
   const key = `emailBuilder.module.${id}`;
-  const stored = localStorage.getItem(key);
+  const stored = persist ? localStorage.getItem(key) : null;
   // Mirror testDataEnabled init: missing key falls back to defaultOn;
   // explicit 'false'/'true' overrides regardless of defaultOn.
   let state;
@@ -4034,7 +4039,7 @@ function createModuleToggle(id, label, defaultOn, onChange) {
 
   function flip() {
     state = !state;
-    localStorage.setItem(key, String(state));
+    if (persist) localStorage.setItem(key, String(state));
     sync();
     onChange(state);
   }
