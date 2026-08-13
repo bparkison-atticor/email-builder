@@ -125,10 +125,13 @@ The switch and the selected client **reset on reload**, unlike the Test data tog
 
 Brands are configured in the `templates` map in `index.html` — grep `const templates`. The map's keys are the authoritative brand list; each entry's `name` is the label shown in the template dropdown. Scroll to the `TEMPLATE CONFIGS` block (grep `TEMPLATE CONFIGS`) in the `<script>` to edit them. Each brand has:
 
+- `name` — the label shown in the template dropdown.
 - `bannerImageUrl` — publicly hosted banner image
 - `bannerAlt` — alt text (should match brand name for accessibility)
 - `bannerWidth` — rendered banner width (e.g. `"600px"`)
 - `bannerHref` — optional; wraps banner in a clickable link
+- `bannerHtml` — inline HTML banner (a text wordmark or a hand-sized `<img>`), used *instead of* `bannerImageUrl` / `bannerAlt` / `bannerWidth`. `buildMjml()` prefers it when present.
+- `bannerBackgroundColor` — background behind the banner block; pairs with `bannerHtml`.
 - `ctaBackgroundColor` — brand hex for the CTA button fill (also used to style links in body copy)
 - `ctaTextColor` — usually `#ffffff`
 - `ctaMicrocopyFontSize` — size of the optional microcopy under the CTA button; every brand ships the shared default `DEFAULT_CTA_MICROCOPY_FONT_SIZE` (`13px`)
