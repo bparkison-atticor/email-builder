@@ -1,7 +1,7 @@
 ---
 epic: dark-mode-preview-hardening
 created: 2026-08-12T00:00:00Z
-status: active
+status: complete
 originating_ideas: [SPRINT-006-007-compound]
 ---
 

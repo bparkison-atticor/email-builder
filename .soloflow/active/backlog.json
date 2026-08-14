@@ -1,32 +1,4 @@
 {
   "version": 2,
-  "tasks": {
-    "TASK-029": {
-      "status": "ready",
-      "depends_on": [],
-      "idea": "SPRINT-006-007-compound"
-    },
-    "TASK-030": {
-      "status": "ready",
-      "depends_on": [
-        "TASK-029"
-      ],
-      "idea": "SPRINT-006-007-compound"
-    },
-    "TASK-031": {
-      "status": "ready",
-      "depends_on": [
-        "TASK-030"
-      ],
-      "idea": "SPRINT-006-007-compound"
-    },
-    "TASK-032": {
-      "status": "ready",
-      "depends_on": [
-        "TASK-031",
-        "TASK-028"
-      ],
-      "idea": "SPRINT-006-007-compound"
-    }
-  }
+  "tasks": {}
 }

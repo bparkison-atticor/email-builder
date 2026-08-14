@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-08-13 — CTA microcopy centers under the button
+
+### Fixed
+- **CTA microcopy rendered flush-left instead of centered under the CTA button (TASK-033).** `buildMicrocopyBlock` never passed an alignment option to `richTextToMjText`, and neither the function's six original opts nor the head's `<mj-attributes>` mj-text rule set one, so the caption fell back to MJML's left default while the `mj-button` above it centered via MJML's own default — a short caption read as detached body copy instead of a button caption. `richTextToMjText` gained a seventh opt, `align` (default `null`, only emitted when non-null, always appended last so existing attribute-order fixtures are unaffected), and `buildMicrocopyBlock` now passes `align: 'center'`. Body-copy call sites (`bodyAboveQuill`, `bodyBelowQuill`) pass no `opts` and stay byte-identical. New fixtures in `MICROCOPY_BLOCK_FIXTURES` and `RICHTEXT_OVERRIDE_FIXTURES` cover the emission and the omission case respectively.
+
+## 2026-08-12 — Dark mode preview: visible client caption
+
+### Added
+- **Dark-mode disclosure caption.** A muted one-line strip (`#darkNote`) directly above the preview names the client being simulated and what it does, sourced from `DARK_MODE_CLIENT_NOTES`. Shown only while Dark mode is on; updates on every client change. It replaces hover-only `title` attributes as the primary explanation — visible text is announced to screen readers and needs no mouse, which matters most for **Apple Mail**, where the correct behavior is "renders unchanged" and the explanation was the only thing distinguishing that from a broken toggle. The picker's `title` attributes now read from the same map, so hover detail and caption cannot drift.
+
+### Fixed
+- **Overstated dark-mode chrome legibility.** The `.preview-stage.dark` surround is fully occluded at desktop widths (the iframe is `width: 100%` with no stage padding); it is only visible in the mobile viewport. The changelog bullet and the code comment that both claimed it made the Apple Mail no-op "read as a deliberate result" have been corrected, and the caption now carries that job at every viewport.
+
 ## 2026-08-12 — CTA microcopy + rich-text italics
 
 Closes the `cta-microcopy` epic (IDEA-006, TASK-025 through TASK-028). CTA microcopy is a new optional field; the italics support and the `richTextToMjText` refactor it depends on are additive and byte-parity-gated for every existing call site.
@@ -12,7 +25,7 @@ Closes the `cta-microcopy` epic (IDEA-006, TASK-025 through TASK-028). CTA micro
 - **`ctaMicrocopyFontSize` / `ctaMicrocopyColor` brand keys.** Added to all eight brand configs, each resolving to the new shared defaults `DEFAULT_CTA_MICROCOPY_FONT_SIZE` (`'13px'`) and `DEFAULT_CTA_MICROCOPY_COLOR` (`'#6b6b6b'`) — per-brand override slots, not yet overridden by any brand.
 - **Conditional `mj-button` padding.** `ctaButtonPadding(microcopyHtml)` tightens the button's bottom padding from `18px` to `6px` whenever microcopy is present, so the caption reads as attached to the button instead of floating below it; with no microcopy the padding is byte-identical to what shipped before this epic.
 - **Live character count with no limit.** `plainTextLength` backs a `#ctaMicrocopyCount` hint under the field — guidance only, nothing is blocked or truncated.
-- **Test harness Sections 11–13.** Section 11 covers the italics normalization and the widened toolbar/format config. Section 12 covers `richTextToMjText`'s default-parity guarantee (seven byte-comparison fixtures) plus the new `opts` style overrides. Section 13 covers CTA microcopy emission gating, the muted-link/no-typed-bullets behavior, the conditional button padding, and DOM guards confirming the toolbar carries no list buttons and that the link button routes through the shared link modal.
+- **Test harness Sections 13–15.** Section 13 covers the italics normalization and the widened toolbar/format config. Section 14 covers `richTextToMjText`'s default-parity guarantee (seven byte-comparison fixtures) plus the new `opts` style overrides. Section 15 covers CTA microcopy emission gating, the muted-link/no-typed-bullets behavior, the conditional button padding, and DOM guards confirming the toolbar carries no list buttons and that the link button routes through the shared link modal. (Renumbered from 11–13 by the dark-mode preview hardening epic — see the 2026-08-12 dark-mode caption entry above — to keep harness section numbers monotonic in source order.)
 
 ### Changed
 - **Paste sanitization whitelist** now includes `italic` alongside `bold`, `link`, and `list` — pasted italic formatting survives instead of being stripped to plain text.
@@ -27,7 +40,7 @@ Closes the `dark-mode-preview` epic (IDEA-005, TASK-021 through TASK-024). Previ
 - **`gmailDarkTransform`** simulates the Gmail iOS app: a CSS `invert(100%) hue-rotate(180deg)` filter on `<body>`, re-applied to `img`/`video`/`svg`, which cancels the body inversion so photos render correctly, plus an explicit inverted `<html>` background to close a canvas seam some browsers otherwise leave white. Chosen over Gmail web, which leaves the email body untouched entirely — simulating it would teach the marketer nothing.
 - **`outlookDarkTransform`** simulates Outlook.com / OWA's selective contrast repair: inline background and text colors are remapped (light backgrounds darken, already-dark colors are left alone, dark text is lifted and contrast-checked against a simulated `#1b1b1b` surface). Chosen over Outlook desktop's full invert, which would look near-identical to the Gmail option and make the picker uninformative.
 - **`appleMailDarkTransform`** simulates Apple Mail (macOS 12.4+ / iOS 13+), the only opt-in surface of the three. It classifies the compiled HTML via `detectAuthorDarkScheme` ('authored' / 'meta-only' / 'none') and, since this builder's compiler emits no `prefers-color-scheme` / `color-scheme` CSS today, renders the email **unchanged** — the faithful simulation of "nothing to opt into."
-- **`.preview-stage.dark`** darkens the chrome around the iframe (`#1a1a1a`) so the Apple Mail no-op still reads as a deliberate result rather than a broken toggle.
+- **`.preview-stage.dark`** darkens the chrome around the iframe (`#1a1a1a`). Visible only in the mobile viewport — at desktop widths the iframe is 100% wide and covers it entirely.
 - **Test harness Sections 8–10.** New predicate-fixture sections for the Gmail transform (marker injection, filter placement, canvas-seam fix, and a preview-only purity guard asserting `lastHtml` never carries the `EB-DARKSIM` marker regardless of toggle state); the Outlook transform (background/text remap, brand-color preservation, href/background-image safety); and the Apple Mail transform plus `detectAuthorDarkScheme`'s three-way classification, including a drift guard that fails loudly the moment `buildMjml()` starts emitting author dark-mode CSS — the signal to implement the transform's currently-unreachable `'authored'` branch.
 
 ## 2026-08-11 — Keller Postman lead outreach wordmark size

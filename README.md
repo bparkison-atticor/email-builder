@@ -51,6 +51,7 @@ The server binds to `127.0.0.1` (localhost only) so nothing on your Wi-Fi can re
 An optional sentence or two rendered under the CTA button — a reassurance line ("No fees unless we win.") or a fine-print caveat. Leave it empty and nothing renders at all.
 
 - **It's part of the CTA module.** Switching the **Call to action** toggle off hides the field and drops the microcopy from the output along with the button; what you typed comes back when the toggle goes back on.
+- **Renders centered**, matching the centered CTA button directly above it, so a short caption reads as attached to the button instead of as detached body copy.
 - **Toolbar is bold, italics, and link — no lists, on purpose.** This field is fine print, not a list.
 - **Links inside microcopy stay muted gray**, not the brand accent color body-copy links use. Auto-linked phone numbers are muted here too.
 - **A leading `*` or `-` stays literal.** In body copy that pattern becomes a bullet; here it's deliberately left alone so `* Restrictions apply.` reads as fine print, not a one-item list.
@@ -125,10 +126,13 @@ The switch and the selected client **reset on reload**, unlike the Test data tog
 
 Brands are configured in the `templates` map in `index.html` — grep `const templates`. The map's keys are the authoritative brand list; each entry's `name` is the label shown in the template dropdown. Scroll to the `TEMPLATE CONFIGS` block (grep `TEMPLATE CONFIGS`) in the `<script>` to edit them. Each brand has:
 
+- `name` — the label shown in the template dropdown.
 - `bannerImageUrl` — publicly hosted banner image
 - `bannerAlt` — alt text (should match brand name for accessibility)
 - `bannerWidth` — rendered banner width (e.g. `"600px"`)
 - `bannerHref` — optional; wraps banner in a clickable link
+- `bannerHtml` — inline HTML banner (a text wordmark or a hand-sized `<img>`), used *instead of* `bannerImageUrl` / `bannerAlt` / `bannerWidth`. `buildMjml()` prefers it when present.
+- `bannerBackgroundColor` — background behind the banner block; pairs with `bannerHtml`.
 - `ctaBackgroundColor` — brand hex for the CTA button fill (also used to style links in body copy)
 - `ctaTextColor` — usually `#ffffff`
 - `ctaMicrocopyFontSize` — size of the optional microcopy under the CTA button; every brand ships the shared default `DEFAULT_CTA_MICROCOPY_FONT_SIZE` (`13px`)
@@ -153,7 +157,7 @@ To add a new brand: copy one of the existing entries, give it a new key, edit th
 - CTA button: 16px font, 4px border-radius (modern mobile tap target)
 - Footer: 11–12px `#6b6b6b` on `#f1f1f1` background (passes WCAG AA contrast)
 - `format-detection` and `x-apple-disable-message-reformatting` meta tags are emitted to suppress iOS auto-detection and Apple's auto-reformatting
-- CTA microcopy (when present) renders as a 13px `#6b6b6b` block directly beneath the CTA button, with any links inside it muted rather than brand-colored, and the button's own bottom padding tightens from 18px to 6px so the caption reads as attached to the button
+- CTA microcopy (when present) renders as a centered, 13px `#6b6b6b` block directly beneath the CTA button, with any links inside it muted rather than brand-colored, and the button's own bottom padding tightens from 18px to 6px so the caption reads as attached to the button
 
 ## Scope
 

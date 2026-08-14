@@ -246,9 +246,13 @@
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     margin: 16px 0;
   }
-  /* Chrome around the iframe (not the email itself) so a no-op client
-     transform (Apple Mail, TASK-023) is still legibly different from
-     "the toggle is broken" (IDEA-005 / TASK-021). */
+  /* SECONDARY signal only. At desktop widths .preview-iframe is
+     width:100%/height:100% with no stage padding, so this surround is
+     fully occluded — measured at 1600x1000: zero #1a1a1a pixels visible.
+     It only shows in the mobile viewport, where the iframe narrows to
+     375px. The PRIMARY disclosure that a simulation is running is the
+     visible #darkNote caption above the stage (DARK_MODE_CLIENT_NOTES),
+     which is also what carries the Apple Mail no-op explanation. */
   .preview-stage.dark { background: #1a1a1a; }
   /* Required: the author rule `.seg-control { display: inline-flex; }`
      beats the UA stylesheet's `[hidden] { display: none }`, so without
@@ -271,6 +275,18 @@
     display: none;
   }
   .warn.visible { display: block; }
+
+  /* Primary dark-mode disclosure. Do NOT add a `display` declaration here:
+     visibility is driven by the `hidden` attribute, and an author
+     `display` rule beats the UA stylesheet's `[hidden] { display: none }`
+     — the same trap `.seg-control[hidden]` above exists to work around. */
+  .dark-note {
+    font-size: 12px;
+    color: var(--muted);
+    padding: 8px 20px;
+    background: #f9fafb;
+    border-bottom: 1px solid var(--border);
+  }
 
   /* ---------- Form panel cards (ENH-001) ---------- */
   .seg {
@@ -746,6 +762,14 @@
             Mobile
           </button>
         </div>
+        <!-- RUNTIME-EXTENDED CONTAINER. Everything after this divider is
+             appended by JS, in this order: the Test data toggle
+             (createModuleToggle('testData', ...) → previewHeaderLeft.appendChild),
+             then the dark-mode divider + #darkClientControl
+             (previewHeaderLeft.insertAdjacentHTML), then the Dark mode toggle
+             (previewHeaderLeft.insertBefore, ahead of the picker). A new
+             *static* child added here would render BEFORE all of them — add
+             new header controls at those JS call sites instead. -->
         <span class="divider" aria-hidden="true"></span>
       </div>
       <div class="copy-group">
@@ -767,6 +791,7 @@
       </div>
     </div>
     <div class="warn" id="warn"></div>
+    <div class="dark-note" id="darkNote" role="status" hidden></div>
     <div class="preview-stage" id="previewStage">
       <iframe class="preview-iframe" id="preview" title="Email preview"></iframe>
     </div>
@@ -1515,6 +1540,7 @@ function richTextToMjText(html, tpl, opts = {}) {
     padding = '0 0 14px 0', // mj-text padding attribute
     blockMargin = 14,       // p/ul/ol bottom margin in px
     convertTypedBullets = true,
+    align = null,           // mj-text align attribute; null = inherit MJML's left default
   } = opts;
   // Strip empty paragraphs Quill inserts when the user hits Enter twice.
   const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
@@ -1661,6 +1687,7 @@ function richTextToMjText(html, tpl, opts = {}) {
     `padding="${escapeHtml(padding)}"`,
     fontSize ? `font-size="${escapeHtml(fontSize)}"` : '',
     color ? `color="${escapeHtml(color)}"` : '',
+    align ? `align="${escapeHtml(align)}"` : '',
   ].filter(Boolean).join(' ');
   return `        <mj-text ${attrs}>\n          ${div.innerHTML}\n        </mj-text>`;
 }
@@ -1672,8 +1699,9 @@ function plainTextLength(text) {
 }
 
 // Pure. '' for an empty editor; otherwise a muted, smaller mj-text block
-// styled from the active brand's microcopy keys. Links are muted rather than
-// brand-accent, and the typed-bullet converter is off (see microcopyToolbar).
+// styled from the active brand's microcopy keys, centered to match the CTA
+// button above it. Links are muted rather than brand-accent, and the
+// typed-bullet converter is off (see microcopyToolbar).
 function buildMicrocopyBlock(html, tpl) {
   if (!hasRichHtml(html)) return '';
   const color = tpl.ctaMicrocopyColor || DEFAULT_CTA_MICROCOPY_COLOR;
@@ -1684,6 +1712,7 @@ function buildMicrocopyBlock(html, tpl) {
     padding: '0 0 18px 0',
     blockMargin: 8,
     convertTypedBullets: false,
+    align: 'center',
   });
 }
 
@@ -2454,6 +2483,31 @@ function renderTestHarness() {
     body.appendChild(row);
   }
 
+  // Shared row renderer for the predicate-shaped harness sections (7-10).
+  // A fixture is { label, check(), description }; check() is called inside
+  // a try/catch so a throwing predicate renders as FAIL rather than
+  // aborting the whole harness. New predicate sections should call this.
+  // Section 15's MICROCOPY_DOM_GUARDS loop was migrated onto this helper by
+  // TASK-031 (FIND-SPRINT-009-2) — it was the same { label, check(),
+  // description } shape, differing only in its failText. The other loops
+  // in Sections 1-6 and 13-15 render an input/expected/actual field shape
+  // and deliberately do not fit here.
+  function renderPredicateFixtures(body, fixtures, failText = 'FAIL') {
+    for (const fixture of fixtures) {
+      const pass = (() => { try { return fixture.check(); } catch { return false; } })();
+      const row = document.createElement('div');
+      row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
+      row.innerHTML =
+        '<div class="harness-row-label">' +
+          '<span>' + escapeHtml(fixture.label) + '</span>' +
+          '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
+        '</div>' +
+        '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
+        '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : failText) + '</code></div>';
+      body.appendChild(row);
+    }
+  }
+
   // --- Section 7: script-not-truncated regression guard (TASK-020) ---
   // Asserts that the module script body was NOT truncated by the HTML parser.
   // Strategy: if the script was truncated, render() never ran and lastHtml is
@@ -2482,19 +2536,7 @@ function renderTestHarness() {
     },
   ];
 
-  for (const guard of TRUNCATION_GUARDS) {
-    const pass = (() => { try { return guard.check(); } catch { return false; } })();
-    const row = document.createElement('div');
-    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
-    row.innerHTML =
-      '<div class="harness-row-label">' +
-        '<span>' + escapeHtml(guard.label) + '</span>' +
-        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
-      '</div>' +
-      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(guard.description) + '</code></div>' +
-      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — script was truncated or wiring did not run') + '</code></div>';
-    body.appendChild(row);
-  }
+  renderPredicateFixtures(body, TRUNCATION_GUARDS, 'FAIL — script was truncated or wiring did not run');
 
   // --- Section 8: dark-mode preview transforms — Gmail (TASK-021) ---
   // Every function under test is pure string-in/string-out, so fixtures
@@ -2563,9 +2605,31 @@ function renderTestHarness() {
       description: 'With no </head> in the compiled HTML, the style block must be inserted immediately after the opening <body> tag.',
     },
     {
-      label: 'Preview-only purity guard: lastHtml never carries EB-DARKSIM',
-      check() { return typeof lastHtml === 'string' && lastHtml.indexOf('EB-DARKSIM') === -1; },
-      description: 'lastHtml (Copy HTML / View HTML source) must never carry a preview-only dark-mode stylesheet, regardless of toggle state.',
+      label: 'Preview-only purity guard: lastHtml never carries EB-DARKSIM (dark mode forced ON)',
+      check() {
+        const savedEnabled = darkModeEnabled;
+        const savedClient = darkModeClient;
+        try {
+          // Force the condition the invariant is about. A fresh load has dark
+          // mode OFF, which makes applyDarkMode the identity function — the
+          // pre-TASK-029 version of this fixture passed vacuously on every
+          // ordinary harness run (FIND-SPRINT-007-7).
+          darkModeEnabled = true;
+          darkModeClient = 'gmail';
+          render();
+          const previewIsTransformed = String(els.preview.srcdoc).indexOf('EB-DARKSIM') !== -1;
+          const exportIsPure = typeof lastHtml === 'string' && lastHtml.length > 0
+            && lastHtml.indexOf('EB-DARKSIM') === -1;
+          // Both halves are required: exportIsPure alone would still pass if
+          // the transform silently stopped running.
+          return previewIsTransformed && exportIsPure;
+        } finally {
+          darkModeEnabled = savedEnabled;
+          darkModeClient = savedClient;
+          render();
+        }
+      },
+      description: 'With dark mode forced ON and Gmail selected, the preview srcdoc must carry the EB-DARKSIM marker while lastHtml (Copy HTML / View HTML source) must not. The finally block restores the real toggle state and re-renders.',
     },
     {
       label: 'injectPreviewStyle: literal </style> inside css is neutralized',
@@ -2581,19 +2645,7 @@ function renderTestHarness() {
     },
   ];
 
-  for (const fixture of DARK_MODE_FIXTURES) {
-    const pass = (() => { try { return fixture.check(); } catch { return false; } })();
-    const row = document.createElement('div');
-    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
-    row.innerHTML =
-      '<div class="harness-row-label">' +
-        '<span>' + escapeHtml(fixture.label) + '</span>' +
-        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
-      '</div>' +
-      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
-      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
-    body.appendChild(row);
-  }
+  renderPredicateFixtures(body, DARK_MODE_FIXTURES);
 
   // --- Section 9: dark-mode preview transforms — Outlook (TASK-022) ---
   // Same predicate-fixture shape and row renderer as Section 8. All
@@ -2705,19 +2757,7 @@ function renderTestHarness() {
     },
   ];
 
-  for (const fixture of OUTLOOK_DARK_FIXTURES) {
-    const pass = (() => { try { return fixture.check(); } catch { return false; } })();
-    const row = document.createElement('div');
-    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
-    row.innerHTML =
-      '<div class="harness-row-label">' +
-        '<span>' + escapeHtml(fixture.label) + '</span>' +
-        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
-      '</div>' +
-      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
-      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
-    body.appendChild(row);
-  }
+  renderPredicateFixtures(body, OUTLOOK_DARK_FIXTURES);
 
   // --- Section 10: dark-mode preview transforms — Apple Mail + author-CSS drift guard (TASK-023) ---
   // Same predicate-fixture shape and row renderer as Sections 8/9. Fixture
@@ -2732,11 +2772,18 @@ function renderTestHarness() {
 
   const APPLEMAIL_DARK_FIXTURES = [
     {
-      label: 'Detector: authored beats meta (substring-ordering trap)',
+      label: 'Detector: authored — plain @media block',
       check() {
         return detectAuthorDarkScheme('<style>@media (prefers-color-scheme: dark){body{color:#fff}}</style>') === 'authored';
       },
-      description: '"prefers-color-scheme" contains the substring "color-scheme", so a detector that checked meta-only first would misclassify this input as meta-only. It must return authored.',
+      description: 'Locks the primary authored-detection path. This input alone cannot detect a branch reorder in detectAuthorDarkScheme — it contains no meta-name signal for the swapped branch to falsely win against, so the next fixture exists specifically to catch that mutation.',
+    },
+    {
+      label: 'Detector: authored beats meta (substring-ordering trap)',
+      check() {
+        return detectAuthorDarkScheme('<meta name="color-scheme" content="light dark"><style>@media (prefers-color-scheme: dark){body{color:#fff}}</style>') === 'authored';
+      },
+      description: 'Both a meta-name signal and a real authored block are present; only the shipped branch order returns authored — either reordering returns meta-only.',
     },
     {
       label: 'Detector: color-scheme meta',
@@ -2754,6 +2801,16 @@ function renderTestHarness() {
         return detectAuthorDarkScheme('<html><head><meta name="format-detection" content="telephone=no"></head><body>x</body></html>') === 'none';
       },
       description: 'An input with neither prefers-color-scheme nor a color-scheme signal must classify as none.',
+    },
+    {
+      label: 'Detector: CSS color-scheme property with a keyword value is meta-only',
+      check() { return detectAuthorDarkScheme('<style>:root{color-scheme:light dark}</style>') === 'meta-only'; },
+      description: 'The CSS color-scheme property (not just the meta name) with a recognized keyword value must classify as meta-only — this is the real, common email-authoring pattern the tightened regex still needs to catch.',
+    },
+    {
+      label: 'Detector: prose "color-scheme:" with a non-keyword value is none',
+      check() { return detectAuthorDarkScheme('<p>Ask about our color-scheme: blue and white.</p>') === 'none'; },
+      description: 'Marketer body copy reaches this function through the compiled HTML. "color-scheme: blue and white" contains no HTML-special characters and survives escapeHtml verbatim — a false positive here would silently flip Apple Mail out of its identity pass-through into a partial invert (FIND-SPRINT-007-14).',
     },
     {
       label: 'Pass-through is exact identity when scheme is none',
@@ -2780,29 +2837,183 @@ function renderTestHarness() {
     },
   ];
 
-  for (const fixture of APPLEMAIL_DARK_FIXTURES) {
-    const pass = (() => { try { return fixture.check(); } catch { return false; } })();
-    const row = document.createElement('div');
-    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
-    row.innerHTML =
-      '<div class="harness-row-label">' +
-        '<span>' + escapeHtml(fixture.label) + '</span>' +
-        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
-      '</div>' +
-      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
-      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL') + '</code></div>';
-    body.appendChild(row);
-  }
+  renderPredicateFixtures(body, APPLEMAIL_DARK_FIXTURES);
 
-  // --- Section 11: rich-text italics — em/i normalisation (TASK-025) ---
+  // --- Section 11: module toggle factory — persistence opt-out + header order (TASK-030) ---
+  // Renumbered from 14 to 11 by TASK-031 (FIND-SPRINT-009-6), which owns
+  // CHANGELOG.md and could therefore update its "Test harness Sections
+  // 11-13" entry in the same commit. Source order is now monotonic:
+  // 1-10, 11 (this section), 12 (TASK-031's dark-mode caption, immediately
+  // below), 13-15 (rich-text italics / richtext parity / CTA microcopy,
+  // shifted up two to make room).
+  const h11 = document.createElement('h3');
+  h11.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h11.textContent = 'Module toggle factory — persistence opt-out';
+  body.appendChild(h11);
+
+  const MODULE_TOGGLE_FIXTURES = [
+    {
+      label: 'persist=false: flipping writes no localStorage key',
+      check() {
+        const k = 'emailBuilder.module.__harnessProbeA';
+        localStorage.removeItem(k);
+        try {
+          const t = createModuleToggle('__harnessProbeA', 'probe', false, () => {}, false);
+          t.element.click();
+          return t.isOn() === true && localStorage.getItem(k) === null;
+        } finally { localStorage.removeItem(k); }
+      },
+      description: 'A non-persisting toggle must still flip its in-memory state but must never touch emailBuilder.module.<id>. This is the invariant that let the dark-mode switch stop being hand-rolled.',
+    },
+    {
+      label: 'persist=false: a pre-existing stored value is ignored',
+      check() {
+        const k = 'emailBuilder.module.__harnessProbeB';
+        localStorage.setItem(k, 'false');
+        try {
+          const t = createModuleToggle('__harnessProbeB', 'probe', true, () => {}, false);
+          return t.isOn() === true;
+        } finally { localStorage.removeItem(k); }
+      },
+      description: 'With persist=false the factory must not read storage either — defaultOn wins over a stale saved value.',
+    },
+    {
+      label: 'persist defaults to true: flipping still writes its key',
+      check() {
+        const k = 'emailBuilder.module.__harnessProbeC';
+        localStorage.removeItem(k);
+        try {
+          const t = createModuleToggle('__harnessProbeC', 'probe', false, () => {});
+          t.element.click();
+          return localStorage.getItem(k) === 'true';
+        } finally { localStorage.removeItem(k); }
+      },
+      description: 'The opt-out must be opt-IN: omitting the 5th argument preserves the persisting behavior every existing caller (cta, promo, testData) relies on.',
+    },
+    {
+      label: 'Preview header append order: viewport, divider, Test data, divider, Dark mode, client picker',
+      check() {
+        const kids = Array.from(document.querySelector('.preview-header-left').children);
+        const at = (pred) => kids.findIndex(pred);
+        const vp = at(el => !!el.querySelector && !!el.querySelector('button[data-vp]'));
+        const td = at(el => el.classList.contains('module-toggle') && el.textContent.includes('Test data'));
+        const dm = at(el => el.id === 'darkModeSwitch');
+        const pk = at(el => el.id === 'darkClientControl');
+        const toggles = kids.filter(el => el.classList.contains('module-toggle')).length;
+        return vp === 0 && vp < td && td < dm && dm < pk && toggles === 2;
+      },
+      description: 'The container is runtime-extended and order-dependent (see the HTML comment on its static trailing divider). This fixture is the executable form of that contract — a static child added to the markup would land at index 0 and fail it.',
+    },
+    {
+      label: 'Live Dark mode switch: click drives darkModeEnabled, picker visibility, stage dark class and #darkNote together',
+      check() {
+        const switchEl = document.getElementById('darkModeSwitch');
+        const picker = document.getElementById('darkClientControl');
+        const stage = document.getElementById('previewStage');
+        const savedOn = switchEl.classList.contains('on');
+        try {
+          switchEl.click();
+          const onAfterFirst = switchEl.classList.contains('on');
+          const firstClickCorrect = darkModeEnabled === onAfterFirst
+            && picker.hidden === !onAfterFirst
+            && stage.classList.contains('dark') === onAfterFirst
+            && darkNote.hidden === !onAfterFirst;
+          switchEl.click();
+          const onAfterSecond = switchEl.classList.contains('on');
+          const secondClickCorrect = onAfterSecond === savedOn
+            && darkModeEnabled === onAfterSecond
+            && picker.hidden === !onAfterSecond
+            && stage.classList.contains('dark') === onAfterSecond
+            && darkNote.hidden === !onAfterSecond;
+          return firstClickCorrect && secondClickCorrect;
+        } finally {
+          // Belt-and-suspenders restore, mirroring Section 8's purity guard:
+          // the two clicks above already return to savedOn on their own, but
+          // if a thrown error ever skipped the second click this puts the
+          // real switch back rather than leaving dark mode on for the rest
+          // of the session.
+          if (switchEl.classList.contains('on') !== savedOn) switchEl.click();
+        }
+      },
+      description: 'Fixtures 1-3 above only exercise throwaway probe toggles that are never inserted into the DOM. This fixture drives the actual #darkModeSwitch the app renders — the element onDarkModeToggle is wired to — and asserts all four of its documented side effects (darkModeEnabled, #darkClientControl.hidden, .preview-stage\'s dark class, and #darkNote.hidden) move together on a real click, then clicks again to leave dark mode exactly as this fixture found it.',
+    },
+  ];
+
+  renderPredicateFixtures(body, MODULE_TOGGLE_FIXTURES);
+
+  // --- Section 12: dark-mode disclosure caption (TASK-031) ---
+  const h12 = document.createElement('h3');
+  h12.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h12.textContent = 'Dark-mode disclosure caption';
+  body.appendChild(h12);
+
+  const DARK_NOTE_FIXTURES = [
+    {
+      label: 'Every registered dark-mode client has a caption',
+      check() {
+        return Object.keys(DARK_MODE_TRANSFORMS).every(k =>
+          typeof DARK_MODE_CLIENT_NOTES[k] === 'string' && DARK_MODE_CLIENT_NOTES[k].length > 0);
+      },
+      description: 'Adding a fourth client to DARK_MODE_TRANSFORMS without a caption would ship a blank disclosure strip for it. This fixture is the coupling between the two maps.',
+    },
+    {
+      label: 'Picker button titles are sourced from DARK_MODE_CLIENT_NOTES',
+      check() {
+        const btns = Array.from(darkClientControl.querySelectorAll('button[data-dm]'));
+        return btns.length === Object.keys(DARK_MODE_TRANSFORMS).length && btns.every(b => b.title === DARK_MODE_CLIENT_NOTES[b.dataset.dm]);
+      },
+      description: 'One source of truth for the hover detail and the visible caption — a hardcoded title in the markup string would drift from the caption silently.',
+    },
+    {
+      label: 'Caption tracks the toggle and the client selection',
+      check() {
+        const savedEnabled = darkModeEnabled;
+        const savedClient = darkModeClient;
+        try {
+          darkModeEnabled = true; darkModeClient = 'applemail'; syncDarkNote();
+          const onApple = darkNote.hidden === false && darkNote.textContent === DARK_MODE_CLIENT_NOTES.applemail;
+          darkModeClient = 'outlook'; syncDarkNote();
+          const onOutlook = darkNote.textContent === DARK_MODE_CLIENT_NOTES.outlook;
+          darkModeEnabled = false; syncDarkNote();
+          const off = darkNote.hidden === true;
+          return onApple && onOutlook && off;
+        } finally {
+          darkModeEnabled = savedEnabled; darkModeClient = savedClient; syncDarkNote();
+        }
+      },
+      description: 'The caption must be hidden when dark mode is off and must swap text on every client change — wiring only one of the two call sites leaves it stale. NOTE: this fixture calls syncDarkNote() itself and mutates state directly, so it cannot detect a broken wireSegControl callback wiring — see the next fixture for that.',
+    },
+    {
+      label: 'Live picker click updates #darkNote (real DOM click, not direct state assignment)',
+      check() {
+        const switchEl = document.getElementById('darkModeSwitch');
+        const picker = document.getElementById('darkClientControl');
+        const savedOn = switchEl.classList.contains('on');
+        const savedBtn = picker.querySelector('button[data-dm].active');
+        try {
+          if (!savedOn) switchEl.click();
+          picker.querySelector('button[data-dm="applemail"]').click();
+          return darkNote.textContent === DARK_MODE_CLIENT_NOTES.applemail && darkNote.hidden === false;
+        } finally {
+          savedBtn.click();
+          if (switchEl.classList.contains('on') !== savedOn) switchEl.click();
+        }
+      },
+      description: 'The previous fixture calls syncDarkNote() itself, so deleting the syncDarkNote() call from the wireSegControl callback (index.html ~4183) would leave it green while the caption feature is dead. This fixture drives the real #darkClientControl button click — the same event the app wires — and goes red if that call site is ever removed. Mirrors Section 11\'s live-click save/click/restore idiom; wireSegControl re-applies .active/aria-pressed on every click, so clicking the saved button is a complete restore.',
+    },
+  ];
+
+  renderPredicateFixtures(body, DARK_NOTE_FIXTURES);
+
+  // --- Section 13: rich-text italics — em/i normalisation (TASK-025) ---
   // Fixture 4 (byte-parity) is the load-bearing row here: its `expected`
   // value was captured from the UNMODIFIED richTextToMjText (before the
   // italic pass existed) so this section doubles as a regression lock that
   // the new DOM pass never perturbs non-italic output.
-  const h11 = document.createElement('h3');
-  h11.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
-  h11.textContent = 'rich-text italics — em/i normalisation';
-  body.appendChild(h11);
+  const h13 = document.createElement('h3');
+  h13.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h13.textContent = 'rich-text italics — em/i normalisation';
+  body.appendChild(h13);
 
   const ITALIC_TPL = { ctaBackgroundColor: '#ED1C24' };
   const ITALIC_FIXTURES = [
@@ -2855,11 +3066,11 @@ function renderTestHarness() {
     body.appendChild(row);
   }
 
-  // --- Section 12: richTextToMjText — default parity + style overrides (TASK-026) ---
-  const h12 = document.createElement('h3');
-  h12.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
-  h12.textContent = 'richTextToMjText — default parity + style overrides';
-  body.appendChild(h12);
+  // --- Section 14: richTextToMjText — default parity + style overrides (TASK-026) ---
+  const h14 = document.createElement('h3');
+  h14.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h14.textContent = 'richTextToMjText — default parity + style overrides';
+  body.appendChild(h14);
 
   const RICHTEXT_TPL = { ctaBackgroundColor: '#ED1C24' };
   const RICHTEXT_PARITY_FIXTURES = [
@@ -2944,6 +3155,20 @@ function renderTestHarness() {
       check: out => out.includes('margin:0 0 8px 0;') && /margin:0;">two/.test(out),
       description: 'blockMargin threads through the p/ul/ol margin passes; the last block is still zeroed regardless of blockMargin.',
     },
+    {
+      label: 'align omitted emits no align attribute at all (TASK-033 parity guard)',
+      html: '<p>x</p>',
+      opts: {},
+      check: out => !out.includes('align='),
+      description: 'align defaults to null, which must inherit MJML\'s left default rather than always emitting align="left" — the two body-copy call sites depend on this to stay byte-identical.',
+    },
+    {
+      label: 'align:"center" appends align="center" last, after color (TASK-033)',
+      html: '<p>x</p>',
+      opts: { fontSize: '13px', color: '#6b6b6b', padding: '0 0 18px 0', align: 'center' },
+      check: out => out.startsWith('        <mj-text padding="0 0 18px 0" font-size="13px" color="#6b6b6b" align="center">'),
+      description: 'align must be appended after padding, font-size, and color so the pre-existing attribute-order fixture above keeps matching through color="#6b6b6b" unchanged.',
+    },
   ];
 
   for (const fixture of RICHTEXT_OVERRIDE_FIXTURES) {
@@ -2989,11 +3214,11 @@ function renderTestHarness() {
     body.appendChild(row);
   }
 
-  // --- Section 13: CTA microcopy — emission gating and muted styling (TASK-027) ---
-  const h13 = document.createElement('h3');
-  h13.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
-  h13.textContent = 'CTA microcopy — emission gating and muted styling';
-  body.appendChild(h13);
+  // --- Section 15: CTA microcopy — emission gating and muted styling (TASK-027) ---
+  const h15 = document.createElement('h3');
+  h15.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h15.textContent = 'CTA microcopy — emission gating and muted styling';
+  body.appendChild(h15);
 
   const MICROCOPY_TPL = { ctaBackgroundColor: '#ED1C24', ctaMicrocopyFontSize: '13px', ctaMicrocopyColor: '#6b6b6b' };
   const MICROCOPY_BLOCK_FIXTURES = [
@@ -3020,6 +3245,12 @@ function renderTestHarness() {
       html: '<p>No obligation.</p>',
       check: out => out.includes('font-size="13px"') && out.includes('color="#6b6b6b"') && out.includes('padding="0 0 18px 0"'),
       description: 'A populated field emits an mj-text styled from tpl.ctaMicrocopyFontSize/ctaMicrocopyColor, with the 18px bottom padding that replaces the button\'s own gap.',
+    },
+    {
+      label: 'Centered emission: align="center" matches the centered CTA button above it (TASK-033)',
+      html: '<p>No cost, no obligation.</p>',
+      check: out => out.includes('align="center"'),
+      description: 'The mj-button above this block has no align attribute and defaults to MJML\'s centered mj-button behavior; the caption must be explicitly centered too or it reads as detached body copy under a centered button.',
     },
     {
       label: 'Muted URL link: brand-accent colour is overridden',
@@ -3146,19 +3377,90 @@ function renderTestHarness() {
     },
   ];
 
-  for (const guard of MICROCOPY_DOM_GUARDS) {
-    const pass = (() => { try { return guard.check(); } catch { return false; } })();
-    const row = document.createElement('div');
-    row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
-    row.innerHTML =
-      '<div class="harness-row-label">' +
-        '<span>' + escapeHtml(guard.label) + '</span>' +
-        '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
-      '</div>' +
-      '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(guard.description) + '</code></div>' +
-      '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : 'FAIL — guard returned false') + '</code></div>';
-    body.appendChild(row);
-  }
+  renderPredicateFixtures(body, MICROCOPY_DOM_GUARDS, 'FAIL — guard returned false');
+
+  // --- Section 16: documentation anchor drift guard (TASK-032) ---
+  // The dev docs point at code with greppable anchors instead of line
+  // numbers. This section fetches the docs, extracts every needle at
+  // runtime, and asserts each one still resolves in index.html.
+  //
+  // DO NOT write any anchor needle as a literal anywhere in this file.
+  // The guard asserts "needle occurs in index.html's source" — a needle
+  // quoted here would match itself and pass forever regardless of the
+  // real code. That is the FIND-SPRINT-007-7 vacuous-pass trap, and it
+  // is why every needle below is captured from the fetched markdown.
+  const ANCHOR_DOCS = ['README.md', 'CODE-PATTERNS.md', 'ARCHITECTURE.md', 'CLAUDE.md'];
+  const ANCHOR_FLOORS = { 'README.md': 2, 'CODE-PATTERNS.md': 18, 'ARCHITECTURE.md': 2, 'CLAUDE.md': 1 };
+
+  const h16 = document.createElement('h3');
+  h16.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
+  h16.textContent = 'Documentation anchor drift guard';
+  body.appendChild(h16);
+  // Container captured synchronously. The awaited continuation appends
+  // only into this element, never into `body` — so if the harness is
+  // re-rendered while a fetch is in flight, the late rows land in a
+  // detached node and are simply never seen, instead of appending
+  // themselves to the bottom of a fresh run.
+  const anchorSection = document.createElement('div');
+  body.appendChild(anchorSection);
+
+  (async () => {
+    const paths = ANCHOR_DOCS.concat(['index.html']);
+    let sources;
+    try {
+      const texts = await Promise.all(paths.map(async (p) => {
+        const res = await fetch(p, { cache: 'no-store' });
+        if (!res.ok) throw new Error(p + ' -> HTTP ' + res.status);
+        return res.text();
+      }));
+      sources = Object.fromEntries(paths.map((p, i) => [p, texts[i]]));
+    } catch (err) {
+      renderPredicateFixtures(anchorSection, [{
+        label: 'Read the doc sources over HTTP',
+        check() { return false; },
+        description: 'Could not read the docs (' + String((err && err.message) || err) + '). This section needs the app served over http:// — see README "How to run". It cannot run from a page opened directly off disk.',
+      }], 'SKIPPED — serve over http:// and reopen the harness (Ctrl+Shift+T)');
+      return;
+    }
+
+    const src = sources['index.html'];
+    const fixtures = [];
+    const seen = new Map(); // needle -> [docs that carry it]
+
+    for (const doc of ANCHOR_DOCS) {
+      // Fresh regex per iteration — a /g regex hoisted out of the loop is
+      // stateful (see the PHONE_REGEX gotcha in CODE-PATTERNS.md).
+      const found = [...sources[doc].matchAll(/grep\s+`([^`\n]+)`/g)].map(m => m[1]);
+      fixtures.push({
+        label: doc + ': carries at least ' + ANCHOR_FLOORS[doc] + ' doc anchors (found ' + found.length + ')',
+        check: () => found.length >= ANCHOR_FLOORS[doc],
+        description: 'Floor check. Without it, a doc rewrite that silently drops the anchor convention would leave this whole section vacuously green — every per-needle row below would simply stop existing. If you removed an anchor deliberately, lower this file\'s value in ANCHOR_FLOORS in the same commit.',
+      });
+      for (const needle of found) {
+        if (!seen.has(needle)) seen.set(needle, []);
+        seen.get(needle).push(doc);
+      }
+    }
+
+    for (const [needle, docs] of seen) {
+      fixtures.push({
+        label: docs.join(' + ') + ' -> ' + needle,
+        check: () => src.includes(needle),
+        description: 'The doc anchor must occur at least once in index.html. A FAIL means the identifier was renamed or deleted and the doc now points at nothing — fix the doc (or restore the identifier) in the same commit.',
+      });
+    }
+
+    const tplKeys = [...new Set(Object.values(templates).flatMap(t => Object.keys(t)))];
+    const undocumented = tplKeys.filter(k => !sources['README.md'].includes(k));
+    fixtures.push({
+      label: 'README documents every key used by the templates map'
+        + (undocumented.length ? ' — undocumented: ' + undocumented.join(', ') : ''),
+      check: () => undocumented.length === 0,
+      description: 'The schema list under README\'s Templates section must name every key present on any brand entry. Adding a key to a brand without documenting it turns this row red. Keys are read from the live `templates` object, so this cannot go stale.',
+    });
+
+    renderPredicateFixtures(anchorSection, fixtures);
+  })();
 }
 
 // resolveTokenPath(path, data) — walk a dot-separated path through `data`.
@@ -3694,8 +3996,10 @@ function outlookDarkTransform(html) {
 // three author-dark-CSS states: 'authored' (the string
 // `prefers-color-scheme` appears anywhere — today only as an
 // @media (prefers-color-scheme: dark) block), 'meta-only' (a
-// color-scheme / supported-color-schemes signal in either meta-name or
-// CSS-property form, with no dark rules behind it), or 'none' (neither).
+// color-scheme / supported-color-schemes signal — either as a meta name,
+// or as a CSS `color-scheme:` property whose value is a recognized
+// keyword (`light` / `dark` / `normal`, optionally prefixed `only`) —
+// with no dark rules behind it), or 'none' (neither).
 //
 // BRANCH ORDER IS LOAD-BEARING: the string `prefers-color-scheme`
 // contains `color-scheme` as a substring, so the 'authored' check MUST
@@ -3705,10 +4009,15 @@ function outlookDarkTransform(html) {
 function detectAuthorDarkScheme(html) {
   if (/prefers-color-scheme/i.test(html)) return 'authored';
   if (/name=["']?(?:color-scheme|supported-color-schemes)/i.test(html)) return 'meta-only';
-  // The [;{"'\s] prefix requires a preceding delimiter so this cannot
-  // match inside the substring "prefers-color-scheme:" — belt-and-braces
-  // given the authored check above already short-circuits that case.
-  if (/[;{"'\s]color-scheme\s*:/i.test(html)) return 'meta-only';
+  // Requires a recognized color-scheme keyword value. Without it, ordinary
+  // marketer prose ("Ask about our color-scheme: blue and white") — which
+  // contains no HTML-special characters and so survives escapeHtml verbatim
+  // into the compiled HTML — would flip Apple Mail out of its identity
+  // pass-through into a full partial invert (FIND-SPRINT-007-14). The
+  // [;{"'\s] prefix additionally keeps this from matching inside the
+  // substring "prefers-color-scheme:", belt-and-braces given the authored
+  // check above already short-circuits that case.
+  if (/[;{"'\s]color-scheme\s*:\s*(?:only\s+)?(?:light|dark|normal)\b/i.test(html)) return 'meta-only';
   return 'none';
 }
 
@@ -3747,6 +4056,20 @@ function appleMailDarkTransform(html) {
   return remapInlineColors(html);
 }
 const DARK_MODE_TRANSFORMS = { gmail: gmailDarkTransform, outlook: outlookDarkTransform, applemail: appleMailDarkTransform };
+
+// DARK_MODE_CLIENT_NOTES — the single source of truth for what the
+// preview is currently simulating. Feeds BOTH the visible #darkNote
+// caption and the picker buttons' title attributes, so the two can never
+// drift. Visible text is what makes this reach keyboard and screen-reader
+// users: a title attribute is hover-only and loses the accessible-name
+// computation to the button's own text content (FIND-SPRINT-007-19/20).
+// Keys must stay in sync with DARK_MODE_TRANSFORMS — harness Section 12
+// asserts that.
+const DARK_MODE_CLIENT_NOTES = {
+  gmail: 'Simulating Gmail (iOS app): the whole email is inverted, then images are re-inverted so photos stay right.',
+  outlook: 'Simulating Outlook.com / OWA: light backgrounds are darkened and low-contrast text is lifted; colors that are already dark are left alone.',
+  applemail: 'Simulating Apple Mail: it only goes dark when the email carries its own dark-mode CSS. This email carries none, so the preview is intentionally unchanged.',
+};
 
 // applyDarkMode(html) — preview-only step in the srcdoc transform chain.
 // Returns `html` unchanged when dark mode is off or the selected client
@@ -3903,6 +4226,14 @@ wireSegControl(viewportButtons, (btn) => {
   previewStage.classList.toggle('mobile', btn.dataset.vp === 'mobile');
 });
 
+// Preview header, left group. `.preview-header-left`'s static markup ends
+// at the viewport .seg-control plus one <span class="divider">; every
+// control after that divider is appended here at runtime, in source order:
+//   1. Test data toggle          (appendChild, below)
+//   2. dark-mode divider + client picker (insertAdjacentHTML, below)
+//   3. Dark mode toggle          (insertBefore the picker, below)
+const previewHeaderLeft = document.querySelector('.preview-header-left');
+
 // Test-data substitution toggle (preview only — never affects copied HTML).
 // Built via the shared createModuleToggle() factory (below) rather than a
 // hand-rolled switch (TASK-014 consolidation).
@@ -3928,59 +4259,69 @@ function onTestDataToggle(isOn) {
 }
 const testDataToggle = createModuleToggle('testData', 'Test data', true, onTestDataToggle);
 testDataToggle.element.title = 'Substitute {{tokens}} in preview';
-document.querySelector('.preview-header-left').appendChild(testDataToggle.element);
+previewHeaderLeft.appendChild(testDataToggle.element);
 
-// Dark-mode preview controls (IDEA-005 / TASK-021). Runtime-inserted, same
-// as the Test data toggle above: static markup here would render before
-// that toggle, since TASK-014 appends it at runtime. Deliberately hand-rolled
-// rather than createModuleToggle() — that factory persists to localStorage
-// under emailBuilder.module.<id>, and dark-mode state must NOT be persisted
-// (locked at the idea checkpoint). Reuses the factory's module-toggle /
-// track markup shape so it shares the same CSS.
-document.querySelector('.preview-header-left').insertAdjacentHTML('beforeend',
+// Dark-mode preview controls (IDEA-005 / TASK-021, migrated onto the shared
+// factory in TASK-030). Runtime-inserted, same as the Test data toggle above.
+//
+// The client picker is inserted BEFORE the toggle is created, and the toggle
+// element is then insertBefore'd ahead of it. That ordering is load-bearing:
+// createModuleToggle fires onChange once during construction, and
+// onDarkModeToggle reads darkClientControl — so the picker must already
+// exist in the DOM when the factory runs.
+previewHeaderLeft.insertAdjacentHTML('beforeend',
   '<span class="divider" aria-hidden="true"></span>' +
-  '<span class="module-toggle" role="switch" aria-checked="false" tabindex="0" id="darkModeSwitch" title="Simulate a dark-mode email client in the preview (preview only)">' +
-    '<span class="track"></span>Dark mode' +
-  '</span>' +
   '<div class="seg-control" role="group" aria-label="Dark mode client" id="darkClientControl" style="width:auto" hidden>' +
-    '<button type="button" class="active" data-dm="gmail" aria-pressed="true" title="Gmail mobile app (iOS) — inverts the entire email, then re-inverts images">Gmail</button>' +
-    '<button type="button" data-dm="outlook" aria-pressed="false" title="Outlook.com / OWA (web) — selectively repairs contrast instead of inverting">Outlook</button>' +
-    '<button type="button" data-dm="applemail" aria-pressed="false" title="Apple Mail (macOS 12.4+ / iOS 13+) — respects author dark-mode CSS; this email has none, so it renders unchanged">Apple Mail</button>' +
+    '<button type="button" class="active" data-dm="gmail" aria-pressed="true">Gmail</button>' +
+    '<button type="button" data-dm="outlook" aria-pressed="false">Outlook</button>' +
+    '<button type="button" data-dm="applemail" aria-pressed="false">Apple Mail</button>' +
   '</div>'
 );
-
-const darkModeSwitch = document.getElementById('darkModeSwitch');
 const darkClientControl = document.getElementById('darkClientControl');
-function syncDarkModeSwitch() {
-  darkModeSwitch.classList.toggle('on', darkModeEnabled);
-  darkModeSwitch.setAttribute('aria-checked', String(darkModeEnabled));
-  darkClientControl.hidden = !darkModeEnabled;
-  previewStage.classList.toggle('dark', darkModeEnabled);
+// Titles and the caption both read DARK_MODE_CLIENT_NOTES — one source,
+// no drift. The titles are supplementary hover detail only; the caption
+// is the disclosure that actually has to work.
+for (const btn of darkClientControl.querySelectorAll('button[data-dm]')) {
+  btn.title = DARK_MODE_CLIENT_NOTES[btn.dataset.dm] || '';
 }
-function flipDarkMode() {
-  darkModeEnabled = !darkModeEnabled;
-  syncDarkModeSwitch();
+
+const darkNote = document.getElementById('darkNote');
+function syncDarkNote() {
+  darkNote.hidden = !darkModeEnabled;
+  darkNote.textContent = DARK_MODE_CLIENT_NOTES[darkModeClient] || '';
+}
+
+function onDarkModeToggle(isOn) {
+  darkModeEnabled = isOn;
+  darkClientControl.hidden = !isOn;
+  previewStage.classList.toggle('dark', isOn);
+  syncDarkNote();
   scheduleRender();
 }
-darkModeSwitch.addEventListener('click', flipDarkMode);
-darkModeSwitch.addEventListener('keydown', (e) => {
-  if (e.key === ' ' || e.key === 'Enter') {
-    e.preventDefault();
-    flipDarkMode();
-  }
-});
-syncDarkModeSwitch();
+// persist = false — dark mode is a review-time convenience, not a content
+// decision; IDEA-005 locked it as non-persisting. See CODE-PATTERNS.md.
+const darkModeToggle = createModuleToggle('darkMode', 'Dark mode', false, onDarkModeToggle, false);
+darkModeToggle.element.id = 'darkModeSwitch';
+darkModeToggle.element.title = 'Simulate a dark-mode email client in the preview (preview only)';
+previewHeaderLeft.insertBefore(darkModeToggle.element, darkClientControl);
+
 wireSegControl(darkClientControl.querySelectorAll('button[data-dm]'), (btn) => {
   darkModeClient = btn.dataset.dm;
+  syncDarkNote();
   scheduleRender();
 });
 
 // ---------- Reusable module toggle factory ----------
 // Returns { element, isOn } — caller is responsible for DOM insertion.
-// State persists under `emailBuilder.module.<id>` in localStorage.
-function createModuleToggle(id, label, defaultOn, onChange) {
+// State persists under `emailBuilder.module.<id>` in localStorage unless
+// `persist` is false, in which case the toggle is session-only: it neither
+// reads nor writes storage and always starts at `defaultOn`. The dark-mode
+// toggle is the canonical non-persisting caller (IDEA-005 locked its state
+// as non-persistent) — do NOT hand-roll a module-toggle element to dodge
+// persistence, pass persist: false.
+function createModuleToggle(id, label, defaultOn, onChange, persist = true) {
   const key = `emailBuilder.module.${id}`;
-  const stored = localStorage.getItem(key);
+  const stored = persist ? localStorage.getItem(key) : null;
   // Mirror testDataEnabled init: missing key falls back to defaultOn;
   // explicit 'false'/'true' overrides regardless of defaultOn.
   let state;
@@ -4012,7 +4353,7 @@ function createModuleToggle(id, label, defaultOn, onChange) {
 
   function flip() {
     state = !state;
-    localStorage.setItem(key, String(state));
+    if (persist) localStorage.setItem(key, String(state));
     sync();
     onChange(state);
   }
