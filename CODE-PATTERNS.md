@@ -96,5 +96,7 @@ to a canonical example — read those for the actual implementation.
 
 - **Doc anchors, not line numbers.** CODE-PATTERNS.md, ARCHITECTURE.md, CLAUDE.md and README.md point at code with a greppable needle in the form grep `function wireSegControl` — a function name, an element id, or a unique call expression. Line-number pointers rot silently and were all removed in commit 043ee5d after drifting 400–1500 lines. Anchors still break when an identifier is renamed, so the Ctrl+Shift+T harness's *Documentation anchor drift guard* section extracts every anchor from these four files at runtime and fails if one no longer resolves in `index.html`. When you rename an anchored identifier, update the doc in the same commit.
 
+- **Behavioral claims must cite the deciding construct.** When a doc states what the app *does* (which characters become a bullet, which formats survive paste, which attributes an anchor carries), name the function or constant that decides it — e.g. "the characters in `BULLET_PREFIX` — grep `const BULLET_PREFIX`" — rather than asserting the behavior in prose alone. A prose-only claim can only be checked against itself; dash and glyph variants (en vs em dash) have drifted between doc and regex before.
+
 `/sf:compound` will append patterns extracted from completed sprints to
 this file over time.
