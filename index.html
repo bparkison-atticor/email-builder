@@ -1765,6 +1765,10 @@ function buildMjml() {
   const bannerBlock = tpl.bannerHtml
     ? `<mj-text padding="0" align="center">${tpl.bannerHtml}</mj-text>`
     : `<mj-image src="${escapeHtml(tpl.bannerImageUrl)}" alt="${escapeHtml(tpl.bannerAlt)}" width="${escapeHtml(tpl.bannerWidth)}" padding="0"${bannerHrefAttr} />`;
+  const ctaBlock = ctaToggle.isOn() ? `        <mj-button href="${escapeHtml(ctaHref)}" target="${ctaTarget}"${ctaRelAttr} background-color="${tpl.ctaBackgroundColor}" color="${tpl.ctaTextColor}" padding="${ctaPadding}">
+          ${escapeHtml(ctaText)}
+        </mj-button>
+${microcopyBlock ? microcopyBlock + '\n' : ''}` : '';
 
   return `<mjml>
   <mj-head>
@@ -1797,10 +1801,7 @@ function buildMjml() {
     <mj-section padding="28px 24px 8px 24px" background-color="#ffffff">
       <mj-column>
 ${richTextToMjText(bodyAboveQuill.root.innerHTML, tpl)}
-${ctaToggle.isOn() ? `        <mj-button href="${escapeHtml(ctaHref)}" target="${ctaTarget}"${ctaRelAttr} background-color="${tpl.ctaBackgroundColor}" color="${tpl.ctaTextColor}" padding="${ctaPadding}">
-          ${escapeHtml(ctaText)}
-        </mj-button>
-${microcopyBlock ? microcopyBlock + '\n' : ''}` : ''}${richTextToMjText(bodyBelowQuill.root.innerHTML, tpl)}
+${ctaBlock}${richTextToMjText(bodyBelowQuill.root.innerHTML, tpl)}
       </mj-column>
     </mj-section>
     <mj-section padding="16px 24px 4px 24px" background-color="#f1f1f1">
