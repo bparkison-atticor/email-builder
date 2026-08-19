@@ -666,7 +666,7 @@
 
     <div class="seg">
       <div class="seg-head">
-        <span class="seg-title">Body</span>
+        <span class="seg-title" id="bodyAboveLabel">Body</span>
         <span class="seg-tag">above CTA</span>
       </div>
       <div class="rich-editor-wrap">
@@ -721,7 +721,7 @@
 
     <div class="seg">
       <div class="seg-head">
-        <span class="seg-title">Body</span>
+        <span class="seg-title" id="bodyBelowLabel">Body</span>
         <span class="seg-tag">below CTA</span>
         <span class="seg-desc">optional</span>
       </div>
@@ -1233,6 +1233,7 @@ const bodyAboveQuill = new Quill('#bodyAbove', {
   theme: 'snow',
   placeholder: 'Enter copy. Bold, italics, lists, and links supported.'
 });
+bodyAboveQuill.root.setAttribute('aria-labelledby', 'bodyAboveLabel');
 
 const bodyBelowQuill = new Quill('#bodyBelow', {
   modules: { toolbar: [...richToolbar] },
@@ -1240,6 +1241,7 @@ const bodyBelowQuill = new Quill('#bodyBelow', {
   theme: 'snow',
   placeholder: 'Optional.'
 });
+bodyBelowQuill.root.setAttribute('aria-labelledby', 'bodyBelowLabel');
 
 // Microcopy toolbar deliberately omits lists: this is one or two sentences
 // under the button, and the compiled output suppresses the typed-bullet
