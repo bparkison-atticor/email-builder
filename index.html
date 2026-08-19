@@ -3109,11 +3109,9 @@ function renderTestHarness() {
     body.appendChild(row);
   }
 
-  // Note: richTextToMjText only ever reads tpl.ctaBackgroundColor — the
-  // ctaMicrocopyFontSize/ctaMicrocopyColor brand-config keys are read by the
-  // (future) caller and passed in as opts.fontSize/opts.color, not by this
-  // function directly, so this fixture tpl omits them.
-  const RICHTEXT_MICROCOPY_TPL = { ctaBackgroundColor: '#ED1C24' };
+  // Note: richTextToMjText never reads ctaMicrocopyFontSize/ctaMicrocopyColor
+  // directly (they're passed in as opts.fontSize/opts.color by the caller), so
+  // the shared RICHTEXT_TPL needs no microcopy-specific keys — reuse it here too.
   const RICHTEXT_OVERRIDE_FIXTURES = [
     {
       label: 'Style overrides: attribute emission + order (padding, font-size, color)',
@@ -3181,7 +3179,7 @@ function renderTestHarness() {
   ];
 
   for (const fixture of RICHTEXT_OVERRIDE_FIXTURES) {
-    const actual = richTextToMjText(fixture.html, RICHTEXT_MICROCOPY_TPL, fixture.opts);
+    const actual = richTextToMjText(fixture.html, RICHTEXT_TPL, fixture.opts);
     const pass = (() => { try { return fixture.check(actual); } catch { return false; } })();
     const row = document.createElement('div');
     row.className = 'harness-row ' + (pass ? 'pass' : 'fail');
