@@ -1,4 +1,52 @@
 {
   "version": 2,
-  "tasks": {}
+  "tasks": {
+    "TASK-034": {
+      "status": "ready",
+      "depends_on": [],
+      "idea": "SPRINT-008-proposal"
+    },
+    "TASK-035": {
+      "status": "ready",
+      "depends_on": [
+        "TASK-034"
+      ],
+      "idea": "SPRINT-008-proposal"
+    },
+    "TASK-036": {
+      "status": "ready",
+      "depends_on": [
+        "TASK-035"
+      ],
+      "idea": "SPRINT-008-proposal"
+    },
+    "TASK-037": {
+      "status": "ready",
+      "depends_on": [
+        "TASK-036"
+      ],
+      "idea": "SPRINT-008-proposal"
+    },
+    "TASK-038": {
+      "status": "ready",
+      "depends_on": [
+        "TASK-037"
+      ],
+      "idea": "SPRINT-008-proposal"
+    },
+    "TASK-039": {
+      "status": "ready",
+      "depends_on": [
+        "TASK-038"
+      ],
+      "idea": "SPRINT-008-proposal"
+    },
+    "TASK-040": {
+      "status": "ready",
+      "depends_on": [
+        "TASK-039"
+      ],
+      "idea": "SPRINT-008-proposal"
+    }
+  }
 }
