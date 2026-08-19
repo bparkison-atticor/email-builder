@@ -1523,11 +1523,17 @@ function autoLinkPhones(root) {
   });
 }
 
+// Shared Quill empty-paragraph cleaning rule — used by both the emptiness
+// predicate and richTextToMjText's own parse input. Keep these in one place.
+function stripQuillEmptyParagraphs(html) {
+  return (html || '').replace(/<p><br><\/p>/g, '').trim();
+}
+
 // Pure: does this Quill innerHTML carry any real content? Quill's "empty"
 // states are '', '<p><br></p>', and '<p></p>'.
 function hasRichHtml(html) {
   if (!html) return false;
-  const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
+  const cleaned = stripQuillEmptyParagraphs(html);
   return !!(cleaned && cleaned !== '<p></p>');
 }
 
@@ -1543,7 +1549,7 @@ function richTextToMjText(html, tpl, opts = {}) {
     align = null,           // mj-text align attribute; null = inherit MJML's left default
   } = opts;
   // Strip empty paragraphs Quill inserts when the user hits Enter twice.
-  const cleaned = html.replace(/<p><br><\/p>/g, '').trim();
+  const cleaned = stripQuillEmptyParagraphs(html);
 
   // Parse into a DOM so we can normalize styling for email clients, which
   // don't collapse margins like browsers and vary wildly on default list styles.
