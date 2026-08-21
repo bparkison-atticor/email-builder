@@ -3436,47 +3436,58 @@ function renderTestHarness() {
     }
 
     const src = sources['index.html'];
-    const fixtures = [];
-    const seen = new Map(); // needle -> [docs that carry it]
+    // The fetch stage above has its own catch; this one covers row-building.
+    // Without it, a throw here dies as an unhandled rejection and the section
+    // renders heading-only — reading as "nothing to check" instead of FAIL.
+    try {
+      const fixtures = [];
+      const seen = new Map(); // needle -> [docs that carry it]
 
-    for (const doc of ANCHOR_DOCS) {
-      // Fresh regex per iteration — a /g regex hoisted out of the loop is
-      // stateful (see the PHONE_REGEX gotcha in CODE-PATTERNS.md).
-      const found = [...sources[doc].matchAll(/grep\s+`([^`\n]+)`/g)].map(m => m[1]);
-      fixtures.push({
-        label: doc + ': carries at least ' + ANCHOR_FLOORS[doc] + ' doc anchors (found ' + found.length + ')',
-        check: () => found.length >= ANCHOR_FLOORS[doc],
-        description: 'Floor check. Without it, a doc rewrite that silently drops the anchor convention would leave this whole section vacuously green — every per-needle row below would simply stop existing. If you removed an anchor deliberately, lower this file\'s value in ANCHOR_FLOORS in the same commit.',
-      });
-      for (const needle of found) {
-        if (!seen.has(needle)) seen.set(needle, []);
-        if (!seen.get(needle).includes(doc)) seen.get(needle).push(doc);
+      for (const doc of ANCHOR_DOCS) {
+        // Fresh regex per iteration — a /g regex hoisted out of the loop is
+        // stateful (see the PHONE_REGEX gotcha in CODE-PATTERNS.md).
+        const found = [...sources[doc].matchAll(/grep\s+`([^`\n]+)`/g)].map(m => m[1]);
+        fixtures.push({
+          label: doc + ': carries at least ' + ANCHOR_FLOORS[doc] + ' doc anchors (found ' + found.length + ')',
+          check: () => found.length >= ANCHOR_FLOORS[doc],
+          description: 'Floor check. Without it, a doc rewrite that silently drops the anchor convention would leave this whole section vacuously green — every per-needle row below would simply stop existing. If you removed an anchor deliberately, lower this file\'s value in ANCHOR_FLOORS in the same commit.',
+        });
+        for (const needle of found) {
+          if (!seen.has(needle)) seen.set(needle, []);
+          if (!seen.get(needle).includes(doc)) seen.get(needle).push(doc);
+        }
       }
-    }
 
-    for (const [needle, docs] of seen) {
+      for (const [needle, docs] of seen) {
+        fixtures.push({
+          label: docs.join(' + ') + ' -> ' + needle,
+          check: () => src.includes(needle),
+          description: 'The doc anchor must occur at least once in index.html. A FAIL means the identifier was renamed or deleted and the doc now points at nothing — fix the doc (or restore the identifier) in the same commit.',
+        });
+      }
+
+      const tplKeys = [...new Set(Object.values(templates).flatMap(t => Object.keys(t)))];
+      // Scope the check to README's Templates section, and require each key as
+      // inline code — a key that happens to appear as an ordinary English word
+      // elsewhere in the file must not count as documented.
+      const readmeSections = sources['README.md'].split(/^## /m);
+      const templatesSection = readmeSections.find(s => s.startsWith('Templates')) || '';
+      const undocumented = tplKeys.filter(k => !templatesSection.includes('`' + k + '`'));
       fixtures.push({
-        label: docs.join(' + ') + ' -> ' + needle,
-        check: () => src.includes(needle),
-        description: 'The doc anchor must occur at least once in index.html. A FAIL means the identifier was renamed or deleted and the doc now points at nothing — fix the doc (or restore the identifier) in the same commit.',
+        label: 'README documents every key used by the templates map'
+          + (undocumented.length ? ' — undocumented: ' + undocumented.join(', ') : ''),
+        check: () => undocumented.length === 0,
+        description: 'The schema list under README\'s Templates section must name every key present on any brand entry as inline code. Adding a key to a brand without documenting it turns this row red. Keys are read from the live `templates` object, so this cannot go stale.',
       });
+
+      renderPredicateFixtures(anchorSection, fixtures);
+    } catch (err) {
+      renderPredicateFixtures(anchorSection, [{
+        label: 'Build the anchor-drift fixtures',
+        check() { return false; },
+        description: 'Row-building threw before any fixtures rendered (' + String((err && err.message) || err) + '). This is a bug in the guard itself, not a doc drift.',
+      }], 'FAIL — guard crashed while building rows');
     }
-
-    const tplKeys = [...new Set(Object.values(templates).flatMap(t => Object.keys(t)))];
-    // Scope the check to README's Templates section, and require each key as
-    // inline code — a key that happens to appear as an ordinary English word
-    // elsewhere in the file must not count as documented.
-    const readmeSections = sources['README.md'].split(/^## /m);
-    const templatesSection = readmeSections.find(s => s.startsWith('Templates')) || '';
-    const undocumented = tplKeys.filter(k => !templatesSection.includes('`' + k + '`'));
-    fixtures.push({
-      label: 'README documents every key used by the templates map'
-        + (undocumented.length ? ' — undocumented: ' + undocumented.join(', ') : ''),
-      check: () => undocumented.length === 0,
-      description: 'The schema list under README\'s Templates section must name every key present on any brand entry as inline code. Adding a key to a brand without documenting it turns this row red. Keys are read from the live `templates` object, so this cannot go stale.',
-    });
-
-    renderPredicateFixtures(anchorSection, fixtures);
   })();
 }
 
