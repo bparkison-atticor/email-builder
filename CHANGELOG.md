@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-18 — New tenant: Lerner and Rowe
+
+### Added
+- **Lerner and Rowe brand template** (`lernerRowe`). The SendGrid-hosted logo (536x193, normalized from `http://` to `https://` to avoid mixed-content blocking) ships with no baked-in whitespace, so the banner uses the `bannerHtml` pattern (like Keches lead outreach) — a padded div wrapping the centered logo at 322px (~1.66x source density) on the default white banner background. CTA in the sampled logo yellow `#FFF200` with black button text (white would fail contrast on yellow), shared microcopy/unsubscribe defaults, and the standard retained-client disclosure block with the firm's Phoenix address (2701 E Camelback Rd, Suite 140, Phoenix, AZ 85016). No new brand-config keys.
+
 ## 2026-08-13 — CTA microcopy centers under the button
 
 ### Fixed
