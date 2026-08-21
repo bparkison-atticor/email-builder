@@ -172,6 +172,9 @@
   }
   /* Compact variant — microcopy is one or two sentences, not body copy. */
   .rich-editor-wrap.compact .ql-editor { min-height: 64px; }
+  /* buildMicrocopyBlock always compiles microcopy with align: 'center' —
+     the compose field must show the same alignment the output ships with. */
+  #ctaMicrocopy .ql-editor { text-align: center; }
   .preview-panel {
     display: flex;
     flex-direction: column;
@@ -3357,6 +3360,13 @@ function renderTestHarness() {
       label: '#ctaMicrocopy lives inside #ctaBody — the CTA collapse hides it for free',
       check() { return els.ctaBody.contains(document.getElementById('ctaMicrocopy')); },
       description: 'Microcopy must be a descendant of #ctaBody so onCtaToggle\'s existing .collapsed class hides it without any toggle-factory change.',
+    },
+    {
+      label: 'CTA microcopy compose field previews its own centered alignment',
+      check() {
+        return getComputedStyle(document.querySelector('#ctaMicrocopy .ql-editor')).textAlign === 'center';
+      },
+      description: 'buildMicrocopyBlock always passes align: \'center\' to richTextToMjText; the compose field must match so the marketer sees what will ship.',
     },
     {
       label: '#ctaBody.scrollHeight stays under the .seg-body collapse-animation ceiling',
