@@ -47,6 +47,18 @@
         "TASK-039"
       ],
       "idea": "SPRINT-008-proposal"
+    },
+    "TASK-041": {
+      "status": "ready",
+      "depends_on": [],
+      "idea": "SPRINT-009-proposal"
+    },
+    "TASK-042": {
+      "status": "ready",
+      "depends_on": [
+        "TASK-035"
+      ],
+      "idea": "SPRINT-009-proposal"
     }
   }
 }
