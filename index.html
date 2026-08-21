@@ -2492,7 +2492,8 @@ function renderTestHarness() {
     body.appendChild(row);
   }
 
-  // Shared row renderer for the predicate-shaped harness sections (7-10).
+  // Shared row renderer for harness sections whose fixtures are
+  // `{ label, check(), description }` (predicate-shaped rows).
   // A fixture is { label, check(), description }; check() is called inside
   // a try/catch so a throwing predicate renders as FAIL rather than
   // aborting the whole harness. New predicate sections should call this.
