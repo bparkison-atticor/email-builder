@@ -990,17 +990,10 @@ Handlebars.registerHelper('blockHelperMissing', function (context, options) {
 
 // ============================================================
 // TEMPLATE CONFIGS — edit brand assets here.
-//   bannerImageUrl     — publicly hosted image URL (CDN / SendGrid)
-//   bannerHref         — optional; wraps banner in a clickable link
-//   ctaBackgroundColor — brand hex, used for CTA button fill
-//   ctaTextColor       — usually #ffffff
-//   unsubscribeHtml    — standalone unsubscribe link (rendered as its own block,
-//                        matches SendGrid's template pattern). Use {{{unsubscribe}}}.
-//   disclosureHtml     — legal/compliance copy (address, dynamic fields, etc.)
-//   ctaMicrocopyFontSize — mj-text font-size for the CTA's supporting sentence;
-//                        shared default DEFAULT_CTA_MICROCOPY_FONT_SIZE ('13px').
-//   ctaMicrocopyColor  — mj-text color for the CTA's supporting sentence;
-//                        shared default DEFAULT_CTA_MICROCOPY_COLOR ('#6b6b6b').
+// Brand entry schema is documented in README.md's "Templates" section;
+// every key on any entry must appear there (enforced by the harness's
+// Documentation anchor drift guard, Section 16). Do not duplicate the
+// key list here — it drifts.
 // ============================================================
 const DEFAULT_UNSUBSCRIBE = `<a href="{{{unsubscribe}}}" style="color:#6b6b6b;text-decoration:underline;">Unsubscribe</a>`;
 
