@@ -3450,7 +3450,7 @@ function renderTestHarness() {
       });
       for (const needle of found) {
         if (!seen.has(needle)) seen.set(needle, []);
-        seen.get(needle).push(doc);
+        if (!seen.get(needle).includes(doc)) seen.get(needle).push(doc);
       }
     }
 
