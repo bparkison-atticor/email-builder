@@ -2513,7 +2513,7 @@ function renderTestHarness() {
           '<span class="harness-badge">' + (pass ? 'PASS' : 'FAIL') + '</span>' +
         '</div>' +
         '<div class="harness-field"><strong>Description:</strong> <code>' + escapeHtml(fixture.description) + '</code></div>' +
-        '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : failText) + '</code></div>';
+        '<div class="harness-field"><strong>Result:</strong> <code>' + (pass ? 'PASS' : escapeHtml(failText)) + '</code></div>';
       body.appendChild(row);
     }
   }
