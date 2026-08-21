@@ -2769,8 +2769,8 @@ function renderTestHarness() {
   renderPredicateFixtures(body, OUTLOOK_DARK_FIXTURES);
 
   // --- Section 10: dark-mode preview transforms — Apple Mail + author-CSS drift guard (TASK-023) ---
-  // Same predicate-fixture shape and row renderer as Sections 8/9. Fixture
-  // 7 (the drift guard) is the highest-value regression lock in this
+  // Same predicate-fixture shape and row renderer as Sections 8/9. The
+  // drift-guard fixture is the highest-value regression lock in this
   // section: it must stay in the harness for the life of the feature —
   // it is the mechanism that turns a silent premise violation (the
   // compiler starting to emit dark-mode CSS) into a loud, named failure.
