@@ -3004,13 +3004,16 @@ function renderTestHarness() {
         try {
           if (!savedOn) switchEl.click();
           picker.querySelector('button[data-dm="applemail"]').click();
-          return darkNote.textContent === DARK_MODE_CLIENT_NOTES.applemail && darkNote.hidden === false;
+          const onApple = darkNote.textContent === DARK_MODE_CLIENT_NOTES.applemail && darkNote.hidden === false;
+          picker.querySelector('button[data-dm="outlook"]').click();
+          const onOutlook = darkNote.textContent === DARK_MODE_CLIENT_NOTES.outlook;
+          return onApple && onOutlook;
         } finally {
           savedBtn.click();
           if (switchEl.classList.contains('on') !== savedOn) switchEl.click();
         }
       },
-      description: 'The previous fixture calls syncDarkNote() itself, so deleting the syncDarkNote() call from the wireSegControl callback (index.html ~4183) would leave it green while the caption feature is dead. This fixture drives the real #darkClientControl button click — the same event the app wires — and goes red if that call site is ever removed. Mirrors Section 11\'s live-click save/click/restore idiom; wireSegControl re-applies .active/aria-pressed on every click, so clicking the saved button is a complete restore.',
+      description: 'The previous fixture calls syncDarkNote() itself, so deleting the syncDarkNote() call from the wireSegControl callback (the picker-click branch inside the dark-mode block) would leave it green while the caption feature is dead. This fixture drives the real #darkClientControl button click — the same event the app wires — and goes red if that call site is ever removed. Mirrors Section 11\'s live-click save/click/restore idiom; wireSegControl re-applies .active/aria-pressed on every click, so clicking the saved button is a complete restore.',
     },
   ];
 
