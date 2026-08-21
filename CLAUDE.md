@@ -32,6 +32,8 @@ Email Builder is a single-file browser app (`index.html`) that compiles MJML tem
 
 - **Library errors must be humanized before display.** Never show raw exception messages from Handlebars, MJML, or other CDN libraries to the user. Use a named function (following the `humanizeTemplateError` pattern in `index.html` — grep `function humanizeTemplateError`) that pattern-matches known error shapes and returns plain-English action-oriented messages. Line numbers that refer to compiled HTML the marketer never sees must be stripped. Compiler tokens (`CLOSE_BLOCK`, `EOF`, `ID`) must be translated to concrete instructions.
 
+- **Behavior changes ship with their docs, in the same commit.** If a change alters a shared helper's signature, adds or removes a UI control, or changes what reads/writes `localStorage`, it must also add a dated CHANGELOG.md entry and correct the affected ARCHITECTURE.md bullet (*Major Components / Layers* or *Data Model*). The Ctrl+Shift+T anchor-drift guard will not catch stale prose — see "Documentation Conventions" in [CODE-PATTERNS.md](CODE-PATTERNS.md).
+
 _`/sf:compound` will append sprint-derived learnings to this section over
 time. Keep entries terse — detailed implementation patterns belong in
 `CODE-PATTERNS.md`, not here._
