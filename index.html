@@ -3401,8 +3401,8 @@ function renderTestHarness() {
   // quoted here would match itself and pass forever regardless of the
   // real code. That is the FIND-SPRINT-007-7 vacuous-pass trap, and it
   // is why every needle below is captured from the fetched markdown.
-  const ANCHOR_DOCS = ['README.md', 'CODE-PATTERNS.md', 'ARCHITECTURE.md', 'CLAUDE.md'];
   const ANCHOR_FLOORS = { 'README.md': 2, 'CODE-PATTERNS.md': 18, 'ARCHITECTURE.md': 2, 'CLAUDE.md': 1 };
+  const ANCHOR_DOCS = Object.keys(ANCHOR_FLOORS);
 
   const h16 = document.createElement('h3');
   h16.style.cssText = 'margin:12px 0 4px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)';
