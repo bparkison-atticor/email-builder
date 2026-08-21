@@ -3463,12 +3463,17 @@ function renderTestHarness() {
     }
 
     const tplKeys = [...new Set(Object.values(templates).flatMap(t => Object.keys(t)))];
-    const undocumented = tplKeys.filter(k => !sources['README.md'].includes(k));
+    // Scope the check to README's Templates section, and require each key as
+    // inline code — a key that happens to appear as an ordinary English word
+    // elsewhere in the file must not count as documented.
+    const readmeSections = sources['README.md'].split(/^## /m);
+    const templatesSection = readmeSections.find(s => s.startsWith('Templates')) || '';
+    const undocumented = tplKeys.filter(k => !templatesSection.includes('`' + k + '`'));
     fixtures.push({
       label: 'README documents every key used by the templates map'
         + (undocumented.length ? ' — undocumented: ' + undocumented.join(', ') : ''),
       check: () => undocumented.length === 0,
-      description: 'The schema list under README\'s Templates section must name every key present on any brand entry. Adding a key to a brand without documenting it turns this row red. Keys are read from the live `templates` object, so this cannot go stale.',
+      description: 'The schema list under README\'s Templates section must name every key present on any brand entry as inline code. Adding a key to a brand without documenting it turns this row red. Keys are read from the live `templates` object, so this cannot go stale.',
     });
 
     renderPredicateFixtures(anchorSection, fixtures);
