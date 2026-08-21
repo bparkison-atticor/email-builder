@@ -2905,12 +2905,13 @@ function renderTestHarness() {
       check() {
         const kids = Array.from(document.querySelector('.preview-header-left').children);
         const at = (pred) => kids.findIndex(pred);
-        const vp = at(el => !!el.querySelector && !!el.querySelector('button[data-vp]'));
+        const vp = at(el => el.querySelector('button[data-vp]'));
         const td = at(el => el.classList.contains('module-toggle') && el.textContent.includes('Test data'));
         const dm = at(el => el.id === 'darkModeSwitch');
         const pk = at(el => el.id === 'darkClientControl');
         const toggles = kids.filter(el => el.classList.contains('module-toggle')).length;
-        return vp === 0 && vp < td && td < dm && dm < pk && toggles === 2;
+        const dividers = kids.filter(el => el.classList.contains('divider')).length;
+        return vp === 0 && vp < td && td < dm && dm < pk && toggles === 2 && dividers === 2;
       },
       description: 'The container is runtime-extended and order-dependent (see the HTML comment on its static trailing divider). This fixture is the executable form of that contract — a static child added to the markup would land at index 0 and fail it.',
     },
